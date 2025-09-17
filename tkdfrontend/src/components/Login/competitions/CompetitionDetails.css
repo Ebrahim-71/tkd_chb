@@ -1,0 +1,397 @@
+/* --- CompetitionDetails.css --- */
+:root {
+  --cd-bg: #fafafa;
+  --cd-card: #ffffff;
+  --cd-text: #1f2937;
+  --cd-muted: #6b7280;
+  --cd-border: #e5e7eb;
+  --cd-primary: #2563eb;      /* آبی */
+  --cd-secondary: #7c3aed;    /* بنفش */
+  --cd-success: #059669;      /* سبز */
+  --cd-danger: #ef4444;       /* قرمز */
+  --cd-shadow: 0 10px 24px rgba(0,0,0,.06);
+  --cd-radius: 16px;
+
+  /* افکت هاور (پاپ ملایم) */
+  --cd-ease: cubic-bezier(.2,.8,.2,1);
+  --cd-card-hover-scale: 1.03;
+  --cd-card-hover-lift: -4px;
+  --cd-shadow-card-hover: 0 16px 32px rgba(0,0,0,.14);
+
+  --cd-chip-bg-hover: #e9eaee;
+  --cd-chip-hover-lift: -2px;
+  --cd-shadow-chip-hover: 0 6px 14px rgba(0,0,0,.12);
+  --cd-border-hover: #d1d5db;
+}
+
+.cd-container {
+  max-width: 1100px;
+  margin: 24px auto 80px;
+  padding: 0 16px;
+  color: var(--cd-text);
+}
+
+.cd-skeleton,
+.cd-error {
+  background: var(--cd-card);
+  border: 1px solid var(--cd-border);
+  border-radius: var(--cd-radius);
+  padding: 18px;
+  box-shadow: var(--cd-shadow);
+}
+.cd-error { color: var(--cd-danger); font-weight: 600; }
+.cd-muted { color: var(--cd-muted); }
+
+/* ========== هدر ========== */
+.cd-hero {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 16px;
+  background: var(--cd-card);
+  border: 1px solid var(--cd-border);
+  border-radius: var(--cd-radius);
+  padding: 16px;
+  box-shadow: var(--cd-shadow);
+  align-items: center;
+}
+.cd-hero.small { grid-template-columns: 1fr; text-align: center; }
+.cd-poster {
+  width: 100%;
+  height: 240px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid var(--cd-border);
+  background: #f6f6f6;
+}
+.cd-hero-body { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.cd-title { margin: 0; font-size: 20px; line-height: 1.4; font-weight: 800; }
+
+/* چیپ‌ها */
+.cd-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.cd-chip {
+  background: #f3f4f6;
+  border: 1px solid var(--cd-border);
+  color: var(--cd-text);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 160ms var(--cd-ease),
+              box-shadow 160ms var(--cd-ease),
+              background-color 160ms var(--cd-ease),
+              border-color 160ms var(--cd-ease);
+  will-change: transform;
+}
+.cd-chip:hover,
+.cd-chip:focus-visible{
+  transform: translateY(var(--cd-chip-hover-lift));
+  border-color: var(--cd-border-hover);
+  box-shadow: var(--cd-shadow-chip-hover);
+}
+.cd-chip:not(.ok):not(.nok):hover,
+.cd-chip:not(.ok):not(.nok):focus-visible{ background: var(--cd-chip-bg-hover); }
+.cd-chip.ok {
+  background: rgba(5,150,105,.08);
+  border-color: rgba(5,150,105,.25);
+  color: var(--cd-success);
+}
+.cd-chip.nok { background: #f3f4f6; color: var(--cd-muted); }
+
+/* ========== سکشن‌ها ========== */
+.cd-section { margin-top: 22px; }
+.cd-section-title { font-size: 16px; margin: 12px 0; font-weight: 800; }
+
+.cd-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  background: var(--cd-card);
+  border: 1px solid var(--cd-border);
+  border-radius: var(--cd-radius);
+  padding: 12px;
+  box-shadow: var(--cd-shadow);
+}
+.cd-row{
+  display:grid; grid-template-columns:180px 1fr; align-items:center; gap:10px;
+  background:#fff; border:1px dashed #c0c0c0; border-radius:12px; padding:10px 12px;
+}
+.cd-row-multi .cd-value { white-space: pre-wrap; }
+.cd-label { color: var(--cd-muted); font-size: 13px; }
+.cd-value { font-size: 14px; }
+
+/* ========== زمین‌ها / اوزان ========== */
+.cd-mats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.cd-mat-card {
+  background: var(--cd-card);
+  border: 1px solid var(--cd-border);
+  border-radius: var(--cd-radius);
+  box-shadow: var(--cd-shadow);
+  overflow: hidden; cursor: pointer; transform: translateZ(0);
+  transition: transform 180ms var(--cd-ease), box-shadow 180ms var(--cd-ease);
+  will-change: transform;
+}
+.cd-mat-card:hover,
+.cd-mat-card:focus-within{
+  transform: translateY(var(--cd-card-hover-lift)) scale(var(--cd-card-hover-scale));
+  box-shadow: var(--cd-shadow-card-hover);
+}
+.cd-mat-header {
+  padding: 10px 12px; font-weight: 700; border-bottom: 1px solid var(--cd-border);
+  background: #f8fafc;
+}
+.cd-weight-list { list-style: none; padding: 10px 12px; margin: 0; }
+.cd-weight-list li {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 8px 0; border-bottom: 1px dashed var(--cd-border);
+}
+.cd-weight-list li:last-child { border-bottom: 0; }
+.cd-weight-name { font-weight: 600; }
+.cd-weight-range { color: var(--cd-muted); font-size: 13px; }
+
+/* ========== پیوست‌ها (گالری + فایل‌ها) ========== */
+.cd-attachments-wrap { display: grid; gap: 16px; }
+.cd-attachments-block {
+  background: var(--cd-card);
+  border: 1px solid var(--cd-border);
+  border-radius: var(--cd-radius);
+  box-shadow: var(--cd-shadow);
+  padding: 12px;
+}
+.cd-block-head { display:flex; align-items:center; gap:8px; font-weight:800; margin-bottom:10px; }
+.cd-count { background:#eef2ff; color:#4338ca; padding:2px 8px; border-radius:999px; font-size:12px; }
+.cd-empty { padding: 10px 0; }
+
+.cd-attachments { display:grid; gap:10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+
+/* آیتم تصویر (button) */
+.cd-attachment.img{
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  border:1px solid var(--cd-border); border-radius:12px; padding:10px; background:#fff; cursor:pointer;
+}
+.cd-thumb{
+  width:100%; height:160px; object-fit:cover; border-radius:8px;
+  border:1px solid var(--cd-border); background:#f3f4f6;
+}
+
+/* آیتم فایل */
+.cd-attachment.file{
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+  border:1px solid var(--cd-border); border-radius:12px; padding:10px; background:#fff;
+}
+.cd-file-body{ display:flex; align-items:center; gap:10px; min-width:0; }
+.cd-file-icon{ font-size:20px; }
+.cd-file-name{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:320px; }
+.cd-file-actions{ display:flex; gap:8px; }
+
+/* ========== مودال‌ها ========== */
+.cd-modal{
+  position:fixed; inset:0; background:rgba(0,0,0,.55);
+  display:grid; place-items:center; z-index:1000; padding:20px;
+}
+.cd-modal-inner{
+  position:relative; width:min(1000px, 96vw); height:min(80vh, 90vh);
+  background:#000; border-radius:14px; overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+.cd-modal-inner--white{ background:#fff; color:var(--cd-text); }
+.cd-modal-media{ width:100%; height:100%; display:block; border:0; object-fit:contain; background:#cacaca; }
+
+/* مودال فشرده‌ی کد مربی */
+.cd-modal-inner--tiny{
+  position:relative; width:min(380px, 80vw); height:auto; max-height:85vh;
+  background:#fff; color:var(--cd-text); border-radius:16px; overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.18); padding:16px 16px 20px;
+}
+.cd-modal-close{
+  position:absolute; top:8px; left:8px;
+  background:#fff; border:1px solid var(--cd-border);
+  border-radius:10px; padding:6px 10px; cursor:pointer; z-index:2;
+}
+.cd-modal-inner--tiny .cd-section-title{ font-size:16px; margin:0 0 8px 0; font-weight:800; }
+
+/* نمایش کد */
+.cd-code-box{
+  background:#f8fafc; border:1px solid var(--cd-border); border-radius:12px;
+  padding:10px 12px; text-align:center; font-weight:800; letter-spacing:2px; margin:12px 0;
+}
+.cd-code-box--small{ font-size:1.8rem; }
+.cd-code-actions{ display:flex; justify-content:center; gap:8px; margin-top:6px; }
+.cd-modal-inner--tiny .btn{ padding:6px 12px; font-size:.92rem; min-width:auto; }
+
+/* ===== Actions bar ===== */
+.cd-actions{
+  display:flex; justify-content:space-between; align-items:center;
+  gap:10px; margin-top:20px;
+}
+.cd-actions-right{ display:flex; gap:10px; flex-wrap:wrap; }
+.cd-actions-left{ display:flex; gap:10px; }
+
+/* ===== Buttons – clean & flat ===== */
+.btn{
+  --h:40px;
+  height:var(--h);
+  padding:0 16px;
+  border-radius:12px;
+  border:1px solid #e5e7eb;
+  background:#fff;
+  color:#111827;
+  font-weight:700;
+  font-size:14px;
+  cursor:pointer;
+  transition:transform .12s cubic-bezier(.2,.8,.2,1),
+             box-shadow .15s cubic-bezier(.2,.8,.2,1),
+             background-color .15s, border-color .15s, filter .15s;
+  box-shadow:0 2px 6px rgba(0,0,0,.06);
+}
+.btn:hover:not(:disabled){
+  transform:translateY(-1px);
+  box-shadow:0 4px 12px rgba(0,0,0,.10);
+}
+.btn:active:not(:disabled){ transform:translateY(0); filter:brightness(.98); }
+.btn:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px rgba(37,99,235,.20);
+}
+
+/* sizes */
+.btn-sm{ --h:34px; padding:0 12px; font-size:13px; border-radius:10px; }
+.btn-lg{ --h:44px; padding:0 18px; font-size:15px; }
+.btn-pill{ border-radius:999px; }
+
+/* variants */
+.btn-primary{
+  background:#2563eb !important;
+  border-color:#2563eb !important;
+  color:#fff; /* اصلاح متن */
+  box-shadow:0 3px 10px rgba(37,99,235,.15);
+}
+.btn-primary:hover:not(:disabled){
+  filter:brightness(1.05) !important;
+  box-shadow:0 5px 14px rgba(37,99,235,.22)!important;
+}
+.btn-secondary{
+  background:#7c3aed !important;
+  border-color:#7c3aed !important;
+  color:#fff;
+  box-shadow:0 3px 10px rgba(124,58,237,.15);
+}
+.btn-secondary:hover:not(:disabled){
+  filter:brightness(1.05)!important;
+  box-shadow:0 5px 14px rgba(124,58,237,.22)!important;
+}
+.btn-outline{
+    background: #4f46e5!important;
+    color: #fff!important;
+    border-color: #4f46e5!important;
+    
+}
+.btn-outline:hover:not(:disabled){
+  background:#f8fafc;
+  border-color:#94a3b8;
+}
+.btn-ghost{
+  background:#f8fafc;
+  border-color:#e5e7eb;
+  color:#374151;
+}
+.btn-ghost:hover:not(:disabled){ background:#eef2f7; }
+.btn-light{
+  background:#fff;
+  border-color:#e5e7eb;
+  color:#111827;
+}
+.btn-light:hover:not(:disabled){ background:#f9fafb; }
+
+/* آیکن داخل دکمه‌ها */
+.btn .icon{ margin-left:8px; font-size:1.1em; line-height:0; }
+
+/* disabled */
+.btn:disabled{
+  opacity:.55; cursor:not-allowed; transform:none !important;
+  box-shadow:none; filter:grayscale(.2);
+}
+
+/* گروه دکمه‌ها */
+.btn-group{ display:flex; gap:10px; flex-wrap:wrap; }
+
+/* mobile full-width buttons */
+@media(max-width:640px){
+  .cd-actions{ flex-direction:column; align-items:stretch; }
+  .cd-actions-right, .cd-actions-left{ width:100%; }
+  .btn{ width:100%; }
+}
+
+/* ========== فرم: ورودی‌ها و راهنما ========== */
+.cd-input,
+.cd-row .cd-value > input,
+.cd-row .cd-value > select,
+.cd-row .cd-value > textarea{
+  width:92%; min-width:0; height:40px;
+  border:1px solid var(--cd-border); border-radius:10px; padding:0 12px;
+  background:#fff; font-size:14px;
+}
+.cd-input:focus,
+.cd-row .cd-value > input:focus,
+.cd-row .cd-value > select:focus,
+.cd-row .cd-value > textarea:focus{
+  outline:none; border-color:var(--cd-primary);
+  box-shadow:0 0 0 3px rgba(37,99,235,.12);
+}
+
+/* حالت خطا */
+.cd-input[aria-invalid="true"]{
+  border-color:var(--cd-danger);
+  box-shadow:0 0 0 3px rgba(239,68,68,.12);
+}
+
+/* غیرفعال */
+.cd-input[disabled],
+.cd-row .cd-value > input[disabled]{ background:#f9fafb; color:var(--cd-muted); }
+
+/* متن راهنما */
+.cd-hint{ margin-top:6px; font-size:11px; color:var(--cd-muted); }
+
+/* چک‌باکس تایید اطلاعات */
+.cd-checkbox{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; }
+.cd-checkbox input{ width:18px; height:18px; }
+
+/* واکنش‌گرا: در موبایل هر ردیف یک ستون شود */
+@media (max-width:560px){ .cd-row{ grid-template-columns:1fr; } }
+
+/* چک‌باکسِ تمام‌عرض در ردیف */
+.cd-row > .cd-checkbox{
+  grid-column:1 / -1; display:inline-flex; align-items:center; gap:8px; padding:6px 2px;
+}
+.cd-row > .cd-checkbox input{ width:18px; height:18px; }
+.cd-row > .cd-checkbox span{ font-size:14px; line-height:1.9; }
+
+/* ===== Print: فقط محتوای اصلی ===== */
+@media print{
+  .dashboard-container{ display:block !important; }
+  .dashboard-container > :not(.dashboard-main){ display:none !important; }
+  .dashboard-main > :not(#print-root):not(.cd-container){ display:none !important; }
+  .cd-actions, .toggle-sidebar-btn, nav, header, footer{ display:none !important; }
+}
+
+/* ===== Dark mode ===== */
+@media (prefers-color-scheme: dark){
+  :root{
+    --cd-card:#0f1220;
+    --cd-text:#e5e7eb;
+    --cd-muted:#9aa2b2;
+    --cd-border:#1f2233;
+  }
+  .btn{
+    background:#0f172a;
+    border-color:#1f2a44;
+    color:#e5e7eb;
+    box-shadow:0 2px 8px rgba(0,0,0,.45);
+  }
+  .btn-outline, .btn-ghost, .btn-light{
+    background:#0b1222;
+    border-color:#1f2a44;
+    color:#e5e7eb;
+  }
+  .btn-primary{ background:#2563eb; border-color:#2563eb; color:#fff; }
+  .btn-secondary{ background:#7c3aed; border-color:#7c3aed; color:#fff; }
+}

@@ -1,0 +1,36 @@
+# Python / Django
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+.env
+.env.*
+venv/
+staticfiles/
+media/
+
+# Node / React
+node_modules/
+build/
+dist/
+*.map
+
+# Binaries & Archives
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.mp4
+*.avi
+*.psd
+*.ai
+*.exe
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+tkdworld/

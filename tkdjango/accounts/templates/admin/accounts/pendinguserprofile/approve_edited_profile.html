@@ -1,0 +1,28 @@
+{% extends "admin/change_form.html" %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <style>
+    .approve-btn { background-color: red; color: white; padding: 8px 14px; border-radius: 5px; text-decoration: none; display: inline-block; font-weight: bold; margin: 10px 0; }
+    a:link, a:visited { color: #000000; text-decoration: none; transition: color 0.15s, background 0.15s; }
+    .approve-btn:hover { background-color: #218838; }
+  </style>
+{% endblock %}
+
+{% block submit_buttons_top %}
+  {{ block.super }}
+  {% if original %}
+    <a class="approve-btn" href="{% url 'accounts:approve_edited_profile' original.pk %}">
+       تایید و انتقال به کاربران اصلی
+    </a>
+  {% endif %}
+{% endblock %}
+
+{% block after_related_objects %}
+  {{ block.super }}
+  {% if original %}
+    <a class="approve-btn" href="{% url 'accounts:approve_edited_profile' original.pk %}">
+      تایید و انتقال به کاربران اصلی
+    </a>
+  {% endif %}
+{% endblock %}

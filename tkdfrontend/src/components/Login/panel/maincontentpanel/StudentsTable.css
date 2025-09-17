@@ -1,0 +1,216 @@
+.students-table {
+  padding: 2rem;
+  background-color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  font-family: 'IRANSans', sans-serif;
+}
+
+.students-title {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  color: #333;
+}
+
+.students-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  justify-content: center;
+}
+
+.students-filters select,
+.students-filters .date-input,
+.students-filters .search-input {
+   padding: 0.6rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background-color: #f9f9f9;
+  min-width: 180px;
+}
+
+.students-table-container {
+  width: 100%;
+  overflow-x: hidden !important;
+  border-radius: 8px;
+  padding: 5px;
+}
+
+/* Scrollbar زیبا */
+.students-table-container::-webkit-scrollbar {
+  height: 6px;
+}
+.students-table-container::-webkit-scrollbar-thumb {
+  background-color: #999;
+  border-radius: 3px;
+}
+.students-table-container::-webkit-scrollbar-track {
+  background-color: #f1f1f1;
+}
+
+/* ساختار جدول دسکتاپ */
+.students-table-header,
+.students-table-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  gap: 0.75rem;
+  padding: 0.8rem 1.5rem;
+  align-items: center;
+  min-width: 100%;
+}
+
+.students-table-header {
+  background-color: #004080;
+  color: #fff;
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-radius: 8px 8px 0 0;
+}
+
+.students-table-row {
+  transition: background-color 0.2s ease;
+
+}
+
+.students-table-row.row-light {
+  background-color: #f2f6fa;
+   padding: 5px;
+    height: 45px;
+}
+
+.students-table-row.row-dark {
+      background-color: #e4e7fa;
+    padding: 5px;
+    height: 45px;
+}
+
+.students-table-row:hover {
+  background-color: #d6e4f2;
+}
+
+.students-table-row div,
+.students-table-header div {
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+/* --- ستون‌بندی داینامیک برای تعداد ستون‌های جدید --- */
+/* مقدار پیش‌فرض شما 7 بود؛ ما 3 ستون اضافه کردیم → 9 یا 10 ستون */
+.students-table-header.columns-9,
+.students-table-row.columns-9 {
+  grid-template-columns: repeat(9, minmax(100px, 1fr));
+}
+
+.students-table-header.columns-10,
+.students-table-row.columns-10 {
+  grid-template-columns: repeat(10, minmax(95px, 1fr));
+}
+
+/* اگر جایی در آینده ستون بیشتری شد */
+.students-table-header.columns-11,
+.students-table-row.columns-11 {
+  grid-template-columns: repeat(11, minmax(90px, 1fr));
+}
+.students-table-header.columns-12,
+.students-table-row.columns-12 {
+  grid-template-columns: repeat(12, minmax(85px, 1fr));
+}
+
+/* مدال‌ها: بج‌های ساده و خوانا */
+.medal-badges {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  direction: rtl;
+}
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  line-height: 1.6;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  white-space: nowrap;
+  font-weight: 600;
+}
+.badge-gold   { background: #fff7cc; }
+.badge-silver { background: #eef2f7; }
+.badge-bronze { background: #ffe9d6; }
+
+/* کمی بهینه‌سازی ترازبندی بعضی ستون‌ها */
+.students-table-row div[data-label="مسابقات"],
+.students-table-row div[data-label="رنکینگ"] {
+  font-variant-numeric: tabular-nums;
+}
+
+
+
+@media (max-width: 768px) {
+  .students-table-header {
+    display: none;
+  }
+
+  .students-table-row {
+    display: block;
+    background-color: #f9fbff;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  }
+
+  .students-table-row div {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4rem 0;
+    font-size: 0.95rem;
+    border-bottom: 1px solid #eee;
+  }
+
+  .students-table-row div:last-child {
+    border-bottom: none;
+  }
+
+  .students-table-row div::before {
+    content: attr(data-label);
+    font-weight: bold;
+    color: #444;
+  }
+
+  .students-table-row.columns-6,
+  .students-table-row.columns-7 {
+    grid-template-columns: none !important;
+    min-width: unset !important;
+  }
+
+  .students-filters {
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  .students-filters select,
+  .students-filters .date-input,
+  .students-filters .search-input {
+    width: 100% !important;
+    min-width: unset !important;
+    font-size: 1rem;
+    box-sizing: border-box;
+  }
+
+
+  .students-table-row.columns-9,
+  .students-table-row.columns-10,
+  .students-table-row.columns-11,
+  .students-table-row.columns-12 {
+    display: block !important;
+    grid-template-columns: none !important;
+    min-width: unset !important;
+  }
+
+}
