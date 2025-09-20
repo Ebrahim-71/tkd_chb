@@ -44,12 +44,37 @@ from django.urls import reverse
 from urllib.parse import urlencode
 
 
+
+
+
+from competitions.services.numbering_service import (
+    number_matches_for_competition, clear_match_numbers_for_competition,
+)
+
 # -------------------------------------------------------------------
 # تنظیمات و کمک‌تابع‌ها
 # -------------------------------------------------------------------
 
 ELIGIBLE_STATUSES = ("paid", "confirmed", "accepted", "completed")
 
+# competitions/admin.py (پایین فایل)
+
+class MatchNumberingEntry(KyorugiCompetition):
+    class Meta:
+        proxy = True
+        verbose_name = "شماره‌گذاری بازی‌ها"
+        verbose_name_plural = "شماره‌گذاری بازی‌ها"
+
+@admin.register(MatchNumberingEntry)
+class MatchNumberingEntryAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request): return False
+    def has_change_permission(self, request, obj=None): return False
+    def has_delete_permission(self, request, obj=None): return False
+
+    def changelist_view(self, request, extra_context=None):
+        from django.shortcuts import redirect
+        from django.urls import reverse
+        return redirect(reverse("admin:competitions_match_numbering"))
 
 def _to_greg(v):
     """jdatetime.date -> datetime.date (Gregorian) یا همان ورودی در غیر این‌صورت."""
@@ -699,6 +724,159 @@ class AnnounceResultsProxyAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         return redirect(reverse("admin:announce-results"))
 
+
+
+
+
+# ---------- فرم صفحه شماره‌گذاری ----------
+class MatchNumberingForm(forms.Form):
+    competition = forms.ModelChoiceField(
+        label="مسابقه",
+        queryset=KyorugiCompetition.objects.order_by("-competition_date", "-id"),
+        required=True,
+    )
+    weights = forms.ModelMultipleChoiceField(
+        label="اوزانی که قرعه‌کشی شده‌اند",
+        queryset=WeightCategory.objects.none(),
+        required=True,
+        help_text="فقط اوزانی را انتخاب کن که برایشان قرعه ساخته‌ای."
+    )
+    reset_old = forms.BooleanField(label="پاک کردن شماره‌های قبلی", required=False, initial=True)
+    do_apply  = forms.BooleanField(label="اعمال شماره‌گذاری", required=False, initial=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        comp = None
+        # تلاش از data -> initial
+        comp_id = self.data.get("competition") or self.initial.get("competition")
+        if comp_id:
+            try:
+                comp = KyorugiCompetition.objects.get(pk=comp_id)
+            except KyorugiCompetition.DoesNotExist:
+                comp = None
+
+        # وزن‌های مجاز از روی تخصیص زمین + جنسیت مسابقه
+        wc_qs = WeightCategory.objects.none()
+        if comp:
+            allowed_ids = list(comp.mat_assignments.values_list("weights__id", flat=True))
+            wc_qs = WeightCategory.objects.filter(id__in=allowed_ids, gender=comp.gender).order_by("min_weight")
+        self.fields["weights"].queryset = wc_qs
+
+
+# ---------- View ادمین ----------
+# ---------- View ادمین ----------
+def numbering_view(request):
+    """/admin/competitions/numbering/"""
+    form = MatchNumberingForm(request.POST or request.GET or None)
+
+    ctx = {**admin.site.each_context(request)}
+    ctx.update({"title": "شماره‌گذاری بازی‌ها", "form": form, "mats_map": None, "brackets": []})
+
+    if not form.is_valid():
+        return TemplateResponse(request, "admin/competitions/match_numbering.html", ctx)
+
+    comp: KyorugiCompetition = form.cleaned_data["competition"]
+    weights_qs = form.cleaned_data["weights"]
+    weight_ids = list(weights_qs.values_list("id", flat=True))
+    reset_old = form.cleaned_data.get("reset_old") or False
+    do_apply  = form.cleaned_data.get("do_apply")  or False
+
+    # اگر فقط پاک‌سازی خواستی و اعمال نزدی
+    if reset_old and not do_apply:
+        clear_match_numbers_for_competition(comp.id, weight_ids)
+        messages.warning(request, "شماره‌های قبلی پاک شد.")
+
+    # اعمال شماره‌گذاری
+    if do_apply:
+        try:
+            number_matches_for_competition(comp.id, weight_ids, clear_prev=reset_old)
+            messages.success(request, "شماره‌گذاری با موفقیت انجام شد.")
+        except Exception as e:
+            messages.error(request, f"خطا در شماره‌گذاری: {e}")
+
+    # نقشهٔ وزن→زمین برای نمایش بالای صفحه
+    mats_map = []
+    for ma in comp.mat_assignments.all().prefetch_related("weights"):
+        ws = [w.name for w in ma.weights.filter(id__in=weight_ids).order_by("min_weight")]
+        if ws:
+            mats_map.append((ma.mat_number, ws))
+    ctx["mats_map"] = mats_map
+
+    # ساخت دادهٔ براکت‌ها
+    draws = (
+        Draw.objects
+        .filter(competition=comp, weight_category_id__in=weight_ids)
+        .select_related("belt_group", "weight_category")
+        .order_by("weight_category__min_weight", "id")
+    )
+
+    brackets = []
+    for dr in draws:
+        # همه‌ی مسابقه‌ها
+        ms = (
+            Match.objects
+            .filter(draw=dr)
+            .select_related("player_a", "player_b")
+            .order_by("round_no", "slot_a", "id")
+        )
+
+        matches_json = []
+        for m in ms:
+            matches_json.append({
+                "id": m.id,
+                "round_no": m.round_no,
+                "slot_a": m.slot_a,
+                "slot_b": m.slot_b,
+                "is_bye": bool(m.is_bye),
+                "player_a": (getattr(m.player_a, "full_name", None)
+                             or f"{getattr(m.player_a,'first_name','')} {getattr(m.player_a,'last_name','')}".strip()
+                             or ""),
+                "player_b": (getattr(m.player_b, "full_name", None)
+                             or f"{getattr(m.player_b,'first_name','')} {getattr(m.player_b,'last_name','')}".strip()
+                             or ""),
+                "match_number": m.match_number,  # کلید درست
+            })
+
+        # زمین مرتبط با این وزن (همیشه مقداردهی کن حتی اگر None باشد)
+        mat_no = None
+        for ma in comp.mat_assignments.all().prefetch_related("weights"):
+            if ma.weights.filter(id=dr.weight_category_id).exists():
+                mat_no = ma.mat_number
+                break
+
+        brackets.append({
+            "title": comp.title,
+            "belt": getattr(dr.belt_group, "label", "—"),
+            "weight": getattr(dr.weight_category, "name", "—"),
+            "mat_no": mat_no,
+            "date_j": _to_jalali_str(comp.competition_date),
+            "size": getattr(dr, "size", 0) or 0,
+            # حتما JSON رشته‌ای بده تا در تمپلیت سالم پارس شود
+            "matches_json": json.dumps(matches_json, ensure_ascii=False),
+        })
+
+    ctx["brackets"] = brackets
+    ctx["board_logo_url"] = getattr(settings, "BOARD_LOGO_URL", None)
+    return TemplateResponse(request, "admin/competitions/match_numbering.html", ctx)
+
+
+
+# ---------- ثبت URL در ادمین ----------
+def _inject_numbering_url(get_urls_fn):
+    def wrapper():
+        urls = get_urls_fn()
+        extra = [
+            path(
+                "competitions/numbering/",
+                admin.site.admin_view(numbering_view),
+                name="competitions_match_numbering",
+            )
+        ]
+        return extra + urls
+    return wrapper
+
+admin.site.get_urls = _inject_numbering_url(admin.site.get_urls)
 
 
 #-------------------------------------------------------------سمینار----------------------------------------------------------------------------

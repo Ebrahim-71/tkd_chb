@@ -47,7 +47,7 @@
     }
     .card .hd .left{
       display:flex; flex-wrap:nowrap; gap:8px; align-items:center;
-      transform:scale(var(--hdrScale)); transform-origin:right center;   /* یک‌خطی با اسکیل خودکار */
+      transform:scale(var(--hdrScale)); transform-origin:right center;
     }
     .pill{ background:#eef2ff; border:1px solid #dbe1ff; padding:4px 10px; border-radius:999px; font-size:12px; white-space:nowrap; color:#4338ca; }
     .card .hd .brand-logo{ height:56px; width:auto; object-fit:contain; flex-shrink:0; }
@@ -361,6 +361,7 @@
       }
     }
 
+    /* --- حالت تک‌نفره: همه مسیرها استراحت و بدون شماره --- */
     function detectSinglePlayerName(matches){
       const s = new Set();
       for (const m of matches){
@@ -372,13 +373,33 @@
 
     function fillSinglePathAllTheWay(wrap, name, mapRound, firstInfo){
       if (!name || !firstInfo || !firstInfo.r) return;
+
+      // پیدا کردن جفت بازیکن در راند اول
       let i = 0;
       for (let idx=0; idx<firstInfo.count; idx++){
         const a = wrap.querySelector(`input.player-input[data-r="${firstInfo.vr}"][data-i="${idx}"][data-pos="a"]`);
         const b = wrap.querySelector(`input.player-input[data-r="${firstInfo.vr}"][data-i="${idx}"][data-pos="b"]`);
         if (a?.value.trim()===name || b?.value.trim()===name){ i = idx; break; }
       }
-      let r = firstRoundInfo.r || firstInfo.r;
+
+      // راند اول: همه «استراحت»؛ جفت بازیکن: یک طرف بازیکن / طرف مقابل استراحت
+      for (let idx=0; idx<firstInfo.count; idx++){
+        const a = wrap.querySelector(`input.player-input[data-r="${firstInfo.vr}"][data-i="${idx}"][data-pos="a"]`);
+        const b = wrap.querySelector(`input.player-input[data-r="${firstInfo.vr}"][data-i="${idx}"][data-pos="b"]`);
+        const n = wrap.querySelector(`input.bubble[data-r="${firstInfo.vr}"][data-i="${idx}"][data-num]`);
+        if (idx === i){
+          const aIs = a?.value.trim()===name;
+          if (aIs){ if (b){ b.value="استراحت"; b.classList.add('bye'); } }
+          else { if (a){ a.value="استراحت"; a.classList.add('bye'); } if (b){ b.value=name; b.classList.remove('bye'); } }
+        }else{
+          if (a){ a.value="استراحت"; a.classList.add('bye'); }
+          if (b){ b.value="استراحت"; b.classList.add('bye'); }
+        }
+        if (n){ n.classList.add('bye-mark'); n.value=""; n.title="استراحت"; }
+      }
+
+      // از همان شاخه، نام را تا فینال بالا ببر؛ همه حباب‌ها بدون شماره
+      let r = firstInfo.r;
       while (true){
         const vr = mapRound(r);
         const a = wrap.querySelector(`input.player-input[data-r="${vr}"][data-i="${i}"][data-pos="a"]`);
@@ -386,22 +407,23 @@
         const n = wrap.querySelector(`input.bubble[data-r="${vr}"][data-i="${i}"][data-num]`);
         if (!a || !b) break;
 
-        if (vr === firstInfo.vr){
-          if (a.value.trim()===name) put(b, "استراحت");
-          else if (b.value.trim()===name) put(a, "استراحت");
-          else { put(a, name); put(b, "استراحت"); }
-          if (n){ n.classList.add('bye-mark'); n.value=""; n.title="استراحت"; }
-        }
+        if (!a.value || a.value==="استراحت"){ a.value=name; a.classList.remove('bye'); b.value="استراحت"; b.classList.add('bye'); }
+        else { b.value="استراحت"; b.classList.add('bye'); }
+        if (n){ n.classList.add('bye-mark'); n.value=""; n.title="استراحت"; }
 
         const nextVr = mapRound(r+1);
         if (!wrap.querySelector(`input.player-input[data-r="${nextVr}"]`)) break;
+
         const nextI = Math.floor(i/2);
         const nextPos = (i % 2 === 0) ? 'a' : 'b';
         const nxt = wrap.querySelector(`input.player-input[data-r="${nextVr}"][data-i="${nextI}"][data-pos="${nextPos}"]`);
-        if (nxt) put(nxt, name);
+        const nxtOpp = wrap.querySelector(`input.player-input[data-r="${nextVr}"][data-i="${nextI}"][data-pos="${nextPos==='a'?'b':'a'}"]`);
+        if (nxt){ nxt.value = name; nxt.classList.remove('bye'); nxt.title = name; }
+        if (nxtOpp){ nxtOpp.value = "استراحت"; nxtOpp.classList.add('bye'); }
 
         i = nextI; r += 1;
       }
+
       const champ = wrap.querySelector('.r6 .champ .player-input');
       if (champ){ champ.value = `🏆  ${name}`; champ.title = name; }
     }
@@ -534,7 +556,7 @@
     /* ====== اجرا ====== */
     document.querySelectorAll('.bracket-wrap').forEach(applyDataAndFit);
     fitAllHeaders();
-    setTimeout(()=>{ fitAllHeaders();snapshotAll(); }, 160);
+    setTimeout(()=>{ fitAllHeaders(); snapshotAll(); }, 160);
     let t; window.addEventListener('resize', ()=>{ clearTimeout(t); t=setTimeout(()=>{ refitAll(); fitAllHeaders(); }, 120); });
   })();
   </script>

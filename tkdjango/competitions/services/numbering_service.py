@@ -4,7 +4,7 @@ from typing import Iterable, Dict, List, Set
 from django.db import transaction
 
 from competitions.models import KyorugiCompetition, Draw, Match
-
+from django.db.models import Q
 
 class NumberingError(Exception):
     pass
@@ -87,7 +87,22 @@ def _ensure_rounds_exist(draw: Draw) -> None:
                 Match.objects.bulk_create(bulk)
 
 
+def _real_players_count(draw: Draw) -> int:
+
+    ids = set()
+    for a_id, b_id in (Match.objects
+                       .filter(draw=draw)
+                       .values_list("player_a_id", "player_b_id")):
+        if a_id: ids.add(a_id)
+        if b_id: ids.add(b_id)
+    return len(ids)
+
 def _has_real_match(draw: Draw) -> bool:
+    """
+    قبلی را دقیق‌تر می‌کنیم: تا وقتی حداقل دو بازیکن نداشته باشیم، «بازی واقعی» نداریم.
+    """
+    if _real_players_count(draw) < 2:
+        return False
     fr = _first_round_no(draw)
     if fr is None:
         return False
@@ -95,7 +110,6 @@ def _has_real_match(draw: Draw) -> bool:
         Match.objects.filter(draw=draw).exclude(round_no=fr).exists()
         or Match.objects.filter(draw=draw, round_no=fr, is_bye=False).exists()
     )
-
 
 @transaction.atomic
 def number_matches_for_competition(
@@ -168,6 +182,7 @@ def number_matches_for_competition(
     all_rounds: List[int] = sorted(all_rounds_set)
 
     # ------------- فاز ۱: همهٔ راندها به‌جز فینال‌ها -------------
+    # ------------- فاز ۱: همهٔ راندها به‌جز فینال‌ها -------------
     for rnd in all_rounds:
         for mat_no in sorted(counters.keys()):
             for dr in drs_by_mat.get(mat_no, []):  # حفظ ترتیب وزن‌ها
@@ -178,12 +193,15 @@ def number_matches_for_competition(
                 if lr is not None and rnd == lr:
                     continue
 
+                # 👈 اضافه کن: آیا این قرعه عملاً تک‌نفره است؟
+                is_single = (_real_players_count(dr) < 2)
+
                 for m in _matches_in_round(dr, rnd):
                     # فقط در راند اول قرعه، بای شماره نگیرد
                     if rnd == fr and m.is_bye:
                         continue
-                    # از راند دوم به بعد، بای ممنوع
-                    if fr is not None and rnd > fr and m.is_bye:
+                    # از راند دوم به بعد، بای را فقط وقتی تبدیل به بازی واقعی کن که قرعه تک‌نفره نباشد
+                    if fr is not None and rnd > fr and m.is_bye and not is_single:
                         m.is_bye = False
 
                     counters[mat_no] += 1

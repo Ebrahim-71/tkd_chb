@@ -5,12 +5,14 @@ from django.conf.urls.static import static
 from accounts.views import mini_profile
 # project/urls.py
 urlpatterns = [
+    path("admin/reports/", include("reports.urls")),
     path('admin/', admin.site.urls),
     path('api/auth/', include(('accounts.urls','accounts'), namespace='accounts')),
     path('api/competitions/', include('competitions.urls', namespace='competitions')),
     path("api/payments/", include("payments.urls", namespace="payments")),
     path('api/', include(('main.urls','main'), namespace='main')),
     path("api/auth/profile/mini/", mini_profile, name="profile-mini"),
+
 ]
 
 if settings.DEBUG:

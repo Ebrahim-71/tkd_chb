@@ -31,10 +31,11 @@ INSTALLED_APPS = [
     'django.contrib.humanize',
     'django_jalali',
     'main',
+    'reports',
     'django_extensions',
     'rest_framework',
     'accounts',
-'competitions',
+    'competitions',
     'payments',
 
 ]
