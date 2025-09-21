@@ -152,3 +152,5 @@ class BoardStudentsForm(forms.Form):
         bqs = get_board_qs()                         # ← جدید
         if bqs is not None:
             self.fields["board"].queryset = bqs      # ← جدید
+
+
