@@ -44,7 +44,7 @@ _COMMON_ATTRS = {
 }
 
 # -------------------------------
-# فرم بازه تاریخ (برای سایر گزارش‌ها)
+# فرم بازه تاریخ (برای سایر گزارش‌ها)  [بدون تغییر]
 # -------------------------------
 class DateRangeForm(forms.Form):
     if _USE_JALALI:
@@ -81,10 +81,8 @@ class DateRangeForm(forms.Form):
 
 
 # -------------------------------
-# فرم شاگردان مربی (بدون جستجوی تاریخ تولد)
+# فرم شاگردان مربی (بدون DOB)  [بدون تغییر]
 # -------------------------------
-from .services import list_coaches_qs, get_club_qs, get_belt_choices
-
 class CoachStudentsForm(forms.Form):
     coach = forms.ModelChoiceField(queryset=None, required=False, label="مربی")
     belt  = forms.ChoiceField(
@@ -94,24 +92,24 @@ class CoachStudentsForm(forms.Form):
     club  = forms.ModelChoiceField(queryset=None, required=False, label="باشگاه")
     national_code = forms.CharField(required=False, label="کدملی")
 
-    # ⛔️ فیلدهای dob_start/dob_end حذف شدند (طبق خواسته)
-
     def __init__(self,*a,**kw):
         super().__init__(*a,**kw)
-        # coach و club از queryset تغذیه می‌شوند
         self.fields["coach"].queryset = list_coaches_qs()
         cqs = get_club_qs()
         if cqs is not None:
             self.fields["club"].queryset = cqs
-#-*-*-*-**-*-*-*-*-*-**-*--*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
 
+
+# -------------------------------
+# فرم شاگردان باشگاه  [بدون تغییر]
+# -------------------------------
 class ClubStudentsForm(forms.Form):
-    club  = forms.ModelChoiceField(queryset=None, required=False, label="باشگاه")  # انتخاب اصلی
+    club  = forms.ModelChoiceField(queryset=None, required=False, label="باشگاه")
     belt  = forms.ChoiceField(
         choices=[('', 'همهٔ کمربندها')] + get_belt_choices(),
         required=False, label="کمربند"
     )
-    coach = forms.ModelChoiceField(queryset=None, required=False, label="مربی")    # ← فیلتر جایگزین
+    coach = forms.ModelChoiceField(queryset=None, required=False, label="مربی")
     national_code = forms.CharField(required=False, label="کدملی")
 
     class Media:
@@ -126,11 +124,11 @@ class ClubStudentsForm(forms.Form):
         self.fields["coach"].queryset = list_coaches_qs()
 
 
-
-
-
+# -------------------------------
+# فرم شاگردان هیئت  [بدون تغییر]
+# -------------------------------
 class BoardStudentsForm(forms.Form):
-    board = forms.ModelChoiceField(queryset=None, required=False, label="هیئت")     # ← جدید
+    board = forms.ModelChoiceField(queryset=None, required=False, label="هیئت")
     coach = forms.ModelChoiceField(queryset=None, required=False, label="مربی")
     club  = forms.ModelChoiceField(queryset=None, required=False, label="باشگاه")
     belt  = forms.ChoiceField(
@@ -149,8 +147,34 @@ class BoardStudentsForm(forms.Form):
         cqs = get_club_qs()
         if cqs is not None:
             self.fields["club"].queryset = cqs
-        bqs = get_board_qs()                         # ← جدید
+        bqs = get_board_qs()
         if bqs is not None:
-            self.fields["board"].queryset = bqs      # ← جدید
+            self.fields["board"].queryset = bqs
 
 
+# -------------------------------
+# فرم «مربی و داور هیئت‌ها»  ← جدید
+# -------------------------------
+class BoardCoachesRefereesForm(forms.Form):
+    ROLE_CHOICES = (
+        ("", "هر دو نقش"),
+        ("coach", "فقط مربی"),
+        ("referee", "فقط داور"),
+    )
+    board = forms.ModelChoiceField(queryset=None, required=False, label="هیئت")
+    role  = forms.ChoiceField(choices=ROLE_CHOICES, required=False, label="نقش")
+    club  = forms.ModelChoiceField(queryset=None, required=False, label="باشگاه")
+    national_code = forms.CharField(required=False, label="کدملی")
+
+    class Media:
+        css = {"all": JALALI_CSS}
+        js  = JALALI_JS
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        bqs = get_board_qs()
+        if bqs is not None:
+            self.fields["board"].queryset = bqs
+        cqs = get_club_qs()
+        if cqs is not None:
+            self.fields["club"].queryset = cqs
