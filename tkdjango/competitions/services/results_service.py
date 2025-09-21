@@ -5,7 +5,7 @@ from django.db.models import Sum, F, Count, Case, When, Value
 from competitions.models import KyorugiResult, RankingTransaction, Enrollment
 from accounts.models import UserProfile, TkdClub, TkdBoard
 
-PLAYER_POINTS = {1: 4.0, 2: 3.0, 3: 2.0}
+PLAYER_POINTS = {1: 7.0, 2: 3.0, 3: 1.0}
 COACH_POINTS  = {"gold": 1.0,  "silver": 0.75, "bronze": 0.5}
 ORG_POINTS    = {"gold": 0.75, "silver": 0.5,  "bronze": 0.25}
 

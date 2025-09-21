@@ -7,11 +7,12 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 
+from .forms import DateRangeForm, CoachStudentsForm, ClubStudentsForm, BoardStudentsForm
 
 from . import services
 
-from .forms import DateRangeForm, CoachStudentsForm, ClubStudentsForm
 
+# tkdjango/reports/views.py
 
 def _admin_ctx(request):
     return admin.site.each_context(request)
@@ -38,13 +39,13 @@ def center(request):
     return render(request, "admin/reports/center.html", ctx)
 
 
-# داخل users_report:
+
 @staff_member_required
 def users_report(request):
     form, start, end = _daterange_from_form(request)
     data = services.users_summary(start, end)
 
-    # --- شاگردان اساتید (موجود) ---
+    # --- شاگردان اساتید ---
     coach_form = CoachStudentsForm(request.GET or None, prefix="cs")
     students = None
     coach_display = None
@@ -65,9 +66,8 @@ def users_report(request):
         else:
             students = {"rows": []}
 
-    # --- شاگردان باشگاه‌ها (جدید) ---
-    club_form  = ClubStudentsForm(request.GET or None,  prefix="cl")
-
+    # --- شاگردان باشگاه‌ها ---
+    club_form  = ClubStudentsForm(request.GET or None, prefix="cl")
     club_students = None
     club_display = None
     if request.GET.get("show_club_students") == "1":
@@ -87,17 +87,48 @@ def users_report(request):
         else:
             club_students = {"rows": []}
 
+    # --- شاگردان هیئت‌ها (جدید) ---
+    board_form = BoardStudentsForm(request.GET or None, prefix="bd")
+    board_students = None
+    board_display = None
+    if request.GET.get("show_board_students") == "1":
+        if board_form.is_valid():
+            cd = board_form.cleaned_data
+            board = cd.get("board")
+            belt  = cd.get("belt")
+            coach = cd.get("coach")
+            club  = cd.get("club")
+            ncode = cd.get("national_code")
+            board_display = str(board) if board else None
+
+            board_students = services.board_students(
+                board_id      = board.id if board else None,
+                belt_id       = belt,
+                coach_id      = coach.id if coach else None,
+                club_id       = getattr(club, "id", None) if club else None,
+                national_code = ncode or None,
+            )
+        else:
+            board_students = {"rows": []}
+
     ctx = {
         "form": form,
         "data": data,
+
         "coach_form": coach_form,
         "students": students,
         "coach_display": coach_display,
+
         "club_form": club_form,
         "club_students": club_students,
         "club_display": club_display,
+
+        "board_form": board_form,
+        "board_students": board_students,
+        "board_display": board_display,
     }
     return render(request, "admin/reports/users.html", ctx)
+
 @staff_member_required
 def competitions_report(request):
     form, s, e = _daterange_from_form(request)

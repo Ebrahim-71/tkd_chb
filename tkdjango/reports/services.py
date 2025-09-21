@@ -859,3 +859,197 @@ def club_students(club_id, belt_id=None, coach_id=None, national_code=None):
             "national_code": national_code,
         },
     }
+
+
+# tkdjango/reports/services.py
+
+# tkdjango/reports/services.py
+
+def get_board_qs():
+    try:
+        from accounts.models import TkdBoard
+        return TkdBoard.objects.all()
+    except Exception:
+        pass
+    try:
+        from accounts.models import Board
+        return Board.objects.all()
+    except Exception:
+        pass
+    return None
+
+
+def _clubs_qs_for_board(board_id):
+    """
+    همه‌ی باشگاه‌های زیرمجموعه‌ی یک هیئت را برمی‌گرداند، بدون فرض نام دقیق فیلد.
+    """
+    try:
+        from accounts.models import TkdClub as _Club
+    except Exception:
+        try:
+            from accounts.models import Club as _Club
+        except Exception:
+            return None
+
+    # فهرست نام‌های محتمل فیلد ارجاع به هیئت (FK یا M2M)
+    cand_fk = ["board", "tkd_board", "federation_board", "province_board", "hyat", "heyat"]
+    cand_m2m = ["boards", "tkd_boards", "related_boards"]
+
+    q = None
+    # FK ها
+    for name in cand_fk:
+        if _field_exists(_Club, name):
+            return _Club.objects.filter(**{f"{name}_id": board_id})
+    # M2M ها
+    for name in cand_m2m:
+        try:
+            fld = _Club._meta.get_field(name)
+            if getattr(fld, "many_to_many", False):
+                return _Club.objects.filter(**{f"{name}__id": board_id})
+        except Exception:
+            continue
+
+    # هیچ فیلدی پیدا نشد
+    return None
+
+def board_students(board_id=None, belt_id=None, coach_id=None, club_id=None, national_code=None):
+    """
+    لیست شاگردان زیرمجموعه‌ی یک هیئت:
+      - اگر club_id داده شود، از همان باشگاه فیلتر می‌کنیم؛
+        وگرنه از هیئت → باشگاه‌ها استخراج می‌کنیم.
+    """
+    from accounts.models import UserProfile
+
+    if not (board_id or club_id):
+        return {"rows": [], "filters_applied": {
+            "board_id": None, "club_id": club_id, "belt_id": belt_id,
+            "coach_id": coach_id, "national_code": national_code
+        }}
+
+    # 1) مبنا: اعضای باشگاه(ها)
+    base_qs = UserProfile.objects.all()
+
+    # اگر باشگاه مشخص شده، همان را بگیر؛ وگرنه همه‌ی باشگاه‌های هیئت را پیدا کن
+    club_ids = None
+    if club_id:
+        club_ids = [club_id]
+    else:
+        cqs = _clubs_qs_for_board(board_id)
+        if cqs is not None:
+            club_ids = list(cqs.values_list("id", flat=True))
+
+    if club_ids:
+        if _field_exists(UserProfile, "club"):
+            base_qs = base_qs.filter(club_id__in=club_ids)
+        else:
+            # fallback اگر club مستقیم تو پروفایل نیست
+            try:
+                base_qs = base_qs.filter(club__id__in=club_ids)
+            except Exception:
+                # اگر رابطه‌ی دیگری بین پروفایل و باشگاه دارید، اینجا اضافه‌اش کنید
+                base_qs = UserProfile.objects.none()
+    else:
+        # اگر به هر دلیلی باشگاهی پیدا نشد، هیچ نتیجه‌ای نده
+        base_qs = UserProfile.objects.none()
+
+    # 2) فقط بازیکن‌ها
+    if _field_exists(UserProfile, ROLE_FIELD_NAME):
+        role_q = Q()
+        for v in ROLE_VALUES["player"]:
+            role_q |= Q(**{f"{ROLE_FIELD_NAME}__iexact": v})
+        base_qs = base_qs.filter(role_q)
+    elif _field_exists(UserProfile, "is_player"):
+        base_qs = base_qs.filter(is_player=True)
+
+    # 3) فیلتر کمربند
+    base_qs = _apply_belt_filter(base_qs, UserProfile, belt_id)
+
+    # 4) فیلتر مربی (اختیاری)
+    if coach_id:
+        cq = Q()
+        for name in ("coach", "coach_user", "teacher", "mentor", "master", "main_coach", "head_coach"):
+            if _field_exists(UserProfile, name):
+                cq |= Q(**{f"{name}_id": coach_id})
+        if cq:
+            base_qs = base_qs.filter(cq)
+
+    # 5) فیلتر کدملی
+    if national_code:
+        for cand in ("national_code", "nid", "national_id"):
+            if _field_exists(UserProfile, cand):
+                base_qs = base_qs.filter(**{f"{cand}__iexact": national_code})
+                break
+
+    players = list(base_qs)
+
+    # شمارش مسابقات و … (مثل بقیه سرویس‌ها)
+    EnrollmentModel = None
+    try:
+        from competitions.models import Enrollment as _E
+        EnrollmentModel = _E
+    except Exception:
+        pass
+
+    def _count_competitions(pid):
+        if not EnrollmentModel:
+            return 0
+        pf = next((c for c in ("player","athlete","user","profile") if _field_exists(EnrollmentModel, c)), None)
+        if not pf:
+            return 0
+        return EnrollmentModel.objects.filter(**{f"{pf}_id": pid}).count()
+
+    rows = []
+    for p in players:
+        fname = getattr(p, "first_name", "") or ""
+        lname = getattr(p, "last_name", "") or ""
+        full_name = (fname + " " + lname).strip() or getattr(p, "name", "") or str(p)
+        belt_val = _belt_text(p)
+        nid = next((getattr(p, cand) for cand in ("national_code","nid","national_id") if getattr(p, cand, None)), "")
+
+        # coach_name برای جدول
+        coach_name = ""
+        for cfield in ("coach","coach_user","teacher","mentor","master","main_coach","head_coach"):
+            if hasattr(p, cfield) and getattr(p, cfield, None):
+                cobj = getattr(p, cfield)
+                cf = getattr(cobj, "first_name", "") or ""
+                cl = getattr(cobj, "last_name", "") or ""
+                coach_name = (cf + " " + cl).strip() or getattr(cobj, "coach_name", "") or str(cobj)
+                if coach_name:
+                    break
+
+        birth_str = ""; birth_jalali = ""
+        for dob_field in ("birth_date","date_of_birth","dob","birthdate","birthday","dateBirth","datebirth","birth"):
+            if hasattr(p, dob_field):
+                _dv = getattr(p, dob_field)
+                if hasattr(_dv, "strftime"):
+                    birth_str = _dv.strftime("%Y-%m-%d")
+                elif _dv:
+                    birth_str = str(_dv)
+                break
+
+        comp_cnt = _count_competitions(p.id)
+        g, s, b = _medals_for_player(p.id)
+        r_comp, r_total = _rankings_for_player(p.id)
+
+        rows.append({
+            "full_name": full_name,
+            "belt": belt_val,
+            "national_code": nid,
+            "coach_name": coach_name,
+            "birth_date": birth_str,
+            "birth_date_jalali": birth_jalali,
+            "competitions": comp_cnt,
+            "medal_gold": g, "medal_silver": s, "medal_bronze": b,
+            "rank_comp": r_comp, "rank_total": r_total,
+        })
+
+    return {
+        "rows": rows,
+        "filters_applied": {
+            "board_id": board_id,
+            "club_id": club_id,
+            "belt_id": getattr(belt_id, "id", belt_id),
+            "coach_id": coach_id,
+            "national_code": national_code,
+        },
+    }

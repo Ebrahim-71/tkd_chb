@@ -2,6 +2,8 @@
 from django import forms
 import datetime as _dt
 
+from .services import list_coaches_qs, get_club_qs, get_belt_choices, get_board_qs
+
 # --- پشتیبانی اختیاری از تاریخ جلالی برای فرم‌های بازه تاریخ (گزارش‌ها) ---
 try:
     from django_jalali import forms as jforms
@@ -102,7 +104,6 @@ class CoachStudentsForm(forms.Form):
         if cqs is not None:
             self.fields["club"].queryset = cqs
 #-*-*-*-**-*-*-*-*-*-**-*--*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
-from .services import list_coaches_qs, get_club_qs, get_belt_choices
 
 class ClubStudentsForm(forms.Form):
     club  = forms.ModelChoiceField(queryset=None, required=False, label="باشگاه")  # انتخاب اصلی
@@ -123,3 +124,31 @@ class ClubStudentsForm(forms.Form):
         if cqs is not None:
             self.fields["club"].queryset = cqs
         self.fields["coach"].queryset = list_coaches_qs()
+
+
+
+
+
+class BoardStudentsForm(forms.Form):
+    board = forms.ModelChoiceField(queryset=None, required=False, label="هیئت")     # ← جدید
+    coach = forms.ModelChoiceField(queryset=None, required=False, label="مربی")
+    club  = forms.ModelChoiceField(queryset=None, required=False, label="باشگاه")
+    belt  = forms.ChoiceField(
+        choices=[('', 'همهٔ کمربندها')] + get_belt_choices(),
+        required=False, label="کمربند"
+    )
+    national_code = forms.CharField(required=False, label="کدملی")
+
+    class Media:
+        css = {"all": JALALI_CSS}
+        js  = JALALI_JS
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["coach"].queryset = list_coaches_qs()
+        cqs = get_club_qs()
+        if cqs is not None:
+            self.fields["club"].queryset = cqs
+        bqs = get_board_qs()                         # ← جدید
+        if bqs is not None:
+            self.fields["board"].queryset = bqs      # ← جدید

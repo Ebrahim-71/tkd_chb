@@ -1,25 +1,35 @@
-{# admin/reports/_coach_students_print.html — PRINT PARTIAL #}
+{# admin/reports/_coach_students_print.html #}
 <style>
-  .cs-print{ font-family:Tahoma, Vazirmatn, Arial, sans-serif; }
-  .cs-print h2{ margin:0 0 8px; font-weight:700; font-size:16px; }
-  .cs-print .sub{ margin:0 0 10px; color:#475569; font-size:12px; }
-  .cs-print .num{ font-variant-numeric:tabular-nums; direction:ltr; }
-  .cs-print table{ width:100%; border-collapse:collapse; table-layout:fixed; font-size:11px; }
-  .cs-print th, .cs-print td{
-    border:1px solid #dfe3e8; padding:4px 6px; text-align:center;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  }
-  .cs-print thead th{ background:#f3f4f6; }
+  /* صفحه و شروع از بالا */
+  @page { size: A4 landscape; margin: 8mm; }
+  html, body { margin: 0; padding: 0; background: #fff; }
 
-  /* عرض‌های پیشنهادی برای 11 ستون (جمع=100%) */
+  /* تایپوگرافی و ظرف اصلی */
+  .cs-print{ font-family: Tahoma, Vazirmatn, Arial, sans-serif; margin: 0; }
+  .cs-print h2{ margin: 0 0 6px; font-weight: 700; font-size: 16px; }
+  .cs-print .sub{ margin: 0 0 8px; color: #475569; font-size: 12px; }
+  .cs-print .num{ font-variant-numeric: tabular-nums; direction: ltr; }
+
+  /* جدول */
+  .cs-print table{ width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+  .cs-print th, .cs-print td{
+    border: 1px solid #dfe3e8; padding: 4px 6px; text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cs-print thead th{ background: #f3f4f6; }
+
+  /* تکرار هدر و جلوگیری از شکست ردیف‌ها */
+  .cs-print thead{ display: table-header-group; }
+  .cs-print tfoot{ display: table-footer-group; }
+  .cs-print tr{ page-break-inside: avoid; }
+
+  /* دقیقاً هر ۲۵ سطر یک شکست صفحه (به‌جز آخرین) */
+  .cs-print tbody tr:nth-child(30n):not(:last-child){ page-break-after: always; }
+
+  /* عرض‌های پیشنهادی (جمع ≈ 100%) */
   .w-name{width:22%} .w-belt{width:8%} .w-ncode{width:12%} .w-club{width:14%}
   .w-dob{width:10%} .w-cnt{width:6%} .w-g{width:6%} .w-s{width:6%} .w-b{width:6%}
   .w-rcomp{width:5%} .w-rtot{width:5%}
-
-  /* تکرار thead و جلوگیری از شکستن ردیف‌ها در چاپ */
-  .cs-print thead{ display:table-header-group; }
-  .cs-print tfoot{ display:table-footer-group; }
-  .cs-print tr{ page-break-inside:avoid; }
 </style>
 
 <div class="cs-print">
@@ -63,8 +73,4 @@
     </tbody>
   </table>
 
-  <div style="margin-top:6px;font-size:11px;color:#475569">
-    تاریخ چاپ: <span class="num">{{ now|date:"Y/m/d H:i" }}</span>
-    — تعداد ردیف: <span class="num">{{ rows|length }}</span>
-  </div>
 </div>

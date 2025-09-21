@@ -7,10 +7,17 @@
   {{ form.media.css }}{{ coach_form.media.css }}{{ club_form.media.css }}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@majidh1/jalalidatepicker@0.6.0/dist/jalali-datepicker.min.css">
   <style>
-    /* خاموش کردن ویجت میلادی ادمین در هر حال */
-    .datetimeshortcuts, .calendarbox { display:none !important; }
-    /* نمایش بهتر ورودی‌های تاریخ شمسی */
-    input.jalali-date-input { direction:ltr; text-align:center; }
+    .datetimeshortcuts,.calendarbox{display:none!important}
+    input.jalali-date-input{direction:ltr;text-align:center}
+
+    /* جدول‌های داخل صفحه (غیر چاپ) */
+    .table-wrap{max-height:62vh;overflow:auto;border:1px solid #e5e7eb;border-radius:14px;margin-top:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    table.report{width:100%;border-collapse:collapse;background:#fff}
+    table.report th,table.report td{border-bottom:1px solid #f1f5f9;padding:10px;text-align:center;white-space:nowrap}
+    table.report thead th{position:sticky;top:0;background:#f8fafc;z-index:1;font-weight:700;color:#374151}
+    table.report tbody tr:nth-child(odd){background:#e5ecff}
+    .badge{display:inline-block;min-width:40px;text-align:center;padding:4px 10px;border-radius:999px;border:1px solid #e5e7eb;background:#fff;font-size:12px}
+    .num{font-variant-numeric:tabular-nums}
   </style>
 {% endblock %}
 
@@ -18,45 +25,71 @@
   {{ form.media.js }}{{ coach_form.media.js }}{{ club_form.media.js }}
   <script src="{% url 'admin:jsi18n' %}"></script>
   <script src="https://cdn.jsdelivr.net/npm/@majidh1/jalalidatepicker@0.6.0/dist/jalali-datepicker.min.js"></script>
+
   <script>
-    // وقتی DOM آماده شد:
-    document.addEventListener('DOMContentLoaded', function(){
-      // فقط start/end عمومی؛ dob_* حذف شد چون دیگر نداریم
-      var sel = 'input[name="start"],input[name="end"],.jalali-date-input';
+    // راه‌اندازی ورودی‌های تاریخ جلالی
+    document.addEventListener('DOMContentLoaded',function(){
+      var sel='input[name="start"],input[name="end"],.jalali-date-input';
       document.querySelectorAll(sel).forEach(function(el){
-        try { el.type = 'text'; } catch(e) {}
+        try{el.type='text'}catch(e){}
         el.classList.add('jalali-date-input');
         el.setAttribute('data-jdp','true');
         el.setAttribute('data-jdp-only-date','true');
         if(!el.getAttribute('data-jdp-min-date')) el.setAttribute('data-jdp-min-date','1330-01-01');
         if(!el.getAttribute('data-jdp-max-date')) el.setAttribute('data-jdp-max-date','1420-12-29');
-        // حذف کلاس‌های ادمین که تقویم میلادی را تریگر می‌کنند:
         el.classList.remove('vDateField','vTimeField','vDateTimeField');
-        // اگر آیکون تقویم میلادی کنارش رندر شده، حذفش کن:
-        var sib = el.nextElementSibling;
-        if (sib && (sib.classList.contains('datetimeshortcuts') || sib.classList.contains('calendarbox'))) {
-          sib.remove();
-        }
+        var sib=el.nextElementSibling;
+        if(sib && (sib.classList.contains('datetimeshortcuts')||sib.classList.contains('calendarbox'))) sib.remove();
       });
-      if (window.jalaliDatepicker && typeof jalaliDatepicker.startWatch === 'function') {
-        jalaliDatepicker.startWatch({
-          selector: '.jalali-date-input',
-          time: false,
-          minDate: '1330-01-01',
-          maxDate: '1420-12-29',
-          topSpace: 6
-        });
+      if(window.jalaliDatepicker && typeof jalaliDatepicker.startWatch==='function'){
+        jalaliDatepicker.startWatch({selector:'.jalali-date-input',time:false,minDate:'1330-01-01',maxDate:'1420-12-29',topSpace:6});
       }
     });
+
+    // تابع چاپ جداگانه: محتوای نسخه چاپی پارشیال را در پنجره تمیز باز و چاپ می‌کند
+    function printPartial(id){
+      var el=document.getElementById(id);
+      if(!el){ alert('بخش چاپ پیدا نشد'); return; }
+      var html = `
+        <!doctype html><html dir="rtl" lang="fa">
+        <head>
+          <meta charset="utf-8">
+          <title>چاپ</title>
+          <style>
+            @page{ size:A4 landscape; margin:8mm; }
+            html,body{ margin:0; padding:0; background:#fff; }
+            *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+          </style>
+        </head>
+        <body>` + el.innerHTML + `</body></html>`;
+      var win = window.open('', '_blank');
+      win.document.open(); win.document.write(html); win.document.close();
+      win.focus(); win.print();
+      setTimeout(function(){ try{ win.close(); }catch(e){} }, 200);
+    }
+
+    // توابع کمکی جستجو (برای پارشیال اساتید اگر از آن استفاده شود)
+    function toEnDigits(s){var fa='۰۱۲۳۴۵۶۷۸۹',en='0123456789',o='';s=String(s||'');for(var i=0;i<s.length;i++){var ch=s[i],idx=fa.indexOf(ch);o+=idx>=0?en[idx]:ch}return o}
+    function normalizeText(str){str=String(str||'').toLowerCase().replace(/\u200c|‌/g,'');str=toEnDigits(str).replace(/[\/.\u2013\u2014\u2212]/g,'-');return str.replace(/\s+/g,' ').trim()}
+    function csFilterRows(){
+      var q=normalizeText(document.getElementById('cs-search')?.value||'');
+      var rows=[...document.querySelectorAll('#cs-table tbody tr')];var vis=0;
+      rows.forEach(function(r){
+        var t=normalizeText(r.innerText);
+        r.querySelectorAll('[data-search]').forEach(function(el){t+=' '+normalizeText(el.getAttribute('data-search')||'')});
+        var show=t.indexOf(q)!==-1; r.style.display=show?'':'none'; if(show) vis++;
+      });
+      var c=document.getElementById('cs-count'); if(c) c.textContent=vis;
+    }
   </script>
 {% endblock %}
 
 {% block content %}
 <div style="direction:rtl">
   <h1>گزارش کاربران</h1>
-
   <p style="margin:8px 0"><a class="button" href="{% url 'reports:center' %}">بازگشت به مرکز گزارش‌گیری</a></p>
 
+  {# کارت‌های خلاصه #}
   <div class="module" style="padding:12px; margin-bottom:12px">
     <style>
       .stats-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
@@ -66,7 +99,6 @@
       .stat-title{font-size:12px;color:#6b7280;margin-bottom:6px}
       .stat-value{font-size:20px;font-weight:700}
       .stat-note{font-size:12px;color:#6b7280;margin-top:6px;line-height:1.7}
-      input.jalali-date{direction:ltr;text-align:center}
     </style>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-title">کل کاربران</div><div class="stat-value">{{ data.summary.total_all }}</div></div>
@@ -89,180 +121,33 @@
 
   {% include "admin/reports/_filter_form.html" %}
 
-  <!-- =================== شاگردان اساتید =================== -->
+  <!-- شاگردان اساتید -->
   <details class="module no-print" style="margin-top:16px; padding:12px" {% if request.GET.show_students == '1' %}open{% endif %}>
     <summary style="cursor:pointer"><h3 style="display:inline">شاگردان اساتید</h3></summary>
-
-    <style>
-      .filters-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:8px}
-      @media(max-width:1100px){.filters-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
-      .filters-grid label{display:block;margin-bottom:4px;color:#4b5563;font-size:12px}
-      .filters-grid input,.filters-grid select{width:91%;height:36px;padding:6px 10px;border:3px solid #e5e7eb;border-radius:10px;background:#fff}
-      .filters-actions{grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-      .filters-actions input[type="search"]{max-width:260px;margin-inline-start:auto}
-      .table-wrap{max-height:62vh;overflow:auto;border:1px solid #e5e7eb;border-radius:14px;margin-top:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-      table.report{width:100%;border-collapse:collapse;background:#fff}
-      table.report th, table.report td{border-bottom:1px solid #f1f5f9;padding:10px;text-align:center;white-space:nowrap}
-      table.report thead th{position:sticky;top:0;background:#f8fafc;z-index:1;font-weight:700;color:#374151}
-      table.report tbody tr:nth-child(odd){background:#e5ecff}
-      table.report tbody tr:hover{background:#f7faff}
-      .badge{display:inline-block;min-width:40px;text-align:center;padding:4px 10px;border-radius:999px;border:1px solid #e5e7eb;background:#fff;font-size:12px}
-      .num{font-variant-numeric:tabular-nums}
-      #cs-table td.col-g{background:#fff7ed}
-      #cs-table td.col-s{background:#f8fafc}
-      #cs-table td.col-b{background:#fff1f2}
-      .table-meta{display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px;font-size:14px;color:#334155}
-      .table-meta b{font-weight:700}
-      /* توجه: هیچ @page در این فایل نباشد؛ پارشیال چاپ مدیریت می‌کند */
-      @media print{
-        body *{visibility:hidden!important}
-        #print-cs, #print-cs *{visibility:visible!important}
-        #print-cs{
-          display:block !important;   /* مهم */
-          position:fixed; inset:0; padding:0; margin:0;
-        }
-        table.report{zoom:1;}
-      }
-    </style>
-
-    <form method="get" class="filters-grid">
-      <input type="hidden" name="show_students" value="1"/>
-      <div><label>مربی</label>{{ coach_form.coach }}</div>
-      <div><label>کمربند</label>{{ coach_form.belt }}</div>
-      <div><label>باشگاه</label>{{ coach_form.club }}</div>
-
-      <div class="filters-actions">
-        <button class="button" type="submit">نمایش</button>
-        <button class="button" type="button" onclick="document.getElementById('cs-search').value='';csFilterRows()">پاک‌سازی جستجو</button>
-        <input id="cs-search" type="search" placeholder="جستجو بر اساس نام و کدملی..." oninput="csFilterRows()">
-      </div>
-    </form>
-
-    {% if students %}
-      <div class="table-meta no-print">
-        <div>شاگردانِ استاد: <b>{{ coach_display|default:"—" }}</b></div>
-        <div>تعداد شاگردها: <b id="cs-count">{{ students.rows|length }}</b></div>
-      </div>
-
-      <div class="table-wrap no-print">
-        <table class="report" id="cs-table">
-          <thead>
-            <tr>
-              <th>نام و نام‌خانوادگی</th><th>کمربند</th><th>کدملی</th><th>باشگاه</th>
-              <th>تاریخ تولد</th><th>تعداد مسابقات</th><th>طلا</th><th>نقره</th><th>برنز</th>
-              <th>رنکینگ مسابقات</th><th>رنکینگ کل</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in students.rows %}
-              <tr>
-                <td style="font-weight:600">{{ row.full_name|default:"-" }}</td>
-                <td><span class="badge">{{ row.belt|default:"-" }}</span></td>
-                <td class="num">{{ row.national_code|default:"-" }}</td>
-                <td>{{ row.club_name|default:"-" }}</td>
-                <td class="num" data-search="{{ row.birth_date }} {% if row.birth_date_jalali %}{{ row.birth_date_jalali }}{% endif %}">
-                  {{ row.birth_date|default:"-" }}
-                </td>
-                <td class="num">{{ row.competitions|default:"0" }}</td>
-                <td class="num col-g">{{ row.medal_gold|default:"0" }}</td>
-                <td class="num col-s">{{ row.medal_silver|default:"0" }}</td>
-                <td class="num col-b">{{ row.medal_bronze|default:"0" }}</td>
-                <td class="num">{{ row.rank_comp|default:"0" }}</td>
-                <td class="num">{{ row.rank_total|default:"0" }}</td>
-              </tr>
-            {% empty %}
-              <tr><td colspan="11">موردی یافت نشد.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <div class="no-print" style="margin-top:12px">
-        <button class="button" onclick="window.print()">چاپ جدول</button>
-      </div>
-
-      <div id="print-cs" style="display:none">
-        {# Landscape از داخل پارشیال چاپ تنظیم می‌شود #}
-        {% include "admin/reports/_coach_students_print.html" with rows=students.rows coach_name=coach_display %}
-      </div>
-    {% endif %}
+    {% include "admin/reports/partials/coach_students.html" %}
   </details>
 
-  <!-- =================== شاگردان باشگاه‌ها =================== -->
+  <!-- شاگردان باشگاه‌ها -->
   <details class="module no-print" style="margin-top:16px; padding:12px" {% if request.GET.show_club_students == '1' %}open{% endif %}>
     <summary style="cursor:pointer"><h3 style="display:inline">شاگردان باشگاه‌ها</h3></summary>
-
     {% include "admin/reports/partials/club_students.html" %}
-    {# این پارشیال قبلاً ساختیم؛ خودش شامل فرم و جدول و JS ایزوله است #}
   </details>
+  <!-- شاگردان هیئت‌ها -->
+<details class="module no-print" style="margin-top:16px; padding:12px" {% if request.GET.show_board_students == '1' %}open{% endif %}>
+  <summary style="cursor:pointer"><h3 style="display:inline">شاگردان هیئت‌ها</h3></summary>
+  {% include "admin/reports/partials/board_students.html" %}
+</details>
+
+  {# نسخه‌های چاپی مخفی (پنجره‌ی چاپ از همین‌ها تغذیه می‌شود) #}
+  {% if students %}
+    <div id="print-cs" style="display:none">
+      {% include "admin/reports/_coach_students_print.html" with rows=students.rows coach_name=coach_display %}
+    </div>
+  {% endif %}
+  {% if club_students %}
+    <div id="print-cl" style="display:none">
+      {% include "admin/reports/_club_students_print.html" with rows=club_students.rows club_name=club_display %}
+    </div>
+  {% endif %}
 </div>
-
-<script>
-  // ابزارک‌های جستجوی فارسی→انگلیسی
-  function toEnDigits(str){
-    if(!str) return "";
-    var fa="۰۱۲۳۴۵۶۷۸۹", en="0123456789", out="";
-    for (var i=0;i<String(str).length;i++){
-      var ch = String(str)[i], idx = fa.indexOf(ch);
-      out += (idx>=0)? en[idx] : ch;
-    }
-    return out;
-  }
-  function normalizeText(str){
-    str = String(str||"").toLowerCase().replace(/\u200c|‌/g,"");
-    str = toEnDigits(str).replace(/[\/.\u2013\u2014\u2212]/g,"-");
-    return str.replace(/\s+/g," ").trim();
-  }
-  // فیلتر جدول «شاگردان اساتید» (ایزوله با پیشوند cs-)
-  function csFilterRows(){
-    var q = normalizeText(document.getElementById('cs-search').value || "");
-    var rows = Array.from(document.querySelectorAll('#cs-table tbody tr'));
-    var visible = 0;
-    rows.forEach(function(r){
-      var t = normalizeText(r.innerText);
-      r.querySelectorAll('[data-search]').forEach(function(el){
-        t += " " + normalizeText(el.getAttribute('data-search') || "");
-      });
-      var show = t.indexOf(q) !== -1;
-      r.style.display = show ? "" : "none";
-      if (show) visible++;
-    });
-    var counter = document.getElementById('cs-count');
-    if (counter) counter.textContent = visible;
-  }
-</script>
-
-<!-- قوانین چاپ سراسری برای نمایش نسخه‌های چاپی -->
-<style>
-  @media print{
-    /* همه‌چیز پنهان */
-    body *{ visibility:hidden !important; }
-
-    /* فقط یکی از نسخه‌های چاپی را باز کن، بسته به پارامترهای URL */
-    {% if request.GET.show_students == '1' %}
-      /* چاپ شاگردان اساتید */
-      #print-cs, #print-cs *{ visibility:visible !important; }
-      #print-cs{
-        display:block !important;
-        position:fixed; inset:0; padding:0; margin:0;
-      }
-    {% endif %}
-
-    {% if request.GET.show_club_students == '1' %}
-      /* چاپ شاگردان باشگاه‌ها */
-      #print-cl, #print-cl *{ visibility:visible !important; }
-      #print-cl{
-        display:block !important;
-        position:fixed; inset:0; padding:0; margin:0;
-      }
-    {% endif %}
-
-    /* Named pages برای جهت چاپ (Landscape) */
-    @page csPage { size: A4 landscape; margin: 8mm; }
-    @page clPage { size: A4 landscape; margin: 8mm; }
-    #print-cs { page: csPage; }
-    #print-cl { page: clPage; }
-  }
-</style>
-
 {% endblock %}

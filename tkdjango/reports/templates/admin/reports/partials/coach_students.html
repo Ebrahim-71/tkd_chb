@@ -1,7 +1,7 @@
 {# templates/admin/reports/partials/coach_students.html #}
 <div id="cs-root">
   <style>
-    /* استایل‌های کلی (بدون استایل چاپ) */
+    /* UI عادی (غیر چاپ) */
     .cs-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:8px}
     @media(max-width:1100px){.cs-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
     .cs-grid label{display:block;margin-bottom:4px;color:#4b5563;font-size:12px}
@@ -14,14 +14,12 @@
     table.cs-table{width:100%;border-collapse:collapse;background:#fff}
     table.cs-table th, table.cs-table td{border-bottom:1px solid #f1f5f9;padding:10px;text-align:center;white-space:nowrap}
     table.cs-table thead th{position:sticky;top:0;background:#f8fafc;z-index:1;font-weight:700;color:#374151}
-    table.cs-table tbody tr:nth-child(odd){background:#e5ecff}
+    table.cs-table tbody tr:nth-child(odd){background:#eef4ff}
     table.cs-table tbody tr:hover{background:#f7faff}
 
     .cs-badge{display:inline-block;min-width:40px;text-align:center;padding:4px 10px;border-radius:999px;border:1px solid #e5e7eb;background:#fff;font-size:12px}
     .cs-num{font-variant-numeric:tabular-nums}
-    .cs-g{background:#fff7ed}
-    .cs-s{background:#f8fafc}
-    .cs-b{background:#fff1f2}
+    .cs-g{background:#fff7ed}.cs-s{background:#f8fafc}.cs-b{background:#fff1f2}
 
     .cs-meta{display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px;font-size:14px;color:#334155}
     .cs-meta b{font-weight:700}
@@ -31,8 +29,8 @@
     #cs-table thead th .cs-sort-ind{font-size:11px;opacity:.7;margin-inline-start:6px}
   </style>
 
-  <!-- فرم فیلتر (بدون تاریخ) -->
-  <form method="get" class="cs-grid">
+  <!-- فیلترها -->
+  <form method="get" class="cs-grid no-print">
     <input type="hidden" name="show_students" value="1"/>
     <div><label>مربی</label>{{ coach_form.coach }}</div>
     <div><label>کمربند</label>{{ coach_form.belt }}</div>
@@ -46,12 +44,12 @@
   </form>
 
   {% if students %}
-    <div class="cs-meta">
+    <div class="cs-meta no-print">
       <div>شاگردانِ استاد: <b>{{ coach_display|default:"—" }}</b></div>
       <div>تعداد شاگردها: <b id="cs-count">{{ students.rows|length }}</b></div>
     </div>
 
-    <div class="cs-wrap">
+    <div class="cs-wrap no-print">
       <table class="cs-table" id="cs-table">
         <thead>
           <tr>
@@ -90,129 +88,83 @@
       </table>
     </div>
 
-    <div style="margin-top:12px">
-      <button class="button" onclick="window.print()">چاپ جدول</button>
+    <!-- دکمه چاپ زیر جدول (فقط نسخه چاپیِ همین پارشیال) -->
+    <div class="no-print" style="margin-top:12px">
+      <button class="button" type="button" onclick="printPartial('cs-print')">چاپ جدول</button>
     </div>
-    {# ظرف چاپی حذف شد؛ چاپ فقط در users.html → #print-cs #}
+
+    <!-- نسخه چاپیِ مخفی: از فایل پرینت اختصاصی استفاده می‌کند -->
+    <div id="cs-print" style="display:none">
+      {% include "admin/reports/_coach_students_print.html" with rows=students.rows coach_name=coach_display %}
+    </div>
   {% endif %}
 </div>
 
-<!-- اسکریپت یکپارچه برای جستجو + سورت -->
+<!-- جستجو + سورت -->
 <script>
 (function(){
-  /* ---------- Helpers ---------- */
   const fa="۰۱۲۳۴۵۶۷۸۹", en="0123456789";
-  const faToEn = s => String(s||"").replace(/[۰-۹]/g, d=> en[fa.indexOf(d)]);
-  const clean  = s => faToEn(String(s||"").toLowerCase()
-    .replace(/\u200c|‌/g,"")
-    .replace(/[\/.\u2013\u2014\u2212]/g,"-")
-    .replace(/\s+/g," ").trim());
+  const faToEn=s=>String(s||"").replace(/[۰-۹]/g,d=>en[fa.indexOf(d)]);
+  const clean=s=>faToEn(String(s||"").toLowerCase()
+                 .replace(/\u200c|‌/g,"")
+                 .replace(/[\/.\u2013\u2014\u2212]/g,"-")
+                 .replace(/\s+/g," ").trim());
 
-  const tbl     = document.getElementById('cs-table');
-  const search  = document.getElementById('cs-search');
-  const clear   = document.getElementById('cs-clear');
-  const counter = document.getElementById('cs-count');
+  const tbl=document.getElementById('cs-table');
+  const search=document.getElementById('cs-search');
+  const clear=document.getElementById('cs-clear');
+  const counter=document.getElementById('cs-count');
   if(!tbl) return;
 
-  const allRows  = Array.from(tbl.querySelectorAll('tbody tr'));
-  const emptyRow = allRows.find(r => r.children.length === 1 || /یافت نشد/.test(r.textContent));
-  const dataRows = emptyRow ? allRows.filter(r=>r!==emptyRow) : allRows;
+  const allRows=[...tbl.querySelectorAll('tbody tr')];
+  const emptyRow=allRows.find(r=>r.children.length===1||/یافت نشد/.test(r.textContent));
+  const dataRows=emptyRow?allRows.filter(r=>r!==emptyRow):allRows;
 
-  dataRows.forEach(r => { r.dataset.cs = clean(r.textContent || r.innerText || ""); r.style.display=""; });
-  if (emptyRow) emptyRow.style.display = dataRows.length ? "none" : "";
+  dataRows.forEach(r=>{r.dataset.cs=clean(r.textContent||r.innerText||""); r.style.display="";});
+  if(emptyRow) emptyRow.style.display=dataRows.length?"none":"";
 
-  /* ---------- Search ---------- */
   function applyFilter(){
-    const q = clean(search.value);
-    let visible = 0;
-    if(!q){
-      dataRows.forEach(r=>{ r.style.display=""; visible++; });
-    }else{
-      dataRows.forEach(r=>{
-        const show = r.dataset.cs.includes(q);
-        r.style.display = show ? "" : "none";
-        if(show) visible++;
-      });
+    const q=clean(search.value); let visible=0;
+    if(!q){ dataRows.forEach(r=>{r.style.display=""; visible++;}); }
+    else{
+      dataRows.forEach(r=>{ const show=r.dataset.cs.includes(q); r.style.display=show?"":"none"; if(show) visible++; });
     }
-    if (emptyRow) emptyRow.style.display = visible ? "none" : "";
-    if (counter) counter.textContent = String(visible);
+    if(emptyRow) emptyRow.style.display=visible?"none":"";
+    if(counter) counter.textContent=String(visible);
   }
-  search.addEventListener('input', applyFilter);
-  search.addEventListener('keyup',  applyFilter);
-  search.addEventListener('keydown', e=>{ if(e.key==='Enter') e.preventDefault(); });
-  if (clear) clear.addEventListener('click', ()=>{ search.value=""; applyFilter(); });
+  if(search){ search.addEventListener('input',applyFilter); search.addEventListener('keyup',applyFilter); }
+  if(clear){ clear.addEventListener('click',()=>{ if(search){search.value="";} applyFilter();}); }
   applyFilter();
 
-  /* ---------- Sort ---------- */
-  const COL_TYPES = ['text','text','num','text','date','num','num','num','num','num','num'];
-
-  function getCellVal(tr, idx){
-    const el = tr.children[idx];
-    return clean(el ? (el.innerText || el.textContent || "") : "");
+  // سورت
+  const COL_TYPES=['text','text','num','text','date','num','num','num','num','num','num'];
+  function getCellVal(tr,idx){ const el=tr.children[idx]; return clean(el?(el.innerText||el.textContent||""):""); }
+  function cmpFactory(type,dir){
+    if(type==='num'){ return (a,b)=>((parseFloat(getCellVal(a,a._idx))||0)-(parseFloat(getCellVal(b,b._idx))||0))*dir; }
+    if(type==='date'){ return (a,b)=>{const sa=getCellVal(a,a._idx), sb=getCellVal(b,b._idx); if(!sa&&!sb) return 0; if(!sa) return 1; if(!sb) return -1; return (sa<sb?-1:sa>sb?1:0)*dir;}; }
+    return (a,b)=> getCellVal(a,a._idx).localeCompare(getCellVal(b,b._idx),'fa',{numeric:true,sensitivity:'base'})*dir;
   }
-
-  function cmpFactory(type, dir){
-    if(type==='num'){
-      return (a,b)=>{
-        const na = parseFloat(getCellVal(a, a._idx)) || 0;
-        const nb = parseFloat(getCellVal(b, b._idx)) || 0;
-        return (na - nb) * dir;
-      };
-    }
-    if(type==='date'){
-      return (a,b)=>{
-        const sa = getCellVal(a, a._idx);
-        const sb = getCellVal(b, b._idx);
-        if(!sa && !sb) return 0;
-        if(!sa) return 1;
-        if(!sb) return -1;
-        return (sa < sb ? -1 : sa > sb ? 1 : 0) * dir;
-      };
-    }
-    return (a,b)=>{
-      const sa = getCellVal(a, a._idx);
-      const sb = getCellVal(b, b._idx);
-      if(!sa && !sb) return 0;
-      if(!sa) return 1;
-      if(!sb) return -1;
-      return sa.localeCompare(sb, 'fa', {numeric:true, sensitivity:'base'}) * dir;
-    };
-  }
-
-  function setIndicator(th, state){
-    const ths = [...th.parentElement.children];
+  function setIndicator(th,state){
+    const ths=[...th.parentElement.children];
     ths.forEach(h=>{
-      const i = h.querySelector('.cs-sort-ind') || h.appendChild(Object.assign(document.createElement('span'), {className:'cs-sort-ind'}));
-      if(h===th) return;
-      i.textContent = '';
-      h.dataset.sortDir = '';
+      const i=h.querySelector('.cs-sort-ind')||h.appendChild(Object.assign(document.createElement('span'),{className:'cs-sort-ind'}));
+      if(h===th) return; i.textContent=''; h.dataset.sortDir='';
     });
-    const ind = th.querySelector('.cs-sort-ind') || th.appendChild(Object.assign(document.createElement('span'), {className:'cs-sort-ind'}));
-    ind.textContent = state === 'asc' ? '▲' : state === 'desc' ? '▼' : '';
+    const ind=th.querySelector('.cs-sort-ind')||th.appendChild(Object.assign(document.createElement('span'),{className:'cs-sort-ind'}));
+    ind.textContent= state==='asc'?'▲':state==='desc'?'▼':'';
   }
-
-  const ths = [...tbl.querySelectorAll('thead th')];
-  ths.forEach((th, idx)=>{
-    const type = COL_TYPES[idx] || 'text';
-    th.classList.add('cs-sortable');
-    th.dataset.sortDir = '';
-    th.addEventListener('click', ()=>{
-      const nextDir = th.dataset.sortDir ? (th.dataset.sortDir==='asc'?'desc':'asc') : (type==='num'?'desc':'asc');
-      th.dataset.sortDir = nextDir;
-      setIndicator(th, nextDir);
-
-      const tbody = tbl.querySelector('tbody');
-      const rowsToSort = dataRows.filter(r => r.style.display !== 'none');
-      rowsToSort.forEach(r => r._idx = idx);
-
-      const dirNum = nextDir==='asc' ? 1 : -1;
-      rowsToSort.sort(cmpFactory(type, dirNum));
-
-      const frag = document.createDocumentFragment();
-      const hiddenRows = dataRows.filter(r => r.style.display === 'none');
-      hiddenRows.forEach(r => frag.appendChild(r));
-      rowsToSort.forEach(r => frag.appendChild(r));
-      if (emptyRow) frag.appendChild(emptyRow);
+  [...tbl.querySelectorAll('thead th')].forEach((th,idx)=>{
+    const type=COL_TYPES[idx]||'text';
+    th.classList.add('cs-sortable'); th.dataset.sortDir='';
+    th.addEventListener('click',()=>{
+      const nextDir=th.dataset.sortDir?(th.dataset.sortDir==='asc'?'desc':'asc'):(type==='num'?'desc':'asc');
+      th.dataset.sortDir=nextDir; setIndicator(th,nextDir);
+      const tbody=tbl.querySelector('tbody');
+      const rowsToSort=dataRows.filter(r=>r.style.display!=='none'); rowsToSort.forEach(r=> r._idx=idx);
+      const dirNum=nextDir==='asc'?1:-1; rowsToSort.sort(cmpFactory(type,dirNum));
+      const frag=document.createDocumentFragment();
+      const hidden=dataRows.filter(r=>r.style.display==='none'); hidden.forEach(r=>frag.appendChild(r));
+      rowsToSort.forEach(r=>frag.appendChild(r)); if(emptyRow) frag.appendChild(emptyRow);
       tbody.appendChild(frag);
     });
   });

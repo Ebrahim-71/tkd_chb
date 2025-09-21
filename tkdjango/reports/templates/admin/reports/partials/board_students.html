@@ -1,7 +1,6 @@
-{# templates/admin/reports/partials/club_students.html #}
-<div id="cl-root">
+{# templates/admin/reports/partials/board_students.html #}
+<div id="bd-root">
   <style>
-    /* UI عادی */
     .cs-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:8px}
     @media(max-width:1100px){.cs-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
     .cs-grid label{display:block;margin-bottom:4px;color:#4b5563;font-size:12px}
@@ -24,39 +23,39 @@
     .cs-meta{display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px;font-size:14px;color:#334155}
     .cs-meta b{font-weight:700}
 
-    /* سورت هدر */
-    #cl-table thead th.cs-sortable{cursor:pointer;user-select:none;position:relative;}
-    #cl-table thead th .cs-sort-ind{font-size:11px;opacity:.7;margin-inline-start:6px}
+    #bd-table thead th.cs-sortable{cursor:pointer;user-select:none;position:relative;}
+    #bd-table thead th .cs-sort-ind{font-size:11px;opacity:.7;margin-inline-start:6px}
   </style>
 
-  <!-- فیلترها -->
+  <!-- فیلترها: مربی، باشگاه، کمربند + جستجو -->
   <form method="get" class="cs-grid no-print">
-    <input type="hidden" name="show_club_students" value="1"/>
-    <div><label>باشگاه</label>{{ club_form.club }}</div>
-    <div><label>کمربند</label>{{ club_form.belt }}</div>
-    <div><label>مربی</label>{{ club_form.coach }}</div>
+  <input type="hidden" name="show_board_students" value="1"/>
+  <div><label>هیئت</label>{{ board_form.board }}</div>   <!-- ← جدید -->
+  <div><label>مربی</label>{{ board_form.coach }}</div>
+  <div><label>باشگاه</label>{{ board_form.club }}</div>
+  <div><label>کمربند</label>{{ board_form.belt }}</div>
+  <div class="cs-actions">
+    <button class="button" type="submit">نمایش</button>
+    <button class="button" type="button" id="bd-clear">پاک‌سازی</button>
+    <input id="bd-search" type="search" placeholder="جستجو بر اساس نام و کد ملی…">
+  </div>
+</form>
 
-    <div class="cs-actions">
-      <button class="button" type="submit">نمایش</button>
-      <button class="button" type="button" id="cl-clear">پاک‌سازی</button>
-      <input id="cl-search" type="search" placeholder="جستجو بر اساس نام و کد ملی…">
-    </div>
-  </form>
 
-  {% if club_students %}
+  {% if board_students %}
     <div class="cs-meta">
-      <div>شاگردانِ باشگاه: <b>{{ club_display|default:"—" }}</b></div>
-      <div>تعداد شاگردها: <b id="cl-count">{{ club_students.rows|length }}</b></div>
+      <div>شاگردانِ هیئت: <b>{{ board_display|default:"—" }}</b></div>
+      <div>تعداد شاگردها: <b id="bd-count">{{ board_students.rows|length }}</b></div>
     </div>
 
     <div class="cs-wrap">
-      <table class="cs-table" id="cl-table">
+      <table class="cs-table" id="bd-table">
         <thead>
           <tr>
             <th>نام و نام‌خانوادگی</th>
             <th>کمربند</th>
             <th>کدملی</th>
-            <th>نام مربی</th>
+            <th>نام مربی</th>   {# مثل club_students ستون مربی را داریم #}
             <th>تاریخ تولد</th>
             <th>تعداد مسابقات</th>
             <th>طلا</th><th>نقره</th><th>برنز</th>
@@ -64,7 +63,7 @@
           </tr>
         </thead>
         <tbody>
-          {% for row in club_students.rows %}
+          {% for row in board_students.rows %}
             <tr>
               <td style="font-weight:600">{{ row.full_name|default:"-" }}</td>
               <td><span class="cs-badge">{{ row.belt|default:"-" }}</span></td>
@@ -87,12 +86,12 @@
 
     <!-- دکمه چاپ زیر جدول -->
     <div style="margin-top:12px">
-      <button class="button" type="button" onclick="printClubPartial()">چاپ جدول</button>
+      <button class="button" type="button" onclick="printBoardPartial()">چاپ جدول</button>
     </div>
 
-    <!-- محتوای خام چاپ (از پارشیالِ مخصوص چاپ) -->
-    <div id="cl-print" style="display:none">
-      {% include "admin/reports/_club_students_print.html" with rows=club_students.rows club_name=club_display %}
+    <!-- محتوای خام چاپ -->
+    <div id="bd-print" style="display:none">
+      {% include "admin/reports/_board_students_print.html" with rows=board_students.rows board_name=board_display %}
     </div>
   {% endif %}
 </div>
@@ -103,10 +102,10 @@
   const faToEn=s=>String(s||"").replace(/[۰-۹]/g,d=>en[fa.indexOf(d)]);
   const clean=s=>faToEn(String(s||"").toLowerCase().replace(/\u200c|‌/g,"").replace(/[\/.\u2013\u2014\u2212]/g,"-").replace(/\s+/g," ").trim());
 
-  const tbl=document.getElementById('cl-table');
-  const search=document.getElementById('cl-search');
-  const clear=document.getElementById('cl-clear');
-  const counter=document.getElementById('cl-count');
+  const tbl=document.getElementById('bd-table');
+  const search=document.getElementById('bd-search');
+  const clear=document.getElementById('bd-clear');
+  const counter=document.getElementById('bd-count');
   if(tbl){
     const allRows=[...tbl.querySelectorAll('tbody tr')];
     const emptyRow=allRows.find(r=>r.children.length===1||/یافت نشد/.test(r.textContent));
@@ -128,7 +127,7 @@
     if(clear){ clear.addEventListener('click',()=>{search.value=""; applyFilter();}); }
     applyFilter();
 
-    // سورت ساده
+    // سورت
     const COL_TYPES=['text','text','num','text','date','num','num','num','num','num','num'];
     function getCellVal(tr,idx){ const el=tr.children[idx]; return clean(el?(el.innerText||el.textContent||""):""); }
     function cmpFactory(type,dir){
@@ -160,19 +159,18 @@
   }
 
   // چاپ مستقل پارشیال
-  window.printClubPartial = function(){
-    const src = document.getElementById('cl-print');
+  window.printBoardPartial = function(){
+    const src = document.getElementById('bd-print');
     if(!src) return;
     const w = window.open('', '_blank');
     w.document.open();
     w.document.write(`
       <!doctype html><html lang="fa" dir="rtl">
-      <head><meta charset="utf-8"><title>چاپ شاگردان باشگاه</title></head>
+      <head><meta charset="utf-8"><title>چاپ شاگردان هیئت</title></head>
       <body>${src.innerHTML}</body>
       </html>
     `);
     w.document.close();
-    // صبر کوتاه برای رندر فونت/جدول، سپس پرینت و بستن
     w.focus();
     setTimeout(()=>{ w.print(); w.close(); }, 200);
   };
