@@ -1,95 +1,165 @@
-// src/components/CoachAgreementFlow.jsx  ← مسیر را با پروژه‌ات چک کن
-import { useEffect, useState } from "react";
-// ⛳ مسیر را با جای فایل خودت تطبیق بده
+// src/components/Login/competitions/CoachAgreementFlow.jsx
+import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+
 import {
+  // Kyorugi
   getCoachApprovalStatus,
   approveCompetition,
-  getCompetitionDetail,
+  // Poomsae
+  getPoomsaeCoachApprovalStatus,
+  approvePoomsaeCompetition,
+  // Common
+  getCompetitionTerms,
+  getCurrentRole,
 } from "../../../api/competitions";
 import "./CoachAgreementFlow.css";
 
 const toFa = (s) => String(s ?? "").replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
 
 export default function CoachAgreementFlow({ competition, onDone, onCancel }) {
-  const publicId = competition?.public_id || competition?.id;
+  const navigate = useNavigate();
 
-  // UI state
+  const publicId = competition?.public_id || competition?.id;
+  const style = useMemo(() => String(competition?.style_display || "").trim(), [competition]);
+  const isKyorugi = style === "کیوروگی";
+  const isPoomsae = style === "پومسه";
+
+  // UI
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState("terms"); // "terms" | "code"
 
   // data
   const [approved, setApproved] = useState(false);
   const [code, setCode] = useState(null);
-
   const [coachName, setCoachName] = useState("—");
   const [clubNames, setClubNames] = useState([]);
-
   const [termsTitle, setTermsTitle] = useState("تعهدنامه مربی");
   const [terms, setTerms] = useState("");
 
-  // inputs
+  // inputs/network
   const [checked, setChecked] = useState(false);
-
-  // network
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // ----- Helper: pick role segment for routing -----
+  const getRoleSegment = () => {
+    const raw =
+      (getCurrentRole && getCurrentRole()) ||
+      (localStorage.getItem("user_role") || "");
+    const r = String(raw).toLowerCase();
+    if (r === "both") return "coach";
+    if (["coach", "player", "referee", "club", "heyat", "board"].includes(r)) return r;
+    // اگر رشته‌ای مرکب باشد (coach,player و ...):
+    if (r.includes("coach")) return "coach";
+    if (r.includes("referee")) return "referee";
+    if (r.includes("club")) return "club";
+    if (r.includes("heyat") || r.includes("board")) return "heyat";
+    if (r.includes("player")) return "player";
+    return "coach";
+  };
+
+  const goToDetails = () => {
+    if (!publicId) return;
+    const roleSeg = getRoleSegment();
+    const target = `/dashboard/${encodeURIComponent(roleSeg)}/competitions/${encodeURIComponent(publicId)}`;
+    // یک tick برای اینکه unmount مودال کامل شود
+    setTimeout(() => {
+      navigate(target);
+      // اگر والد هم listener دارد، اشکالی ندارد صدا بزنیم:
+      onDone?.(publicId);
+    }, 0);
+  };
 
   useEffect(() => {
     let alive = true;
 
     async function bootstrap() {
+      if (!publicId) return;
       setLoading(true);
       setError("");
 
       try {
-        // 1) وضعیت مربی (approved/code)
-        const st = await getCoachApprovalStatus(publicId);
-        if (!alive) return;
-
-        setApproved(!!st?.approved);
-        setCode(st?.code || null);
-        setCoachName(st?.coach_name || "—");
-        setClubNames(Array.isArray(st?.club_names) ? st.club_names : []);
-
-        // 2) متن تعهدنامه از جزئیات مسابقه (اگر روی کارت نبود)
-        if (competition?.terms_title || competition?.terms_content) {
-          setTermsTitle((competition.terms_title || "تعهدنامه مربی").trim());
-          setTerms((competition.terms_content || "").trim());
-        } else {
-          try {
-            const det = await getCompetitionDetail(publicId);
-            if (!alive) return;
-            setTermsTitle((det?.terms_title || "تعهدنامه مربی").trim());
-            setTerms((det?.terms_content || "").trim());
-          } catch (_) {
-            // اگر نگرفتیم، اهمیتی ندارد
-          }
+        // 1) متن تعهدنامه (مشترک)
+        try {
+          const det = await getCompetitionTerms(publicId);
+          if (!alive) return;
+          setTermsTitle((det?.title || "تعهدنامه مربی").trim());
+          setTerms((det?.content || "").trim() || "با پذیرش این تعهدنامه، مسئولیت‌های مربی/نماینده را می‌پذیرم.");
+        } catch {
+          if (!alive) return;
+          setTermsTitle("تعهدنامه مربی");
+          setTerms("با پذیرش این تعهدنامه، مسئولیت‌های مربی/نماینده را می‌پذیرم.");
         }
 
-        // اگر از قبل تأیید بوده، مستقیم برو به مرحلهٔ کد
-        setStep(st?.approved ? "code" : "terms");
-      } catch (e) {
-        if (!alive) return;
-        setError(e?.message || "خطا در دریافت اطلاعات");
+        // 2) وضعیت تایید + کُد (برای هر سبک API درست را صدا بزن)
+        try {
+          const st = isPoomsae
+            ? await getPoomsaeCoachApprovalStatus(publicId)
+            : await getCoachApprovalStatus(publicId);
+
+          if (!alive) return;
+          setApproved(!!st?.approved);
+          setCode(st?.code || null);
+          setCoachName(st?.coach_name || "—");
+          setClubNames(Array.isArray(st?.club_names) ? st.club_names : []);
+          setStep(st?.approved ? "code" : "terms");
+        } catch (e) {
+          if (!alive) return;
+          setError(e?.message || "خطا در دریافت وضعیت مربی");
+          setStep("terms");
+        }
       } finally {
         if (alive) setLoading(false);
       }
     }
 
-    if (publicId) bootstrap();
-    return () => { alive = false; };
-  }, [publicId, competition?.terms_title, competition?.terms_content]);
+    bootstrap();
+    return () => {
+      alive = false;
+    };
+  }, [publicId, isKyorugi, isPoomsae]);
 
+  // تأیید تعهدنامه
   const handleApprove = async () => {
     if (!checked || !publicId) return;
     setSubmitting(true);
     setError("");
 
     try {
-      const res = await approveCompetition(publicId); // { code }
+      if (isKyorugi) {
+        const res = await approveCompetition(publicId); // POST
+        setApproved(true);
+        setStep("code");
+        if (res?.code) {
+          setCode(res.code);
+        } else {
+          await new Promise((r) => setTimeout(r, 200));
+          try {
+            const st = await getCoachApprovalStatus(publicId);
+            setCode(st?.code || null);
+          } catch {
+            setCode(null);
+          }
+        }
+        return; // کاربر با «ادامه» به جزئیات می‌رود
+      }
+
+      // پومسه
+      const res = await approvePoomsaeCompetition(publicId); // POST
       setApproved(true);
-      setCode(res?.code || null);
-      setStep("code"); // ✅ بلافاصله برو به مرحلهٔ کد
+      setStep("code");
+      if (res?.code) {
+        setCode(res.code);
+      } else {
+        await new Promise((r) => setTimeout(r, 200));
+        try {
+          const st = await getPoomsaeCoachApprovalStatus(publicId);
+          setCode(st?.code || null);
+        } catch {
+          setCode(null);
+        }
+      }
     } catch (e) {
       setError(e?.message || "خطا در تایید تعهدنامه");
     } finally {
@@ -97,11 +167,15 @@ export default function CoachAgreementFlow({ competition, onDone, onCancel }) {
     }
   };
 
+  // تازه‌سازی کُد (برای هر دو سبک)
   const refreshCode = async () => {
     setSubmitting(true);
     setError("");
     try {
-      const st = await getCoachApprovalStatus(publicId);
+      setStep("code");
+      const st = isPoomsae
+        ? await getPoomsaeCoachApprovalStatus(publicId)
+        : await getCoachApprovalStatus(publicId);
       setApproved(!!st?.approved);
       setCode(st?.code || null);
     } catch (e) {
@@ -146,12 +220,16 @@ export default function CoachAgreementFlow({ competition, onDone, onCancel }) {
       {/* Error */}
       {!!error && <div className="alert-error">{error}</div>}
 
-      {/* Terms step */}
+      {/* مرحلهٔ تعهدنامه */}
       {step === "terms" ? (
         <>
           <div className="modal-meta">
-            <div><b>مربی:</b> {coachName}</div>
-            <div><b>باشگاه‌ها:</b> {clubNames?.length ? clubNames.join("، ") : "—"}</div>
+            <div>
+              <b>مربی:</b> {coachName}
+            </div>
+            <div>
+              <b>باشگاه‌ها:</b> {clubNames?.length ? clubNames.join("، ") : "—"}
+            </div>
           </div>
 
           <div className="modal-text" style={{ whiteSpace: "pre-line" }}>
@@ -168,7 +246,9 @@ export default function CoachAgreementFlow({ competition, onDone, onCancel }) {
           </label>
 
           <div className="modal-actions">
-            <button className="btn btn-secondary" onClick={onCancel}>انصراف</button>
+            <button className="btn btn-secondary" onClick={onCancel}>
+              انصراف
+            </button>
             <button
               className="btn btn-success"
               disabled={!checked || submitting}
@@ -180,17 +260,22 @@ export default function CoachAgreementFlow({ competition, onDone, onCancel }) {
           </div>
         </>
       ) : (
-        // Code step
+        // مرحلهٔ «کُد»
         <>
           {approved && code ? (
             <>
               <p className="modal-code">
-                کد تأیید شما <b>{toFa(String(code))}</b> می‌باشد.<br />
+                کد تأیید شما <b>{toFa(String(code))}</b> می‌باشد.
+                <br />
                 لطفاً این کد را برای ثبت‌نام به بازیکنان تیم خود ارائه کنید.
               </p>
               <div className="modal-actions" style={{ gap: 8 }}>
-                <button className="btn btn-outline" onClick={copyCode}>کپی کد</button>
-                <button className="btn btn-success" onClick={onDone}>ادامه</button>
+                <button className="btn btn-outline" onClick={copyCode}>
+                  کپی کد
+                </button>
+                <button className="btn btn-success" onClick={goToDetails}>
+                  ادامه
+                </button>
               </div>
             </>
           ) : (
@@ -198,9 +283,11 @@ export default function CoachAgreementFlow({ competition, onDone, onCancel }) {
               <p className="modal-code">تأیید انجام شد، اما کدی دریافت نشد.</p>
               <div className="modal-actions" style={{ gap: 8 }}>
                 <button className="btn btn-outline" onClick={refreshCode} disabled={submitting}>
-                  {submitting ? "در حال دریافت…" : "دریافت/تازه‌سازی کد"}
+                  {submitting ? "در حال دریافت…" : "تازه‌سازی کد"}
                 </button>
-                <button className="btn btn-success" onClick={onDone}>ادامه</button>
+                <button className="btn btn-success" onClick={goToDetails}>
+                  ادامه
+                </button>
               </div>
             </>
           )}

@@ -124,11 +124,11 @@ function App() {
               <Route path="enrollments/:enrollmentId/card" element={<EnrollmentCard />} />
               {/* چاپ کارت‌های گروهی */}
               <Route path="enrollments/bulk" element={<EnrollmentCardsBulk />} />
-              <Route path="/dashboard/:role/competitions/:slug/results" element={<CompetitionResults />} />
+              {/* ✅ مسیر نتایج باید نسبیِ فرزند باشد (بدون / اول) */}
+              <Route path="competitions/:slug/results" element={<CompetitionResults />} />
+              {/* دوره/سمینار */}
               <Route path="courses/:slug" element={<SeminarDetail />} />
-
             </Route>
-
 
             {/* صفحات محتوا */}
             <Route path="/news/:id" element={<NewsDetail />} />

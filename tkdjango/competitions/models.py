@@ -301,14 +301,12 @@ class CoachApproval(models.Model):
                 fields=['competition', 'coach'],
                 name='uniq_competition_coach'
             ),
-            # یکتا وقتی کد نال نیست
             models.UniqueConstraint(
                 fields=['competition', 'code'],
                 condition=models.Q(code__isnull=False),
                 name='uniq_competition_code'
             ),
         ]
-        # ایندکس کاربردی برای فیلترهای متداول
         indexes = [
             models.Index(fields=['competition', 'is_active', 'terms_accepted']),
         ]
@@ -321,7 +319,6 @@ class CoachApproval(models.Model):
     @staticmethod
     def _rand_code(length: int = 6) -> str:
         """تولید کد عددی با طول ثابت (پیش‌فرض: ۶ رقم)."""
-        import random
         upper = 10**length - 1
         return f"{random.randint(0, upper):0{length}d}"
 
@@ -331,18 +328,14 @@ class CoachApproval(models.Model):
         اگر قبلاً کد دارد و force=False باشد، همان کد را برمی‌گرداند.
         اگر force=True باشد، «به‌اجبار» کد جدید و یکتا (در سطح همان مسابقه) می‌سازد.
         """
-        # اگر کد داریم و اصراری به تغییر نیست، برگردان
         if self.code and not force:
             return self.code
 
-        # قفل رکورد برای جلوگیری از رقابت
         current = CoachApproval.objects.select_for_update().get(pk=self.pk)
 
-        # اگر بعد از قفل هنوز کد دارد و force=False، همان را بده
         if current.code and not force:
             return current.code
 
-        # پیدا کردن کد یکتا
         for _ in range(25):
             c = self._rand_code(6)  # ۶ رقمی
             exists = CoachApproval.objects.filter(
@@ -361,7 +354,6 @@ class CoachApproval(models.Model):
 
     def clean(self):
         """اعتبارسنجی اختیاری: اگر کد هست، فقط رقم و ۴ تا ۸ رقم."""
-        from django.core.exceptions import ValidationError
         import re as _re
         if self.code:
             if not _re.fullmatch(r"\d{4,8}", str(self.code)):
@@ -369,22 +361,31 @@ class CoachApproval(models.Model):
         super().clean()
 
     def save(self, *args, **kwargs):
-        """
-        جلوگیری از تغییر کد پس از اولین بار (immutable)،
-        مگر وقتی از متد set_fresh_code با فلگ داخلی اجازه داده شود.
-        """
-        if self.pk is not None:
-            try:
-                orig_code = CoachApproval.objects.filter(pk=self.pk).values_list('code', flat=True).first()
-            except CoachApproval.DoesNotExist:
-                orig_code = None
+        update_fields = kwargs.get("update_fields")
+        # فقط اگر code واقعاً در حال ویرایش باشد، یا update_fields خالی/None باشد، حساسیت به تغییر کد را اعمال کن
+        should_check_code = (not update_fields) or ("code" in update_fields)
 
-            # اگر قبلاً کد داشته و الان عوض شده ولی فلگ مجاز نیست → خطا
-            if orig_code and self.code != orig_code and not getattr(self, "_allow_code_change", False):
-                from django.core.exceptions import ValidationError
+        # 🔧 نکتهٔ اصلی: وقتی از مسیر داخلی set_fresh_code فراخوانی می‌شویم،
+        # فلگ _allow_code_change=True می‌شود؛ در آن حالت بررسی تغییر کد را رد کن.
+        if self.pk and should_check_code and not getattr(self, "_allow_code_change", False):
+            orig = type(self).objects.only("code").get(pk=self.pk)
+            if orig.code != self.code:
                 raise ValidationError({"code": "تغییر کد مجاز نیست. فقط مدیر می‌تواند کد جدید تولید کند."})
 
         return super().save(*args, **kwargs)
+
+    # هِلپر اختیاری برای ویو: تغییر وضعیت بدون برخورد به save() سفارشی
+    def approve_terms(self):
+        """
+        تعهدنامه را می‌پذیرد و تایید را فعال می‌کند—با update مستقیم (بدون عبور از save()).
+        """
+        now = timezone.now()
+        type(self).objects.filter(pk=self.pk).update(
+            terms_accepted=True,
+            is_active=True,
+            approved_at=now,
+        )
+        self.refresh_from_db(fields=("terms_accepted", "is_active", "approved_at"))
 
 # =========================
 # ثبت‌نام بازیکن (Enrollment)
@@ -948,3 +949,288 @@ class SeminarParticipants(SeminarRegistration):
         proxy = True
         verbose_name = "لیست شرکت‌کنندگان سمینارها"
         verbose_name_plural = "لیست شرکت‌کنندگان سمینارها"
+
+
+
+
+
+
+# ==================================================================== مسابقه پومسه ==========================================================
+class PoomsaeCompetition(models.Model):
+    GENDER_CHOICES = [('male', 'آقایان'), ('female', 'بانوان')]
+    BELT_LEVEL_CHOICES = [
+        ('yellow_blue', 'زرد تا آبی'),
+        ('red_black', 'قرمز و مشکی'),
+    ]
+
+    title = models.CharField('عنوان مسابقه', max_length=255)
+    poster = models.ImageField('پوستر شاخص', upload_to='poomsae_posters/', null=True, blank=True)
+    entry_fee = models.PositiveIntegerField('مبلغ ورودی (تومان)', default=0, validators=[MinValueValidator(0)])
+
+    belt_level = models.CharField('رده کمربندی', max_length=20, choices=BELT_LEVEL_CHOICES)
+    belt_groups = models.ManyToManyField(BeltGroup, verbose_name='گروه‌های کمربندی', blank=True)
+
+    # ⬇️ به‌جای FK تک‌تایی، چندتایی شد:
+    age_categories = models.ManyToManyField(
+        AgeCategory,
+        verbose_name='رده‌های سنی',
+        blank=True,
+        related_name='poomsae_competitions'
+    )
+
+    gender = models.CharField('جنسیت', max_length=10, choices=GENDER_CHOICES)
+
+    city = models.CharField('شهر محل برگزاری', max_length=100)
+    address = models.TextField('آدرس محل برگزاری', blank=True, default="")
+
+    registration_start = models.DateField(verbose_name='شروع ثبت‌نام')
+    registration_end   = models.DateField(verbose_name='پایان ثبت‌نام')
+    draw_date          = models.DateField(verbose_name='تاریخ قرعه‌کشی', null=True, blank=True)
+    competition_date   = models.DateField(verbose_name='تاریخ برگزاری')
+
+    registration_open = models.BooleanField('فعال بودن ثبت‌نام', default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    public_id = models.CharField('شناسه عمومی', max_length=16, unique=True, db_index=True,
+                                 editable=False, default=_gen_public_id)
+    terms_template = models.ForeignKey(
+        TermsTemplate,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='poomsae_competitions',
+        verbose_name="قالب تعهدنامه",)
+    class Meta:
+        verbose_name = 'مسابقه پومسه'
+        verbose_name_plural = 'مسابقات پومسه'
+        constraints = [
+            models.CheckConstraint(
+                check=Q(registration_start__lte=F('registration_end')),
+                name='poom_reg_start_lte_reg_end'
+            ),
+            models.CheckConstraint(
+                check=Q(draw_date__lte=F('competition_date')) | Q(draw_date__isnull=True),
+                name='poom_draw_lte_comp_or_null'
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['public_id']),
+            models.Index(fields=['competition_date']),
+        ]
+        ordering = ('-competition_date', '-id')
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def style_display(self):
+        return "پومسه"
+
+    def clean(self):
+        for f in ["registration_start", "registration_end", "draw_date", "competition_date"]:
+            d = getattr(self, f)
+            if d and getattr(d, "year", 3000) < 1700:
+                setattr(self, f, jdatetime.date(d.year, d.month, d.day).togregorian())
+        super().clean()
+
+    def save(self, *args, **kwargs):
+        attempts = 5
+        while attempts > 0:
+            try:
+                if not self.public_id:
+                    self.public_id = _gen_public_id(10)
+                return super().save(*args, **kwargs)
+            except IntegrityError as e:
+                if 'public_id' in str(e).lower():
+                    self.public_id = _gen_public_id(10)
+                    attempts -= 1
+                    continue
+                raise
+        raise IntegrityError("عدم امکان ایجاد شناسهٔ عمومی یکتا برای مسابقهٔ پومسه.")
+
+
+class PoomsaeImage(models.Model):
+    competition = models.ForeignKey(PoomsaeCompetition, related_name='images',
+                                    on_delete=models.CASCADE, verbose_name='مسابقه')
+    image = models.ImageField('تصویر پیوست', upload_to='poomsae_images/')
+
+    class Meta:
+        verbose_name = 'تصویر مسابقه پومسه'
+        verbose_name_plural = 'تصاویر مسابقه پومسه'
+
+    def __str__(self):
+        return f"تصویر - {self.competition.title}"
+
+
+class PoomsaeFile(models.Model):
+    competition = models.ForeignKey(PoomsaeCompetition, related_name='files',
+                                    on_delete=models.CASCADE, verbose_name='مسابقه')
+    file = models.FileField('فایل PDF', upload_to='poomsae_files/')
+
+    class Meta:
+        verbose_name = 'فایل مسابقه پومسه'
+        verbose_name_plural = 'فایل‌های مسابقه پومسه'
+
+    def __str__(self):
+        return f"فایل - {self.competition.title}"
+
+
+# --- تقسیم‌بندی پومسه: هر جدول = یک دیویژن ---
+
+# --- تأیید مربی برای پومسه (هم‌رفتار با کیوروگی) ---
+class PoomsaeCoachApproval(models.Model):
+    competition = models.ForeignKey(
+        'competitions.PoomsaeCompetition',
+        on_delete=models.CASCADE,
+        related_name='coach_approvals',
+        verbose_name='مسابقه پومسه'
+    )
+    coach = models.ForeignKey(
+        'accounts.UserProfile',
+        on_delete=models.CASCADE,
+        limit_choices_to={'is_coach': True},
+        related_name='poomsae_competition_approvals',
+        verbose_name='مربی'
+    )
+    code = models.CharField(
+        'کد تأیید مربی',
+        max_length=8,
+        blank=True,
+        null=True,
+        db_index=True
+    )
+    terms_accepted = models.BooleanField('تعهدنامه پذیرفته شد', default=False)
+    is_active = models.BooleanField('فعال', default=True)
+    approved_at = models.DateTimeField('تاریخ تأیید', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'تأیید مربی برای مسابقه پومسه'
+        verbose_name_plural = 'تأییدهای مربیان (پومسه)'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['competition', 'coach'],
+                name='uniq_poom_competition_coach'
+            ),
+            models.UniqueConstraint(
+                fields=['competition', 'code'],
+                condition=models.Q(code__isnull=False),
+                name='uniq_poom_competition_code'
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['competition', 'is_active', 'terms_accepted']),
+        ]
+
+    def __str__(self):
+        fn = getattr(self.coach, 'first_name', '') or ''
+        ln = getattr(self.coach, 'last_name', '') or ''
+        return f"{self.competition} - {fn} {ln}".strip()
+
+    @staticmethod
+    def _rand_code(length: int = 6) -> str:
+        """تولید کد عددی با طول ثابت (پیش‌فرض: ۶ رقم)."""
+        upper = 10**length - 1
+        return f"{random.randint(0, upper):0{length}d}"
+
+    @transaction.atomic
+    def set_fresh_code(self, save: bool = True, force: bool = False) -> str:
+        """
+        اگر قبلاً کد دارد و force=False باشد، همان کد برمی‌گردد.
+        اگر force=True باشد، کد جدید و یکتا (در سطح همان مسابقه) می‌سازد.
+        """
+        if self.code and not force:
+            return self.code
+
+        current = PoomsaeCoachApproval.objects.select_for_update().get(pk=self.pk)
+
+        if current.code and not force:
+            return current.code
+
+        for _ in range(25):
+            c = self._rand_code(6)
+            exists = PoomsaeCoachApproval.objects.filter(
+                competition=self.competition, code=c
+            ).exists()
+            if not exists:
+                current.code = c
+                if save:
+                    setattr(current, "_allow_code_change", True)
+                    current.save(update_fields=['code'])
+                    delattr(current, "_allow_code_change")
+                return c
+
+        raise ValueError("ساخت کد یکتا ممکن نشد، دوباره تلاش کنید.")
+
+    def clean(self):
+        """اعتبارسنجی: اگر کد هست، فقط رقم و ۴ تا ۸ رقم."""
+        import re as _re
+        if self.code:
+            if not _re.fullmatch(r"\d{4,8}", str(self.code)):
+                raise ValidationError({"code": "کد باید عددی و بین ۴ تا ۸ رقم باشد."})
+        super().clean()
+
+    def save(self, *args, **kwargs):
+        """
+        جلوگیری از تغییر کد پس از اولین بار (immutable)،
+        مگر وقتی از متد set_fresh_code با فلگ داخلی اجازه داده شود.
+        """
+        if self.pk is not None:
+            try:
+                orig_code = PoomsaeCoachApproval.objects.filter(pk=self.pk).values_list('code', flat=True).first()
+            except PoomsaeCoachApproval.DoesNotExist:
+                orig_code = None
+
+            if orig_code and self.code != orig_code and not getattr(self, "_allow_code_change", False):
+                raise ValidationError({"code": "تغییر کد مجاز نیست. فقط از مسیر تولید کد می‌توان آن را عوض کرد."})
+
+        return super().save(*args, **kwargs)
+
+
+
+class PoomsaeDivision(models.Model):
+    competition = models.ForeignKey(
+        PoomsaeCompetition, on_delete=models.CASCADE, related_name="divisions", verbose_name="مسابقه"
+    )
+    gender = models.CharField("جنسیت", max_length=10, choices=PoomsaeCompetition.GENDER_CHOICES)
+    age_category = models.ForeignKey(AgeCategory, on_delete=models.PROTECT, verbose_name="رده سنی")
+    belt = models.ForeignKey(Belt, on_delete=models.PROTECT, verbose_name="کمربند")
+
+    # اگر بعداً kind (انفرادی/جفتی/تیمی) خواستی، اینجا اضافه کن
+    # kind = models.CharField(max_length=10, choices=[("individual","انفرادی"),("pair","جفتی"),("team","تیمی")], default="individual")
+
+    class Meta:
+        verbose_name = "دیویژن پومسه"
+        verbose_name_plural = "دیویژن‌های پومسه"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["competition", "gender", "age_category", "belt"],
+                name="uniq_poom_division_comp_gender_age_belt",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["competition", "gender", "age_category", "belt"]),
+        ]
+
+    def __str__(self):
+        return f"{self.competition.title} | {self.get_gender_display()} | {self.age_category} | {self.belt.name}"
+
+
+class PoomsaeEntry(models.Model):
+    competition = models.ForeignKey(
+        PoomsaeCompetition, on_delete=models.CASCADE, related_name="entries", verbose_name="مسابقه"
+    )
+    player = models.ForeignKey(UserProfile, on_delete=models.PROTECT, related_name="poomsae_entries", verbose_name="بازیکن")
+    division = models.ForeignKey(PoomsaeDivision, on_delete=models.PROTECT, related_name="entries", verbose_name="دیویژن")
+
+    is_paid = models.BooleanField(default=False)
+    paid_amount = models.PositiveIntegerField(default=0)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    insurance_number = models.CharField(max_length=20, blank=True, default="")
+    insurance_issue_date = models.DateField(null=True, blank=True)
+    class Meta:
+        verbose_name = "ثبت‌نام پومسه"
+        verbose_name_plural = "ثبت‌نام‌های پومسه"
+        unique_together = ("competition", "player")  # هر بازیکن یک ثبت‌نام در هر مسابقه (اگر چند دیویژن لازم داری حذفش کن)
+
+    def __str__(self):
+        return f"{self.player} → {self.division}"

@@ -1,4 +1,4 @@
-// MatchCard.jsx
+// src/components/Login/panel/maincontentpanel/MatchCard.jsx
 import React from "react";
 import { Link } from "react-router-dom";
 import "./MatchCard.css";
@@ -13,7 +13,12 @@ const fmtDateFa = (val) => {
 const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
 
 function getRole() {
-  return localStorage.getItem("user_role") || "player"; // پیش‌فرض امن
+  return localStorage.getItem("user_role") || "player"; // fallback امن
+}
+
+function isKyorugi(match) {
+  const s = String(match?.style_display || "").trim();
+  return s === "کیوروگی";
 }
 
 const MatchCard = ({ match, onDetailsClick }) => {
@@ -23,7 +28,7 @@ const MatchCard = ({ match, onDetailsClick }) => {
     ? `${API_BASE}${match.poster}`
     : "/placeholder.jpg";
 
-  const slug = match?.public_id; // 🔑 فقط با public_id
+  const slug = match?.public_id;        // کلید عمومی
   const role = getRole();
 
   return (
@@ -42,16 +47,21 @@ const MatchCard = ({ match, onDetailsClick }) => {
         <p>رده سنی: {match?.age_category_name || "—"}</p>
         <p>رده کمربندی: {match?.belt_level_display || "—"}</p>
         <p>جنسیت: {match?.gender_display || "—"}</p>
+
         <p>شروع ثبت‌نام: {fmtDateFa(match?.registration_start_jalali ?? match?.registration_start)}</p>
         <p>پایان ثبت‌نام: {fmtDateFa(match?.registration_end_jalali ?? match?.registration_end)}</p>
+
+        {/* وزن‌کشی فقط برای کیوروگی */}
+        {isKyorugi(match) && (
+          <p>تاریخ وزن‌کشی: {fmtDateFa(match?.weigh_date_jalali ?? match?.weigh_date)}</p>
+        )}
+
         <p>تاریخ قرعه‌کشی: {fmtDateFa(match?.draw_date_jalali ?? match?.draw_date)}</p>
         <p>تاریخ برگزاری: {fmtDateFa(match?.competition_date_jalali ?? match?.competition_date)}</p>
 
         <p>
           مبلغ ورودی:{" "}
-          {match?.entry_fee
-            ? `${toPersianDigits(Number(match.entry_fee).toLocaleString())} تومان`
-            : "رایگان"}
+          {match?.entry_fee ? `${toPersianDigits(Number(match.entry_fee).toLocaleString())} تومان` : "رایگان"}
         </p>
         <p>محل برگزاری: {match?.city || "—"}</p>
       </div>
@@ -62,7 +72,10 @@ const MatchCard = ({ match, onDetailsClick }) => {
           جزئیات بیشتر و ثبت نام
         </button>
       ) : slug ? (
-        <Link className="match-button" to={`/dashboard/${encodeURIComponent(role)}/competitions/${encodeURIComponent(slug)}`}>
+        <Link
+          className="match-button"
+          to={`/dashboard/${encodeURIComponent(role)}/competitions/${encodeURIComponent(slug)}`}
+        >
           جزئیات بیشتر و ثبت نام
         </Link>
       ) : (

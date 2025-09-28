@@ -1,7 +1,6 @@
 // src/components/Login/panel/Dashboard.jsx
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { useNavigate, Outlet, useParams, useLocation } from "react-router-dom";
-import { matchPath } from "react-router-dom";
+import { useNavigate, Outlet, useParams, useLocation, matchPath } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import StatsCard from "./StatsCard";
 import MainContent from "./MainContent";
@@ -31,6 +30,12 @@ const Dashboard = () => {
 
   const logoutTimerRef = useRef(null);
 
+  // نقش ذخیره‌شده (منبع حقیقت برای مسیرها)
+  const storedRole = useMemo(
+    () => (localStorage.getItem("user_role") || "guest").toLowerCase(),
+    []
+  );
+
   const [role, setRole] = useState(null);
   const [selectedSection, setSelectedSection] = useState("matches");
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
@@ -46,11 +51,10 @@ const Dashboard = () => {
       matchPath("/dashboard/:role/competitions/:slug/bracket", p) ||
       matchPath("/dashboard/:role/competitions/:slug/results", p) ||
       matchPath("/dashboard/:role/enrollments/:enrollmentId", p) ||
-      matchPath("/dashboard/:role/enrollments/:enrollmentId/*", p)||
+      matchPath("/dashboard/:role/enrollments/:enrollmentId/*", p) ||
       matchPath("/dashboard/:role/courses/:slug", p) ||
       matchPath("/dashboard/:role/courses/:slug/*", p) ||
       matchPath("/dashboard/:role/courses/:slug/register/*", p)
-   
     );
   }, [location.pathname]);
 
@@ -81,17 +85,17 @@ const Dashboard = () => {
 
   // احراز هویت + همگام‌سازی نقش + ریسایز + تایمر inactivity
   useEffect(() => {
-    const storedRole = localStorage.getItem("user_role");
-    const token = storedRole && localStorage.getItem(`${storedRole}_token`);
-    if (!storedRole || !token) {
+    const savedRole = localStorage.getItem("user_role");
+    const token = savedRole && localStorage.getItem(`${savedRole}_token`);
+    if (!savedRole || !token) {
       navigate("/", { replace: true });
       return;
     }
-    setRole(storedRole);
+    setRole(savedRole);
 
-    // اگر نقش URL با نقش ذخیره شده نخواند، URL را تصحیح کن
-    if (roleFromRoute && roleFromRoute !== storedRole) {
-      navigate(`/dashboard/${storedRole}${location.search}`, { replace: true });
+    // اگر نقش URL با نقش ذخیره‌شده نخواند، URL را تصحیح کن
+    if (roleFromRoute && roleFromRoute !== savedRole) {
+      navigate(`/dashboard/${savedRole}${location.search}`, { replace: true });
       return;
     }
 
@@ -115,11 +119,13 @@ const Dashboard = () => {
   }, [navigate, roleFromRoute]);
 
   // سینک بخش انتخابی با querystring (?section=...)
+//  اگر در route تو در تو هستیم، اجازه بده Outlet رندر بشه و بخش‌ها تغییر نکنن
   useEffect(() => {
+    if (inNestedView) return;
     const qs = new URLSearchParams(location.search);
     const sec = qs.get("section") || "matches";
     setSelectedSection(sec);
-  }, [location.search]);
+  }, [location.search, inNestedView]);
 
   if (!role) return null;
 
@@ -132,7 +138,6 @@ const Dashboard = () => {
       case "news":
         return <NewsSection role={role} />;
       case "matches":
-        // نقش را پاس می‌دهیم تا MatchesSection بتواند برای club/heyat/board از لیست عمومی استفاده کند
         return <MatchesSection role={role} />;
       case "students":
         return <StudentsTable role={role} />;
@@ -152,9 +157,8 @@ const Dashboard = () => {
         return <HeyatClubsTable role={role} />;
       case "heyat-create-news":
         return <HeyatCreateNews role={role} />;
-     case "courses":          
+      case "courses":
         return <SeminarsSection role={role} />;
-
       default:
         return <MainContent role={role} selectedSection={selectedSection} />;
     }
@@ -162,7 +166,9 @@ const Dashboard = () => {
 
   const handleSectionSelect = (key) => {
     setSelectedSection(key);
-    navigate(`/dashboard/${encodeURIComponent(role)}?section=${encodeURIComponent(key)}`);
+    // مسیر را با نقش ذخیره‌شده بساز تا همیشه با منطق ریدایرکت یکی باشد
+    const r = (localStorage.getItem("user_role") || role || storedRole);
+    navigate(`/dashboard/${encodeURIComponent(r)}?section=${encodeURIComponent(key)}`);
   };
 
   return (
@@ -192,7 +198,6 @@ const Dashboard = () => {
 
         {/* در صفحات تو‌در‌تو (جزئیات/جدول/ثبت‌نام/نتایج/کارت) Outlet رندر می‌شود */}
         {inNestedView ? (
-          // نقش را از طریق context به روت‌های داخلی هم می‌فرستیم
           <Outlet context={{ role, isClubLike: isClubLike(role) }} key={location.pathname} />
         ) : (
           renderContent()

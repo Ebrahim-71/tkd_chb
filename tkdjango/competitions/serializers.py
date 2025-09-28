@@ -9,12 +9,79 @@ from math import inf
 from accounts.models import UserProfile
 from .models import (
     KyorugiCompetition, CompetitionImage, MatAssignment, Belt,Draw, Match,  BeltGroup,
-    CompetitionFile,CoachApproval, WeightCategory, Enrollment,Seminar, SeminarRegistration)
+    CompetitionFile,CoachApproval, WeightCategory, Enrollment,Seminar, SeminarRegistration,PoomsaeCompetition)
 
 
 # -------------------------------------------------
 # Helpers: digits, dates, belts, club snapshot
 # -------------------------------------------------
+# helpers (بالای فایل)
+def _player_belt_code_from_profile(prof: UserProfile):
+    b_attr = getattr(prof, "belt", None)
+
+    # 1) اگر FK به Belt داریم
+    if isinstance(b_attr, Belt):
+        return _norm_belt(getattr(b_attr, "name", None))
+
+    # 2) اگر به‌صورت id ذخیره شده
+    if isinstance(b_attr, int):
+        b = Belt.objects.filter(id=b_attr).first()
+        if b:
+            return _norm_belt(getattr(b, "name", None))
+
+    # 3) فیلدهای متنی قدیمی
+    raw = (
+        getattr(prof, "belt_grade", None)
+        or getattr(prof, "belt_name", None)
+        or getattr(prof, "belt_level", None)
+        or getattr(prof, "belt_code", None)
+    )
+    return _norm_belt(raw)
+
+# بالای فایل، کنار سایر هِلپرها:
+def _player_belt_code_from_profile(prof: UserProfile):
+    """white/yellow/green/blue/red/black را از پروفایل استخراج می‌کند (FK، id، یا متن)."""
+    b_attr = getattr(prof, "belt", None)
+
+    # 1) FK به مدل Belt
+    if isinstance(b_attr, Belt):
+        return _norm_belt(getattr(b_attr, "name", None))
+
+    # 2) اگر به‌صورت عددی ذخیره شده باشد
+    if isinstance(b_attr, int):
+        b = Belt.objects.filter(id=b_attr).first()
+        if b:
+            return _norm_belt(getattr(b, "name", None))
+
+    # 3) فیلدهای متنی رایج
+    raw = (
+        getattr(prof, "belt_grade", None)
+        or getattr(prof, "belt_name", None)
+        or getattr(prof, "belt_level", None)
+        or getattr(prof, "belt_code", None)
+    )
+    return _norm_belt(raw)
+
+_GENDER_MAP = {
+    # male
+    "male": "male", "m": "male", "man": "male",
+    "آقا": "male", "اقا": "male", "مرد": "male",
+    "آقایان": "male", "آقايان": "male", "اقایان": "male",
+    "both": "both", "mixed": "both", "مختلط": "both",
+    "هردو": "both", "هر دو": "both",
+    # female
+    "female": "female", "f": "female", "woman": "female",
+    "زن": "female", "خانم": "female", "بانو": "female",
+    "بانوان": "female", "خانم‌ها": "female", "خانمها": "female",
+}
+def _norm_gender(v):
+    if v is None:
+        return None
+    t = str(v).strip().lower().replace("ي", "ی").replace("ك", "ک").replace("‌", "").replace("-", "")
+    return _GENDER_MAP.get(t, t)
+
+
+
 _DIGIT_MAP = {ord(p): str(i) for i, p in enumerate("۰۱۲۳۴۵۶۷۸۹")}
 _DIGIT_MAP.update({ord(a): str(i) for i, a in enumerate("٠١٢٣٤٥٦٧٨٩")})
 
@@ -60,16 +127,27 @@ def _find_belt_group_obj(comp, player_belt_code: str):
                 return g
     return None
 
+
 def _to_greg_from_str_jalali(s: str):
-    """ورودی 'YYYY/MM/DD' شمسی → date میلادی؛ در غیر اینصورت None."""
+    """ورودی 'YYYY/MM/DD' یا 'YYYY-MM-DD'.
+    اگر سال >= 1700 باشد، میلادی فرض می‌شود؛ وگرنه شمسی و سپس به میلادی تبدیل می‌شود.
+    """
     if not s:
         return None
     t = _to_en_digits(str(s)).strip().replace("-", "/")
     try:
-        jy, jm, jd = [int(x) for x in t.split("/")]
+        jy, jm, jd = [int(x) for x in t.split("/")[:3]]
+    except Exception:
+        return None
+    try:
+        if jy >= 1700:
+            # Gregorian input (e.g., 2025/02/01)
+            return _date(jy, jm, jd)
+        # Jalali input (e.g., 1403/05/20)
         return jdatetime.date(jy, jm, jd).togregorian()
     except Exception:
         return None
+
 
 BELT_BASE = {
     "white": "white", "سفید": "white",
@@ -141,11 +219,17 @@ def _wc_includes(wc, val: float) -> bool:
     return (val >= lo) and (val <= hi)
 
 def _gender_ok_for_wc(comp, wc_gender):
-    if not getattr(comp, "gender", None):
+    rg = _norm_gender(getattr(comp, "gender", None))
+    wg = _norm_gender(wc_gender)
+
+    # مسابقه مختلط یا بدون محدودیت → همهٔ وزن‌ها (male/female/None) مجاز
+    if rg in (None, "", "both"):
         return True
-    if not wc_gender:
+    # مسابقه تک‌جنسیتی → اگر وزن جنسیت ندارد، اوکی؛ وگرنه باید برابر باشد
+    if wg in (None, "",):
         return True
-    return str(wc_gender) == str(comp.gender)
+    return wg == rg
+
 
 def _find_belt_group_label(comp, player_belt_code: str) -> str | None:
     for g in comp.belt_groups.all().prefetch_related("belts"):
@@ -335,13 +419,7 @@ class KyorugiCompetitionDetailSerializer(serializers.ModelSerializer):
         )
 
     def _get_player_belt(self, prof):
-        pri = (
-            getattr(prof, "belt_grade", None)
-            or getattr(prof, "belt_name", None)
-            or getattr(prof, "belt_level", None)
-            or getattr(prof, "belt_code", None)
-        )
-        return _norm_belt(pri)
+        return _player_belt_code_from_profile(prof)
 
     def get_user_eligible_self(self, obj):
         req = self.context.get("request")
@@ -352,17 +430,25 @@ class KyorugiCompetitionDetailSerializer(serializers.ModelSerializer):
         if not prof:
             return False
 
-        gender_ok = True
-        if getattr(obj, "gender", None) and getattr(prof, "gender", None):
-            gender_ok = (obj.gender == prof.gender)
+        # ✅ جنسیت با نرمال‌سازی
+        rg = _norm_gender(getattr(obj, "gender", None))
+        pg = _norm_gender(getattr(prof, "gender", None))
 
+        if rg in (None, "", "both"):  # ✅ مختلط یا بدون محدودیت
+            gender_ok = True
+        elif pg:  # مسابقه تک‌جنسیتی و پروفایل جنسیت دارد
+            gender_ok = (rg == pg)
+        else:  # مسابقه تک‌جنسیتی ولی پروفایل بی‌جنسیت
+            gender_ok = False
+        # سن (برای کیوروگی برقرار بماند)
         dob_j = _parse_jalali_str(getattr(prof, "birth_date", None))
         from_j = _g2j(getattr(obj.age_category, "from_date", None)) if obj.age_category else None
-        to_j   = _g2j(getattr(obj.age_category, "to_date", None))   if obj.age_category else None
+        to_j = _g2j(getattr(obj.age_category, "to_date", None)) if obj.age_category else None
         age_ok = True
         if from_j and to_j:
             age_ok = bool(dob_j and (from_j <= dob_j <= to_j))
 
+        # کمربند
         allowed = set(_allowed_belts(obj))
         player_belt = self._get_player_belt(prof)
         belt_ok = True if not allowed else bool(player_belt and player_belt in allowed)
@@ -384,7 +470,7 @@ class KyorugiCompetitionDetailSerializer(serializers.ModelSerializer):
         data = {
             "registration_open": bool(obj.registration_open),
             "in_reg_window": bool(in_reg_window),
-            "required_gender": getattr(obj, "gender", None),
+            "required_gender": _norm_gender(getattr(obj, "gender", None)),  # ✅
             "player_gender": None,
             "gender_ok": None,
             "age_from": self.get_age_from(obj),
@@ -404,15 +490,22 @@ class KyorugiCompetitionDetailSerializer(serializers.ModelSerializer):
         if not prof:
             return data
 
-        data["profile_role"] = getattr(prof, "role", None)
-        data["player_gender"] = getattr(prof, "gender", None)
-        if data["required_gender"] and data["player_gender"]:
-            data["gender_ok"] = (data["required_gender"] == data["player_gender"])
+        data["required_gender"] = _norm_gender(getattr(obj, "gender", None))
+        data["player_gender"] = _norm_gender(getattr(prof, "gender", None))
+
+        rg, pg = data["required_gender"], data["player_gender"]
+        if rg in (None, "", "both"):
+            data["gender_ok"] = True
+        elif pg:
+            data["gender_ok"] = (rg == pg)
+        else:
+            data["gender_ok"] = False
+
 
         dob_j = _parse_jalali_str(getattr(prof, "birth_date", None))
         data["player_dob"] = _j2str(dob_j) if dob_j else None
         from_j = _g2j(getattr(obj.age_category, "from_date", None)) if obj.age_category else None
-        to_j   = _g2j(getattr(obj.age_category, "to_date", None))   if obj.age_category else None
+        to_j = _g2j(getattr(obj.age_category, "to_date", None)) if obj.age_category else None
         data["age_ok"] = bool(dob_j and from_j and to_j and (from_j <= dob_j <= to_j))
 
         data["player_belt"] = self._get_player_belt(prof)
@@ -420,6 +513,144 @@ class KyorugiCompetitionDetailSerializer(serializers.ModelSerializer):
         data["belt_ok"] = True if not allowed else bool(data["player_belt"] and data["player_belt"] in allowed)
 
         return data
+
+
+# --- Poomsae detail serializer with eligibility ---
+class PoomsaeCompetitionDetailSerializer(serializers.ModelSerializer):
+    age_category_name  = serializers.CharField(source="age_category.name", read_only=True)
+    gender_display     = serializers.CharField(source="get_gender_display", read_only=True)
+    belt_level_display = serializers.CharField(source="get_belt_level_display", read_only=True)
+    style_display      = serializers.CharField(read_only=True)
+
+    registration_start_jalali = serializers.SerializerMethodField()
+    registration_end_jalali   = serializers.SerializerMethodField()
+    draw_date_jalali          = serializers.SerializerMethodField()
+    competition_date_jalali   = serializers.SerializerMethodField()
+
+    belt_groups_display = serializers.SerializerMethodField()
+    can_register        = serializers.SerializerMethodField()
+    user_eligible_self  = serializers.SerializerMethodField()
+    eligibility_debug   = serializers.SerializerMethodField()
+
+    images = CompetitionImageSerializer(many=True, read_only=True)
+    files  = CompetitionFileSerializer(many=True, read_only=True)
+
+    class Meta:
+        model  = PoomsaeCompetition
+        fields = [
+            "id","public_id","title","poster","entry_fee",
+            "age_category_name","gender_display","belt_level_display","style_display",
+            "city","address",
+            "registration_open",
+            "registration_start","registration_end","draw_date","competition_date",
+            "registration_start_jalali","registration_end_jalali","draw_date_jalali","competition_date_jalali",
+            "belt_groups_display",
+            "images","files",
+            "can_register","user_eligible_self","eligibility_debug",
+        ]
+
+    # --- dates (jalali) ---
+    def get_registration_start_jalali(self, obj): return _to_jalali_date_str(obj.registration_start)
+    def get_registration_end_jalali(self, obj):   return _to_jalali_date_str(obj.registration_end)
+    def get_draw_date_jalali(self, obj):          return _to_jalali_date_str(obj.draw_date)
+    def get_competition_date_jalali(self, obj):   return _to_jalali_date_str(obj.competition_date)
+
+    def get_belt_groups_display(self, obj):
+        names = list(obj.belt_groups.values_list("label", flat=True))
+        return "، ".join([n for n in names if n]) if names else ""
+
+    # --- register window ---
+    def get_can_register(self, obj):
+        if not obj.registration_open:
+            return False
+        today = timezone.localdate()
+        if obj.registration_start and obj.registration_end:
+            return obj.registration_start <= today <= obj.registration_end
+        return True
+
+    # --- helpers shared with کیوروگی ---
+    def _get_profile(self, user):
+        return (
+            UserProfile.objects.filter(user=user, role__in=["player","both"]).first()
+            or UserProfile.objects.filter(user=user).first()
+        )
+
+    def _get_player_belt(self, prof):
+        return _player_belt_code_from_profile(prof)
+
+    # --- eligibility main flag ---
+    # --- در همان فایل serializers.py: جایگزین دو متد زیر در PoomsaeCompetitionDetailSerializer ---
+
+    def get_user_eligible_self(self, obj):
+        req = self.context.get("request")
+        user = getattr(req, "user", None)
+        if not user or not user.is_authenticated:
+            return False
+        prof = self._get_profile(user)
+        if not prof:
+            return False
+
+        # جنسیت (CHANGED: normalize)
+        rg = _norm_gender(getattr(obj, "gender", None))
+        pg = _norm_gender(getattr(prof, "gender", None))
+
+        if rg in (None, "", "both"):  # مسابقه مختلط یا بدون محدودیت
+            gender_ok = True
+        elif pg:  # مسابقه تک‌جنسیتی، پروفایل هم جنسیت دارد
+            gender_ok = (rg == pg)
+        else:  # مسابقه تک‌جنسیتی ولی پروفایل جنسیت ندارد
+            gender_ok = False
+
+        # کمربند مثل قبل
+        allowed = set(_allowed_belts(obj))
+        player_belt = self._get_player_belt(prof)
+        belt_ok = True if not allowed else bool(player_belt and player_belt in allowed)
+
+        return bool(gender_ok and belt_ok)
+
+    def get_eligibility_debug(self, obj):
+        req = self.context.get("request")
+        user = getattr(req, "user", None)
+
+        today = timezone.localdate()
+        in_reg_window = True
+        if obj.registration_start and obj.registration_end:
+            in_reg_window = obj.registration_start <= today <= obj.registration_end
+
+        data = {
+            "registration_open": bool(obj.registration_open),
+            "in_reg_window": bool(in_reg_window),
+            "required_gender": _norm_gender(getattr(obj, "gender", None)),
+            "player_gender": None,
+            "gender_ok": None,
+            "age_from": _j2str(_g2j(getattr(obj.age_category, "from_date", None))) if obj.age_category else None,
+            "age_to": _j2str(_g2j(getattr(obj.age_category, "to_date", None))) if obj.age_category else None,
+            "player_dob": None,
+            "age_ok": True,  # پومسه سن شرط نیست
+            "allowed_belts": _allowed_belts(obj),
+            "player_belt": None,
+            "belt_ok": None,
+            "profile_role": None,
+        }
+
+        if not user or not user.is_authenticated:
+            return data
+
+        prof = self._get_profile(user)
+        if not prof:
+            return data
+
+        data["profile_role"] = getattr(prof, "role", None)
+        data["player_gender"] = _norm_gender(getattr(prof, "gender", None))
+        if data["required_gender"] and data["player_gender"]:
+            data["gender_ok"] = (data["required_gender"] == data["player_gender"])
+
+        data["player_belt"] = self._get_player_belt(prof)
+        allowed = set(data["allowed_belts"])
+        data["belt_ok"] = True if not allowed else bool(data["player_belt"] and data["player_belt"] in allowed)
+
+        return data
+
 
 # -------------------------------------------------
 # Register-self (بدون Division)
@@ -895,7 +1126,7 @@ class KyorugiBracketSerializer(serializers.Serializer):
 def _to_jalali_str(d):
     if not d:
         return None
-    if isinstance(d, (timezone.datetime,)):
+    if isinstance(d, _datetime):
         d = d.date()
     try:
         jd = jdatetime.date.fromgregorian(date=d)
@@ -965,7 +1196,10 @@ class SeminarSerializer(serializers.ModelSerializer):
 
     def get_is_open_for_registration(self, obj):
         today = timezone.localdate()
-        return bool(obj.registration_start <= today <= obj.registration_end)
+        if not obj.registration_start or not obj.registration_end:
+            return False
+        return obj.registration_start <= today <= obj.registration_end
+
 
 # -----------------------------
 # SeminarRegistration Serializer
@@ -1105,3 +1339,220 @@ class SeminarCardSerializer(serializers.ModelSerializer):
         if not obj.allowed_roles:
             return True
         return role in obj.allowed_roles
+
+
+
+
+class DashboardPoomsaeCompetitionSerializer(serializers.ModelSerializer):
+    age_category_name  = serializers.CharField(source="age_category.name", read_only=True)
+    gender_display     = serializers.CharField(source="get_gender_display", read_only=True)
+    belt_level_display = serializers.CharField(source="get_belt_level_display", read_only=True)
+    style_display      = serializers.CharField(read_only=True)
+
+    registration_start_jalali = serializers.SerializerMethodField()
+    registration_end_jalali   = serializers.SerializerMethodField()
+    draw_date_jalali          = serializers.SerializerMethodField()
+    competition_date_jalali   = serializers.SerializerMethodField()
+
+    can_register = serializers.SerializerMethodField()
+    status       = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PoomsaeCompetition
+        fields = [
+            "id", "public_id",
+            "title", "poster", "entry_fee",
+            "age_category_name", "gender_display", "belt_level_display",
+            "style_display",
+            "city",
+            "registration_open",
+            "registration_start", "registration_end",
+            "draw_date", "competition_date",
+            "registration_start_jalali", "registration_end_jalali",
+            "draw_date_jalali", "competition_date_jalali",
+            "can_register", "status",
+        ]
+
+    def get_registration_start_jalali(self, obj): return _to_jalali_date_str(obj.registration_start)
+    def get_registration_end_jalali(self, obj):   return _to_jalali_date_str(obj.registration_end)
+    def get_draw_date_jalali(self, obj):          return _to_jalali_date_str(obj.draw_date)
+    def get_competition_date_jalali(self, obj):   return _to_jalali_date_str(obj.competition_date)
+
+    def get_can_register(self, obj):
+        if not obj.registration_open:
+            return False
+        today = timezone.localdate()
+        if obj.registration_start and obj.registration_end:
+            return obj.registration_start <= today <= obj.registration_end
+        return True
+
+    def get_status(self, obj):
+        if not obj.competition_date:
+            return "unknown"
+        today = timezone.localdate()
+        if today < obj.competition_date:
+            return "upcoming"
+        elif today == obj.competition_date:
+            return "today"
+        return "finished"
+# serializers.py (همین فایل) – اضافه کنید:
+
+class PoomsaeSelfRegistrationSerializer(serializers.Serializer):
+    coach_code = serializers.CharField(allow_blank=True, required=False)
+    insurance_number = serializers.CharField()
+    insurance_issue_date = serializers.CharField()  # YYYY/MM/DD (jalali)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._competition = self.context.get("competition")      # PoomsaeCompetition
+        self._request = self.context.get("request")
+        self._player = None
+        self._coach = None
+        self._coach_code = ""
+        self._belt_group = None
+        self._issue_date_greg = None
+
+    def _player_belt_code(self, prof: UserProfile):
+        b_attr = getattr(prof, "belt", None)
+        if isinstance(b_attr, Belt):
+            return _norm_belt(getattr(b_attr, "name", None))
+        if isinstance(b_attr, int):
+            b = Belt.objects.filter(id=b_attr).first()
+            if b:
+                return _norm_belt(getattr(b, "name", None))
+        raw = (
+            getattr(prof, "belt_grade", None)
+            or getattr(prof, "belt_name", None)
+            or getattr(prof, "belt_level", None)
+            or getattr(prof, "belt_code", None)
+        )
+        return _norm_belt(raw)
+
+    def validate(self, attrs):
+        comp = self._competition
+        req = self._request
+        if not comp:
+            raise serializers.ValidationError({"__all__": "مسابقه یافت نشد."})
+
+        # پنجره ثبت‌نام
+        today = timezone.localdate()
+        if comp.registration_start and today < comp.registration_start:
+            raise serializers.ValidationError({"__all__": "ثبت‌نام هنوز شروع نشده است."})
+        if comp.registration_end and today > comp.registration_end:
+            raise serializers.ValidationError({"__all__": "مهلت ثبت‌نام به پایان رسیده است."})
+        if not comp.registration_open:
+            raise serializers.ValidationError({"__all__": "ثبت‌نام این مسابقه فعال نیست."})
+
+        # پروفایل بازیکن
+        player = UserProfile.objects.filter(user=req.user, role__in=["player","both"]).first()
+        if not player:
+            raise serializers.ValidationError({"__all__": "پروفایل بازیکن پیدا نشد."})
+        self._player = player
+
+        # جلوگیری از تکرار
+        if Enrollment.objects.filter(competition=comp, player=player).exists():
+            raise serializers.ValidationError({"__all__": "برای این مسابقه قبلاً ثبت‌نام کرده‌اید."})
+
+        # تاریخ بیمه (≥72h قبل از روز مسابقه)
+        issue_g = _to_greg_from_str_jalali(attrs.get("insurance_issue_date"))
+        if not issue_g:
+            raise serializers.ValidationError({"insurance_issue_date": "تاریخ صدور نامعتبر است (مثلاً ۱۴۰۳/۰۵/۲۰)."})
+        if comp.competition_date and issue_g > (comp.competition_date - timedelta(days=3)):
+            raise serializers.ValidationError({"insurance_issue_date": "تاریخ صدور باید حداقل ۷۲ ساعت قبل از برگزاری باشد."})
+        self._issue_date_greg = issue_g
+
+        # کُد مربی (اگر لازم بود)
+        coach_code = (attrs.get("coach_code") or "").strip()
+        need_coach = bool(getattr(comp, "coach_approval_required", False))
+        if need_coach:
+            if not coach_code:
+                raise serializers.ValidationError({"coach_code": "کد تأیید مربی الزامی است."})
+            appr = CoachApproval.objects.filter(
+                competition=comp, code=coach_code, is_active=True, terms_accepted=True
+            ).select_related("coach").first()
+            if not appr:
+                raise serializers.ValidationError({"coach_code": "کد مربی معتبر نیست."})
+            self._coach = appr.coach
+            self._coach_code = appr.code
+        else:
+            self._coach = getattr(player, "coach", None)
+            self._coach_code = coach_code or ""
+
+        # گروه کمربندی سازگار (اگر مسابقه گروه تعریف کرده)
+        belt_group = None
+        b_obj = getattr(player, "belt", None)
+        if isinstance(b_obj, Belt) and comp.belt_groups.exists():
+            for g in comp.belt_groups.all().prefetch_related("belts"):
+                if g.belts.filter(id=b_obj.id).exists():
+                    belt_group = g
+                    break
+        if belt_group is None:
+            code = self._player_belt_code(player)
+            if code:
+                belt_group = _find_belt_group_obj(comp, code)
+        if comp.belt_groups.exists() and not belt_group:
+            raise serializers.ValidationError({"belt_group": "کمربند شما با گروه‌های مسابقه سازگار نیست."})
+        self._belt_group = belt_group
+
+        # شماره بیمه
+        if not (attrs.get("insurance_number") or "").strip():
+            raise serializers.ValidationError({"insurance_number": "شماره بیمه الزامی است."})
+
+        return attrs
+
+    def create(self, validated_data):
+        comp   = self._competition
+        player = self._player
+        coach  = self._coach
+        coach_name = f"{getattr(coach,'first_name','')} {getattr(coach,'last_name','')}".strip() if coach else ""
+
+        club_obj   = getattr(player, "club", None)
+        club_name  = getattr(club_obj, "club_name", "") or ""
+        board_obj  = getattr(player, "tkd_board", None)
+        board_name = getattr(board_obj, "name", "") or ""
+        if not club_name and isinstance(getattr(player, "club_names", None), list):
+            club_name = "، ".join([c for c in player.club_names if c])
+
+        e = Enrollment.objects.create(
+            competition=comp,
+            player=player,
+            coach=coach,
+            coach_name=coach_name,
+            coach_approval_code=self._coach_code,
+
+            club=club_obj, club_name=club_name,
+            board=board_obj, board_name=board_name,
+
+            belt_group=self._belt_group,   # ✔ برای پومسه هم ذخیره می‌شود
+            weight_category=None,          # ❗ پومسه وزن ندارد
+
+            declared_weight=None,
+            insurance_number=validated_data.get("insurance_number"),
+            insurance_issue_date=self._issue_date_greg,
+            status="pending_payment",
+        )
+        return e
+
+    def to_representation(self, instance: Enrollment):
+        return {
+            "enrollment_id": instance.id,
+            "status": instance.status,
+            "paid": instance.is_paid,
+            "paid_amount": instance.paid_amount,
+            "bank_ref_code": instance.bank_ref_code,
+        }
+# serializers.py
+class EnrollmentLiteSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(source="player.first_name", read_only=True)
+    last_name  = serializers.CharField(source="player.last_name", read_only=True)
+    belt_group_label = serializers.CharField(source="belt_group.label", read_only=True)
+    age_category_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Enrollment
+        fields = ["id","first_name","last_name","belt_group_label","age_category_name","is_paid","paid_amount"]
+
+    def get_age_category_name(self, obj):
+        # از خود مسابقه بگیر (پومسه)
+        comp = obj.competition
+        return getattr(getattr(comp, "age_category", None), "name", None)

@@ -32,7 +32,7 @@ from .models import (
     AgeCategory, Belt, BeltGroup, WeightCategory, KyorugiCompetition,
     MatAssignment, CompetitionImage, CompetitionFile, CoachApproval, TermsTemplate,
     Enrollment, Draw, Match, DrawStart, KyorugiResult,
-    Seminar, SeminarRegistration,
+    Seminar, SeminarRegistration,PoomsaeCompetition, PoomsaeImage, PoomsaeFile, PoomsaeCoachApproval
 )
 from .services.draw_service import create_draw_for_group
 from .services.results_service import apply_results_and_points
@@ -310,6 +310,55 @@ class KyorugiCompetitionAdmin(admin.ModelAdmin):
 # -------------------------------------------------------------------
 # ادمین سن/کمربند/وزن
 # -------------------------------------------------------------------
+# ــــــ تنظیمات بازهٔ تاریخ برای دیت‌پیکر جلالی ــــــ
+# بازه‌ی گسترده برای دیت‌پیکر جلالی + چند اتربیوت کمکی
+JDP_RANGE_ATTRS = {
+    "data-jdp": "",
+    "data-jdp-min-date": "1300/01/01",
+    "data-jdp-max-date": "1450/12/29",
+    "autocomplete": "off",  # جلوگیری از اتوکامپلیت
+}
+
+def _to_greg(v):
+    import jdatetime
+    return v.togregorian() if isinstance(v, jdatetime.date) else v
+
+class AgeCategoryAdminForm(forms.ModelForm):
+    from_date = jforms.jDateField(
+        widget=jadmin.widgets.AdminjDateWidget(attrs=JDP_RANGE_ATTRS)
+    )
+    to_date = jforms.jDateField(
+        required=False,
+        widget=jadmin.widgets.AdminjDateWidget(attrs=JDP_RANGE_ATTRS)
+    )
+
+    class Meta:
+        model = AgeCategory
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        # مقداردهی اولیهٔ جلالی برای ویرایش رکوردهای موجود
+        super().__init__(*args, **kwargs)
+        import datetime, jdatetime
+        for name in ("from_date", "to_date"):
+            v = getattr(self.instance, name, None)
+            if not v:
+                continue
+            if isinstance(v, datetime.datetime):
+                v = v.date()
+            try:
+                self.initial[name] = jdatetime.date.fromgregorian(date=v)
+            except Exception:
+                pass
+
+    # تبدیل تاریخ‌های ورودی جلالی به میلادی پیش از ذخیره
+    def clean_from_date(self):
+        return _to_greg(self.cleaned_data.get("from_date"))
+
+    def clean_to_date(self):
+        return _to_greg(self.cleaned_data.get("to_date"))
+
+
 
 @admin.register(AgeCategory)
 class AgeCategoryAdmin(admin.ModelAdmin):
@@ -328,7 +377,7 @@ class AgeCategoryAdmin(admin.ModelAdmin):
     @admin.display(description="تا تاریخ تولد (شمسی)")
     def get_jalali_to_date(self, obj):
         if obj.to_date:
-            return jdatetime.date.fromgregorian(date=obj.to_date).strftime("%Y/%m/%d")
+            return jdatetime.date.fromgregorian(date=obj.to_date).strftime("%Y/%m/%د")
         return "-"
 
 
@@ -961,8 +1010,23 @@ class SeminarAdmin(admin.ModelAdmin):
     مدیریت سمینارها + نمای سفارشی لیست شرکت‌کنندگان
     """
     form = SeminarAdminForm
-    change_form_template = "admin/competitions/seminar/change_form.html"  # دکمه/لینک «شرکت‌کنندگان» در فرم
+    change_form_template = "admin/competitions/poomsae/change_form.html"  # تمپلیت ساده با یک دکمه اضافه
 
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "<int:pk>/build-divisions/",
+                self.admin_site.admin_view(self.build_divisions_view),
+                name="competitions_poomsae_build_divisions",
+            ),
+        ]
+        return custom + urls
+
+    def build_divisions_view(self, request, pk: int):
+        created = build_poomsae_divisions_for_competition(pk)
+        messages.success(request, f"{created} دیویژن جدید ساخته شد.")
+        return redirect(f"../change/")
     # لیست سمینارها
     list_display = (
         "title",
@@ -1179,3 +1243,86 @@ try:
 except admin.sites.NotRegistered:
     pass
 # پروکسی با @admin.register بالا ثبت شده است
+# ==================================================================== مسابقه پومسه ==========================================================
+
+class PoomsaeCoachApprovalInline(admin.TabularInline):
+    model = PoomsaeCoachApproval
+    extra = 0
+    fields = ("coach", "code", "terms_accepted", "is_active", "approved_at")
+    readonly_fields = ("code", "approved_at")
+
+class PoomsaeCompetitionAdminForm(forms.ModelForm):
+    registration_start = jforms.jDateField(widget=jadmin.widgets.AdminjDateWidget)
+    registration_end   = jforms.jDateField(widget=jadmin.widgets.AdminjDateWidget)
+    draw_date          = jforms.jDateField(required=False, widget=jadmin.widgets.AdminjDateWidget)
+    competition_date   = jforms.jDateField(widget=jadmin.widgets.AdminjDateWidget)
+
+    class Meta:
+        model = PoomsaeCompetition
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _init_jalali(self, ["registration_start", "registration_end", "draw_date", "competition_date"])
+
+    def clean_registration_start(self): return _to_greg(self.cleaned_data.get("registration_start"))
+    def clean_registration_end(self):   return _to_greg(self.cleaned_data.get("registration_end"))
+    def clean_draw_date(self):          return _to_greg(self.cleaned_data.get("draw_date"))
+    def clean_competition_date(self):   return _to_greg(self.cleaned_data.get("competition_date"))
+
+
+class PoomsaeImageInline(admin.TabularInline):
+    model = PoomsaeImage
+    extra = 1
+    verbose_name = "تصویر"
+    verbose_name_plural = "تصاویر پیوست"
+
+
+class PoomsaeFileInline(admin.TabularInline):
+    model = PoomsaeFile
+    extra = 1
+    verbose_name = "فایل PDF"
+    verbose_name_plural = "فایل‌های پیوست"
+
+
+@admin.register(PoomsaeCompetition)
+class PoomsaeCompetitionAdmin(admin.ModelAdmin):
+    form = PoomsaeCompetitionAdminForm
+
+    list_display = ("title", "style_col", "gender", "get_jalali_competition_date", "registration_open", "entry_fee")
+    search_fields = ("title", "public_id", "city", "address")
+    list_filter = (
+        "gender",
+        "belt_level",
+        "registration_open",
+        ("competition_date", JDateFieldListFilter),
+        ("registration_start", JDateFieldListFilter),
+        ("registration_end", JDateFieldListFilter),
+        # اگر خواستی: "age_categories" را هم می‌توانی فیلتر بذاری (اما روی M2M ممکن است UI شلوغ شود)
+    )
+    filter_horizontal = ("belt_groups", "age_categories")  # ⬅️ هر دو چندانتخابی
+    inlines = [PoomsaeImageInline, PoomsaeFileInline,PoomsaeCoachApprovalInline]
+    readonly_fields = ("public_id", "created_at")
+    ordering = ("-competition_date", "-id")
+    fieldsets = (
+        ("اطلاعات کلی", {
+            "fields": ("title", "poster", "entry_fee", "belt_level", "belt_groups", "age_categories", "gender")
+        }),
+        ("محل برگزاری", {"fields": ("city", "address")}),
+        ("تاریخ‌ها", {"fields": ("registration_start", "registration_end", "draw_date", "competition_date")}),
+        ("تنظیمات مسابقه", {"fields": ("registration_open",)}),
+        ("شناسه/سیستمی", {"fields": ("public_id", "created_at"), "classes": ("collapse",)}),
+        ("تعهدنامهٔ مربی", {
+            "fields": ("terms_template",),
+        }),
+    )
+
+    @admin.display(description="تاریخ برگزاری (شمسی)")
+    def get_jalali_competition_date(self, obj):
+        if obj.competition_date:
+            return jdatetime.date.fromgregorian(date=obj.competition_date).strftime("%Y/%m/%d")
+        return "-"
+
+    @admin.display(description="سبک")
+    def style_col(self, obj):
+        return getattr(obj, "style_display", "—")

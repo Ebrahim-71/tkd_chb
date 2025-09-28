@@ -8,14 +8,34 @@ import CoachAgreementFlow from "../competitions/CoachAgreementFlow";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
 
-// فقط همینی که توی URLconf شما هست:
-const DASHBOARD_URL = `${API_BASE}/api/competitions/auth/dashboard/kyorugi/`;
+// اندپوینت‌های داشبورد
+const DASHBOARD_ALL_URL = `${API_BASE}/api/competitions/auth/dashboard/all/`;
+const DASHBOARD_KY_URL  = `${API_BASE}/api/competitions/auth/dashboard/kyorugi/`;
+const DASHBOARD_PO_URL  = `${API_BASE}/api/competitions/auth/dashboard/poomsae/`;
 
 // --- نقش/توکن ---
-function getRole() {
-  return (localStorage.getItem("user_role") || "guest").toLowerCase();
+function getUserRoles() {
+  const raw = String(localStorage.getItem("user_role") || "").toLowerCase();
+  const parts = raw.split(/[,\s]+/).filter(Boolean);
+  const s = new Set(parts);
+  if (s.has("both")) {
+    s.add("player");
+    s.add("coach");
+    s.delete("both");
+  }
+  return Array.from(s);
 }
-const isClubLike = (r) => ["club", "heyat", "board"].includes(String(r).toLowerCase());
+function roleForPath(roles) {
+  if (roles.includes("coach")) return "coach";
+  if (roles.includes("referee")) return "referee";
+  if (roles.includes("club")) return "club";
+  if (roles.includes("heyat")) return "heyat";
+  if (roles.includes("board")) return "board";
+  if (roles.includes("player")) return "player";
+  return "guest";
+}
+const isClubLike = (roles) =>
+  roles.some((r) => ["club", "heyat", "board"].includes(String(r).toLowerCase()));
 
 function candidateTokens(priorRole) {
   const keys = [
@@ -34,7 +54,7 @@ function candidateTokens(priorRole) {
     const v = localStorage.getItem(k);
     if (v && !out.includes(v)) out.push(v);
   }
-  return out; // ممکنه فقط یک توکن داشته باشید؛ مشکلی نیست
+  return out;
 }
 
 function normalizeList(payload) {
@@ -45,7 +65,6 @@ function normalizeList(payload) {
   return [];
 }
 
-// یک URL رو با چند توکن امتحان می‌کنیم؛ اگر 200 شد، لیستش رو برمی‌گردونیم
 async function tryUrlWithTokens(url, tokens) {
   for (const t of tokens.length ? tokens : [null]) {
     try {
@@ -55,35 +74,74 @@ async function tryUrlWithTokens(url, tokens) {
       return { ok: true, status: res.status, data: normalizeList(res.data) };
     } catch (e) {
       const st = e?.response?.status;
-      if (st === 401 || st === 403) continue; // برو توکن بعدی/URL بعدی
-      // خطای دیگر (۴۰۴/۵۰۰/…) → ادامه بده
+      if (st === 401 || st === 403) continue;
     }
   }
   return { ok: false, status: null, data: [] };
 }
 
-// چند URL متداول را پشت هم تست می‌کنیم تا یکی جواب بده
-async function getDashboardListFor(role) {
-  const urls = [
-    `${DASHBOARD_URL}?scope=all`,
-    `${DASHBOARD_URL}?all=1`,
-    `${DASHBOARD_URL}?visibility=public`,
-    `${DASHBOARD_URL}?role=${encodeURIComponent(role)}`,
-    DASHBOARD_URL, // آخرین تلاش: بدون پارامتر
-  ];
-  const tokens = candidateTokens(role);
-
+async function getDashboardList(roles) {
+  const prior = roleForPath(roles);
+  const tokens = candidateTokens(prior);
+  const urls = [DASHBOARD_ALL_URL, DASHBOARD_KY_URL, DASHBOARD_PO_URL];
   for (const u of urls) {
     const r = await tryUrlWithTokens(u, tokens);
-    if (r.ok) return r.data; // حتی اگر خالی بود، یعنی درخواست موفق ولی چیزی برای نقش شما نیست
+    if (r.ok) return r.data;
   }
-  return []; // هیچی گیر نیومد
+  return [];
 }
+
+// --- سبک‌ها ---
+const isKyorugi = (m) => {
+  const s = String(m?.style_display || m?.style || "").trim().toLowerCase();
+  return s.includes("کیوروگی") || s.includes("kyorugi") || s.includes("kyor");
+};
+const isPoomsae = (m) => {
+  const s = String(m?.style_display || m?.style || "").trim().toLowerCase();
+  return s.includes("پوم") || s.includes("poom"); // "پومسه" یا "poomsae"
+};
+
+// --- تایید مربی برای پومسه ---
+const isPoomsaeApproved = (m) => {
+  // اگر بک‌اند فیلد یکپارچه بده، اولویت با همونه
+  const getBool = (v) =>
+    typeof v === "boolean" ? v : (typeof v === "string" ? v.toLowerCase() === "true" : null);
+
+  const candidates = [
+    m?.coach_approved_unified,          // ✅ اگر اضافه شد
+    m?.poomsae_coach_approved,
+    m?.poomsae?.coach_approved,
+    m?.poomsae_coach_approval?.approved,
+    // برخی APIها فیلد عمومی می‌فرستند:
+    m?.coach_approved,
+    m?.coachApproved,
+    m?.coach_approval?.approved,
+  ];
+
+  let sawExplicitFlag = false;
+  for (const v of candidates) {
+    if (v === undefined) continue;
+    const b = getBool(v);
+    if (b === null) continue;
+    sawExplicitFlag = true;
+    return b; // به محض یافتن مقدار معتبر، همون رو برگردون
+  }
+  // اگر هیچ فلگی موجود نبود، یعنی ویو بک‌اند قبلاً فیلتر کرده → اعتماد کن
+  return !sawExplicitFlag ? true : false;
+};
 
 const MatchesSection = () => {
   const navigate = useNavigate();
 
-  const role = useMemo(getRole, []);
+  const roles = useMemo(getUserRoles, []);
+  const rolePath = useMemo(() => roleForPath(roles), [roles]);
+
+  // ✅ نقش ذخیره‌شده در localStorage (Dashboard بر همین اساس ریدایرکت می‌کند)
+  const storedRole = useMemo(
+    () => (localStorage.getItem("user_role") || "guest").toLowerCase(),
+    []
+  );
+
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -93,15 +151,54 @@ const MatchesSection = () => {
 
   const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
 
+  // ناوبری به جزئیات — حتماً با storedRole بساز که با منطق Dashboard همخوان باشد
+  const pushToDetails = (slug, opts = {}) => {
+    if (!slug) return;
+    const base = `/dashboard/${encodeURIComponent(storedRole)}/competitions/${encodeURIComponent(slug)}`;
+    navigate(opts.view === "details" ? `${base}?view=details` : base);
+  };
+
+  // کلیک روی «جزئیات و ثبت‌نام»
+  const handleDetailsClick = (comp) => {
+    if (!comp?.public_id) return;
+
+    // مربی (و نقش‌های both که شامل coach می‌شوند): مودال تعهدنامه
+    if (roles.includes("coach")) {
+      setSelectedMatch(comp);
+      setShowTermsModal(true);
+      return;
+    }
+
+    // داور/باشگاه/هیئت → مستقیم
+    if (roles.includes("referee") || isClubLike(roles)) {
+      pushToDetails(comp.public_id, { view: "details" });
+      return;
+    }
+
+    // بازیکن/سایر → مستقیم
+    pushToDetails(comp.public_id);
+  };
+
+  const handleModalCancel = () => {
+    setShowTermsModal(false);
+    setSelectedMatch(null);
+  };
+
+  // ✅ وقتی تعهدنامه تایید شد و کاربر «ادامه» را زد → برو صفحه جزئیات با storedRole
+  const handleModalDone = (slugFromChild) => {
+    const slug = slugFromChild || selectedMatch?.public_id;
+    setShowTermsModal(false);
+    setSelectedMatch(null);
+    if (slug) pushToDetails(slug);
+  };
+
   useEffect(() => {
     let alive = true;
-
     (async () => {
       setLoading(true);
       setErr("");
 
-      // اگه لاگین نیستیم:
-      const tokens = candidateTokens(role);
+      const tokens = candidateTokens(rolePath);
       if (!tokens.length) {
         setLoading(false);
         setErr("ابتدا وارد حساب شوید.");
@@ -110,16 +207,41 @@ const MatchesSection = () => {
       }
 
       try {
-        // ✅ برای همهٔ نقش‌ها از داشبورد می‌خوانیم
-        const list = await getDashboardListFor(role);
-
+        const list = await getDashboardList(roles);
         if (!alive) return;
-        setMatches(Array.isArray(list) ? list : []);
-        if (!list.length && isClubLike(role)) {
-          // پیام راهنما برای هیئت/باشگاه وقتی لیست خالیه
+
+        // Player-only
+        const playerOnly =
+          roles.includes("player") &&
+          !roles.some((r) => ["coach", "referee", "club", "heyat", "board"].includes(r));
+
+        let data = Array.isArray(list) ? list : [];
+        if (playerOnly) {
+          // ✅ کیوروگی مثل قبل میاد؛
+          // ✅ پومسه فقط وقتی میاد که مربی تایید کرده باشه.
+          data = data.filter(
+            (item) => isKyorugi(item) || (isPoomsae(item) && isPoomsaeApproved(item))
+          );
+        }
+
+        // مرتب‌سازی: جدیدترین بالا
+        const getTime = (x) => {
+          const s = x?.created_at || x?.competition_date || null;
+          const t = s ? Date.parse(s) : NaN;
+          return Number.isNaN(t) ? -Infinity : t;
+        };
+        data.sort((a, b) => {
+          const tb = getTime(b);
+          const ta = getTime(a);
+          if (tb !== ta) return tb - ta;
+          return (b?.id ?? 0) - (a?.id ?? 0);
+        });
+
+        setMatches(data);
+
+        if (!data.length && isClubLike(roles)) {
           setErr(
-            "مسابقه‌ای برای نمایش پیدا نشد. اگر انتظار دارید همهٔ مسابقات را ببینید، " +
-              "در بک‌اند خروجی اندپوینت «/auth/dashboard/kyorugi/» را برای نقش هیئت/باشگاه گسترده‌تر کنید (مثلاً با ?scope=all)."
+            "مسابقه‌ای برای نمایش پیدا نشد. اگر انتظار دارید همهٔ مسابقات را ببینید، خروجی «/auth/dashboard/all/» را برای نقش هیئت/باشگاه گسترده‌تر کنید."
           );
         }
       } catch (e) {
@@ -130,45 +252,14 @@ const MatchesSection = () => {
         alive && setLoading(false);
       }
     })();
-
     return () => {
       alive = false;
     };
-  }, [role]);
-
-  const pushToDetails = (slug, opts = {}) => {
-    if (!slug) return;
-    const base = `/dashboard/${encodeURIComponent(role)}/competitions/${encodeURIComponent(slug)}`;
-    navigate(opts.view === "details" ? `${base}?view=details` : base);
-  };
-
-  const handleDetailsClick = (comp) => {
-    if (!comp?.public_id) return;
-    if (role === "coach" || role === "both") {
-      setSelectedMatch(comp);
-      setShowTermsModal(true);
-    } else if (role === "referee" || role === "player") {
-      pushToDetails(comp.public_id);
-    } else if (isClubLike(role)) {
-      pushToDetails(comp.public_id, { view: "details" }); // بدون «ثبت‌نام خودم»
-    } else {
-      pushToDetails(comp.public_id);
-    }
-  };
-
-  const handleModalDone = () => {
-    setShowTermsModal(false);
-    if (selectedMatch?.public_id) pushToDetails(selectedMatch.public_id);
-    setSelectedMatch(null);
-  };
-  const handleModalCancel = () => {
-    setShowTermsModal(false);
-    setSelectedMatch(null);
-  };
+  }, [roles, rolePath]);
 
   return (
     <div style={{ padding: "2rem" }} dir="rtl">
-      <h2>مسابقات کیوروگی</h2>
+      <h2>مسابقات</h2>
 
       {loading ? (
         <div>در حال بارگذاری…</div>
