@@ -23,9 +23,6 @@ from django.utils.timezone import now
 # بالا: imports
 from datetime import date as _d, datetime as _dt
 
-
-
-
 from rest_framework import views, viewsets, generics, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
@@ -46,6 +43,7 @@ from .models import (
 from .permissions import IsCoach, IsPlayer
 
 # --- Project serializers / utils
+# --- Project serializers / utils
 from .serializers import (
     # Kyorugi
     KyorugiCompetitionDetailSerializer,
@@ -59,7 +57,9 @@ from .serializers import (
     # Seminars
     SeminarSerializer, SeminarRegistrationSerializer, SeminarCardSerializer,
     # Poomsae
-    PoomsaeCompetitionDetailSerializer, DashboardPoomsaeCompetitionSerializer,
+    PoomsaeCompetitionDetailSerializer, DashboardPoomsaeCompetitionSerializer, PoomsaeSelfRegistrationSerializer,
+    # ↓↓↓ اضافه‌ها
+    POOMSAE_ENABLED, POOMSAE_SERIALIZER_ENABLED, CARD_READY_STATUSES, _required_gender_for_comp,
 )
 
 POOMSAE_ENABLED = True
@@ -68,30 +68,92 @@ POOMSAE_SERIALIZER_ENABLED = True
 # وضعیت‌هایی که کارت آماده نمایش است
 CARD_READY_STATUSES = {"paid", "confirmed", "approved", "accepted", "completed"}
 
-def _poomsae_user_eligible(comp, user):
+# داخل CompetitionDetailAnyView
+def _poomsae_user_eligible(self, comp, user):
+    """
+    صلاحیتِ کاربر برای پومسه: جنسیت + کمربند (سن در خودِ serializerها چک می‌شود).
+    این نسخه self-contained است و به هِلپرهای خارجی وابسته نیست.
+    """
     if not user or not getattr(user, "is_authenticated", False):
         return None
+
+    # پروفایل بازیکن
     prof = (UserProfile.objects.filter(user=user, role__in=["player", "both"]).first()
             or UserProfile.objects.filter(user=user).first())
     if not prof:
         return False
 
-    # فقط male/female یا None
-    rg = _required_gender_for_comp(comp)  # ← دیگه "both" نداریم
+    # --- نرمال‌سازی جنسیت (مینیمال)
+    def _norm_gender(v):
+        if v is None:
+            return None
+        t = str(v).strip().lower().replace("ي", "ی").replace("ك", "ک").replace("‌", "").replace("-", "")
+        m = {
+            "male": "male", "m": "male", "man": "male",
+            "آقا": "male", "اقا": "male", "مرد": "male",
+            "آقایان": "male", "آقايان": "male", "اقایان": "male",
+            "female": "female", "f": "female", "woman": "female",
+            "زن": "female", "خانم": "female", "بانو": "female",
+            "بانوان": "female", "خانم‌ها": "female", "خانمها": "female",
+            "both": "both", "mixed": "both", "مختلط": "both",
+            "هردو": "both", "هر دو": "both",
+        }
+        return m.get(t, t)
+
+    rg = _norm_gender(getattr(comp, "gender", None))
     pg = _norm_gender(getattr(prof, "gender", None))
-    gender_ok = True if rg is None else (pg == rg)
+    gender_ok = True if rg in (None, "", "both") else bool(pg and (pg == rg))
+
+    # --- نرمال‌سازی کمربند و بررسی اجازه
+    def _to_en_digits(s):
+        if s is None: return s
+        dmap = {ord(p): str(i) for i, p in enumerate("۰۱۲۳۴۵۶۷۸۹")}
+        dmap.update({ord(a): str(i) for i, a in enumerate("٠١٢٣٤٥٦٧٨٩")})
+        return str(s).translate(dmap)
+
+    def _norm_belt_label(s):
+        if not s:
+            return None
+        t = _to_en_digits(str(s)).strip().lower().replace("ي", "ی").replace("ك", "ک")
+        if "مشکی" in t or "مشكى" in t or "black" in t:
+            return "black"
+        for k, v in {
+            "white": "white", "سفید": "white",
+            "yellow": "yellow", "زرد": "yellow",
+            "green": "green", "سبز": "green",
+            "blue": "blue", "آبی": "blue", "ابي": "blue", "ابی": "blue",
+            "red": "red", "قرمز": "red",
+        }.items():
+            if k in t:
+                return v
+        if t in {"white","yellow","green","blue","red","black"}:
+            return t
+        return None
 
     allowed = set()
     if getattr(comp, "belt_groups", None) and comp.belt_groups.exists():
         for g in comp.belt_groups.all().prefetch_related("belts"):
             for b in g.belts.all():
                 nm = getattr(b, "name", "") or getattr(b, "label", "")
-                code = _norm_belt(nm)
+                code = _norm_belt_label(nm)
                 if code:
                     allowed.add(code)
 
-    player_belt_code = _player_belt_code_from_profile(prof)
-    belt_ok = True if not allowed else (player_belt_code in allowed)
+    # از پروفایل بازیکن کمربند را استخراج کن (چند فیلد رایج)
+    belt_code = None
+    b_attr = getattr(prof, "belt", None)
+    from competitions.models import Belt  # اگر همان app است
+    if isinstance(b_attr, Belt):
+        belt_code = _norm_belt_label(getattr(b_attr, "name", None) or getattr(b_attr, "label", None))
+    else:
+        for fld in ("belt_grade", "belt_name", "belt_level", "belt_code"):
+            raw = getattr(prof, fld, None)
+            if raw:
+                belt_code = _norm_belt_label(raw)
+                if belt_code:
+                    break
+
+    belt_ok = True if not allowed else bool(belt_code and belt_code in allowed)
     return bool(gender_ok and belt_ok)
 
 
@@ -103,23 +165,35 @@ def _gender_norm(val):
     }
     return m.get(str(val).strip().lower(), None)
 
-def _required_gender_for_comp(comp) -> str | None:
-    g = _gender_norm(getattr(comp, "gender", None))
-    return g if g in ("male", "female") else None
+def _required_gender_for_comp(comp):
+    g = getattr(comp, "gender", None)
+    if not g:
+        return None
+    t = str(g).strip().lower().replace("‌","").replace("-", "")
+    mapping = {
+        "m": "male", "male": "male", "man": "male", "آقا": "male", "اقا": "male", "مرد": "male", "آقایان": "male",
+        "f": "female", "female": "female", "woman": "female", "زن": "female", "خانم": "female", "بانوان": "female",
+        "both": "both", "mixed": "both", "مختلط": "both", "هر دو": "both", "هردو": "both",
+    }
+    return mapping.get(t, t)
 
 
-def _get_comp_any_by_key(key):
-    s = str(key).strip()
-    obj = KyorugiCompetition.objects.filter(public_id=s).first()
-    if not obj and s.isdigit():
-        obj = KyorugiCompetition.objects.filter(id=int(s)).first()
-    if not obj and PoomsaeCompetition:
-        obj = PoomsaeCompetition.objects.filter(public_id=s).first() or (
-            PoomsaeCompetition.objects.filter(id=int(s)).first() if s.isdigit() else None
-        )
-    if not obj:
-        raise Http404
-    return obj
+def _get_comp_any_by_key(key: str):
+    """
+    key می‌تواند id عددی، یا public_id باشد. اول پومسه، بعد کیوروگی.
+    """
+    # عددی؟
+    if str(key).isdigit():
+        pk = int(key)
+        obj = PoomsaeCompetition.objects.filter(pk=pk).first()
+        if obj: return obj
+        return KyorugiCompetition.objects.get(pk=pk)
+
+    # public_id
+    obj = PoomsaeCompetition.objects.filter(public_id=key).first()
+    if obj: return obj
+    return get_object_or_404(KyorugiCompetition, public_id=key)
+
 
 
 def _enr_label(e):
@@ -1444,17 +1518,176 @@ def sidebar_seminars(request):
 
 
 # ------------------------------------------------------------- پومسه (اختیاری/ایمن) -------------------------------------------------------------
+# ============================= Config & Constants =============================
 
-class DashboardPoomsaeListView(views.APIView):
+# از همون‌هایی که قبلاً داشتی استفاده کن
+
+POOMSAE_ENABLED = getattr(settings, "POOMSAE_ENABLED", True)
+POOMSAE_SERIALIZER_ENABLED = getattr(settings, "POOMSAE_SERIALIZER_ENABLED", True)
+CARD_READY_STATUSES = getattr(settings, "CARD_READY_STATUSES",
+                              {"paid", "confirmed", "approved", "accepted", "completed"})
+
+# ============================= Helpers (generic) ==============================
+
+_RTL = r"[\u200e\u200f\u202a-\u202e\u2066-\u2069\u200c]"
+_DIGMAP_FA2EN = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+_DIGMAP_EN2FA = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+def _strip_rtl(s: str) -> str:
+    return re.sub(_RTL, "", str(s or ""))
+
+def _fa2en(s: str) -> str:
+    return str(s or "").translate(_DIGMAP_FA2EN)
+
+def _en2fa(s: str) -> str:
+    return str(s or "").translate(_DIGMAP_EN2FA)
+
+def _dequote(s: str) -> str:
+    s = str(s or "").strip()
+    if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+        s = s[1:-1].strip()
+    return s
+
+def _required_gender_for_comp(comp):
+    g = getattr(comp, "gender", None)
+    if not g:
+        return None
+    t = str(g).strip().lower().replace("‌", "").replace("-", "")
+    mapping = {
+        "m": "male", "male": "male", "man": "male",
+        "آقا": "male", "اقا": "male", "مرد": "male", "آقایان": "male",
+        "f": "female", "female": "female", "woman": "female",
+        "خانم": "female", "بانوان": "female", "زن": "female",
+        "both": "both", "mixed": "both", "مختلط": "both", "هردو": "both", "هر دو": "both",
+    }
+    return mapping.get(t, t)
+
+def _get_comp_any_by_key(key: str):
+    """Resolve competition by numeric pk or string public_id (Poomsae first, then Kyorugi)."""
+    if str(key).isdigit():
+        pk = int(key)
+        obj = PoomsaeCompetition.objects.filter(pk=pk).first()
+        if obj:
+            return obj
+        return get_object_or_404(KyorugiCompetition, pk=pk)
+    obj = PoomsaeCompetition.objects.filter(public_id=key).first()
+    if obj:
+        return obj
+    return get_object_or_404(KyorugiCompetition, public_id=key)
+
+def _as_date(val):
+    """
+    Cast date/datetime/str (Gregorian or Jalali) to date (Gregorian). Return None if parse fails.
+    """
+    if not val:
+        return None
+    if isinstance(val, date_cls) and not isinstance(val, dt_cls):
+        return val
+    if isinstance(val, dt_cls):
+        return val.date()
+    try:
+        s = _dequote(_fa2en(_strip_rtl(val))).replace("-", "/")
+        y, m, d = [int(x) for x in s.split("/")[:3]]
+        if y < 1700:  # Jalali
+            return jdatetime.date(y, m, d).togregorian()
+        return date_cls(y, m, d)
+    except Exception:
+        return None
+
+def _fk_name_pointing_to(model_cls, target_obj):
+    """Find FK field name in model_cls pointing to target_obj.__class__."""
+    from django.db.models import ForeignKey as FK
+    for f in model_cls._meta.get_fields():
+        if isinstance(f, FK) and f.related_model is target_obj.__class__:
+            return f.name
+    return None
+
+def _first_existing_attr(obj, names, default=None):
+    for n in names:
+        if hasattr(obj, n):
+            return getattr(obj, n)
+    return default
+
+def _resolve_enrollment_model_for(comp_obj_or_cls=None):
+    """
+    Return an enrollment model that FK's to the competition class (prefer PoomsaeEnrollment).
+    """
+    target_cls = None
+    if comp_obj_or_cls is not None:
+        target_cls = comp_obj_or_cls if isinstance(comp_obj_or_cls, type) else comp_obj_or_cls.__class__
+
+    preferred_labels = [
+        # Poomsae first
+        "competitions.PoomsaeEnrollment",
+        "enrollments.PoomsaeEnrollment",
+        # Then generic/legacy
+        "competitions.Enrollment",
+        "enrollments.Enrollment",
+        "competitions.CompetitionEnrollment",
+        "enrollments.CompetitionEnrollment",
+    ]
+    for label in preferred_labels:
+        try:
+            m = apps.get_model(label)
+            if not m:
+                continue
+            if target_cls is None:
+                return m
+            for f in m._meta.get_fields():
+                if isinstance(f, ForeignKey) and f.related_model is target_cls:
+                    return m
+        except Exception:
+            continue
+
+    if target_cls is not None:
+        for m in apps.get_models():
+            for f in m._meta.get_fields():
+                if isinstance(f, ForeignKey) and f.related_model is target_cls:
+                    return m
+    return None
+
+def _try_get_playerish_instance(user):
+    """
+    Return a 'player-like' profile instance for user if available; fallback to user.
+    """
+    for attr in ("playerprofile", "athleteprofile", "profile", "userprofile"):
+        inst = getattr(user, attr, None)
+        if inst:
+            return inst
+
+    User = get_user_model()
+    for Model in apps.get_models():
+        name = Model.__name__.lower()
+        if "profile" not in name and "athlete" not in name and "player" not in name:
+            continue
+        for f in Model._meta.get_fields():
+            if isinstance(f, (OneToOneField, ForeignKey)) and f.related_model is User:
+                try:
+                    return Model.objects.get(**{f.name: user})
+                except Model.DoesNotExist:
+                    continue
+    return user
+
+def _parse_jalali_date(s: str):
+    if not s:
+        return None
+    try:
+        t = _dequote(_fa2en(_strip_rtl(s))).replace('-', '/')
+        y, m, d = [int(x) for x in t.split('/')[:3]]
+        return jdatetime.date(y, m, d).togregorian() if y < 1700 else date_cls(y, m, d)
+    except Exception:
+        return None
+
+# ============================= Views: Dashboard (Poomsae) =====================
+class DashboardPoomsaeListView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        # اگر مدل پومسه فعال نیست
         if not POOMSAE_ENABLED:
             return Response([], status=200)
 
-        # تشخیص نقش
+        # role detection
         role = ""
         prof = UserProfile.objects.filter(user=request.user).first()
         if prof and prof.role:
@@ -1469,11 +1702,9 @@ class DashboardPoomsaeListView(views.APIView):
         only_open = str(request.query_params.get("only_open", "")).lower() in {"1", "true", "yes"}
         today = now().date()
 
-        # پایهٔ کوئری (بدون انتخاب فیلدهای مشکل‌زا)
         qs = PoomsaeCompetition.objects.all().defer("terms_template")
 
         if role == "player":
-            # بازیکن فقط مسابقاتی را ببیند که مربی‌اش تعهد را تأیید کرده
             if prof and getattr(prof, "coach", None):
                 appr_exists = Exists(
                     PoomsaeCoachApproval.objects.filter(
@@ -1494,26 +1725,20 @@ class DashboardPoomsaeListView(views.APIView):
                 qs = PoomsaeCompetition.objects.none()
 
         elif role == "referee" or only_open:
-            # داور یا وقتی فقطِ باز: فقط مسابقات باز در بازهٔ ثبت‌نام
             qs = qs.filter(
                 registration_open=True,
                 registration_start__lte=today,
                 registration_end__gte=today,
             )
 
-        # مرتب‌سازی: نزدیک‌ترین‌ها بالاتر
         qs = qs.order_by("-competition_date", "-id")
 
-        # خروجی
         if POOMSAE_SERIALIZER_ENABLED:
             try:
-                data = DashboardPoomsaeCompetitionSerializer(
-                    qs, many=True, context={"request": request}
-                ).data
+                data = DashboardPoomsaeCompetitionSerializer(qs, many=True, context={"request": request}).data
             except (OperationalError, ProgrammingError):
                 data = []
         else:
-            # fallback سبک
             base_fields = (
                 "id", "public_id", "title", "style_display", "style",
                 "registration_open", "registration_start", "registration_end",
@@ -1525,14 +1750,14 @@ class DashboardPoomsaeListView(views.APIView):
 
         return Response(data, status=200)
 
-
-class DashboardAllCompetitionsView(views.APIView):
-    """خروجی تجمیعی: کیوروگی + پومسه (در صورت فعال بودن)."""
+# ========================= Views: Dashboard (All comps) =======================
+class DashboardAllCompetitionsView(APIView):
+    """Combined feed: Kyorugi + Poomsae."""
     authentication_classes = [JWTAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        # نقش
+        # role detect
         role = ""
         profile = UserProfile.objects.filter(user=request.user).first()
         if profile and profile.role:
@@ -1547,7 +1772,7 @@ class DashboardAllCompetitionsView(views.APIView):
         only_open = str(request.query_params.get("only_open", "")).lower() in {"1", "true", "yes"}
         today = now().date()
 
-        # Kyorugi (منطق همان داشبورد کیوروگی)
+        # Kyorugi
         ky = KyorugiCompetition.objects.all()
         if role == "player":
             if profile and getattr(profile, "coach", None):
@@ -1568,7 +1793,7 @@ class DashboardAllCompetitionsView(views.APIView):
 
         ky_data = DashboardKyorugiCompetitionSerializer(ky, many=True, context={"request": request}).data
 
-        # Poomsae (اگر موجود)
+        # Poomsae
         po_data = []
         if POOMSAE_ENABLED:
             po = PoomsaeCompetition.objects.all().defer("terms_template")
@@ -1585,13 +1810,20 @@ class DashboardAllCompetitionsView(views.APIView):
                     )
                     po = po.annotate(_appr=appr_exists).filter(_appr=True)
                     if only_open:
-                        po = po.filter(registration_open=True, registration_start__lte=today,
-                                       registration_end__gte=today)
+                        po = po.filter(
+                            registration_open=True,
+                            registration_start__lte=today,
+                            registration_end__gte=today
+                        )
                 else:
                     po = PoomsaeCompetition.objects.none()
 
             elif role == "referee" or only_open:
-                po = po.filter(registration_open=True, registration_start__lte=today, registration_end__gte=today)
+                po = po.filter(
+                    registration_open=True,
+                    registration_start__lte=today,
+                    registration_end__gte=today
+                )
 
             if POOMSAE_SERIALIZER_ENABLED:
                 try:
@@ -1609,21 +1841,24 @@ class DashboardAllCompetitionsView(views.APIView):
                     d["style_display"] = d.get("style_display") or d.get("style") or "پومسه"
 
         data = ky_data + po_data
-        # مرتب‌سازی نزولی بر اساس تاریخ برگزاری (در صورت نبود، بر اساس id)
-        def _sort_key(x):
-            return (x.get("competition_date") or "") or str(x.get("id") or "")
-        data.sort(key=_sort_key, reverse=True)
 
+        def _sort_key(x):
+            d = x.get("competition_date")
+            if isinstance(d, str):
+                try:
+                    from datetime import date as _date
+                    d = _date.fromisoformat(d[:10].replace("/", "-"))
+                except Exception:
+                    d = None
+            return (d or date.min, x.get("id") or 0)
+
+        data.sort(key=_sort_key, reverse=True)
         return Response(data, status=200)
 
-
-
-
-
+# ============================= Views: Coach approvals ========================
 def _get_coach_profile(user):
     """
-    پروفایل مربی را «انعطاف‌پذیر» برگردان:
-    یا is_coach=True یا role در ['coach','both'].
+    Return coach profile if valid (is_coach=True or role in ['coach','both']).
     """
     prof = UserProfile.objects.filter(user=user).first()
     if not prof:
@@ -1640,7 +1875,6 @@ class PoomsaeCoachApprovalStatusAPI(APIView):
     def get(self, request, public_id):
         comp = get_object_or_404(PoomsaeCompetition, public_id=public_id)
         coach = _get_coach_profile(request.user)
-
         appr = PoomsaeCoachApproval.objects.filter(competition=comp, coach=coach).first()
         data = {
             "approved": bool(appr and appr.terms_accepted and getattr(appr, "is_active", False)),
@@ -1678,16 +1912,7 @@ class PoomsaeCoachApproveAPI(APIView):
             appr.set_fresh_code(save=True, force=True)
 
         appr.refresh_from_db(fields=("code", "approved_at"))
-
         return Response({"code": appr.code, "approved_at": appr.approved_at}, status=200)
-
-
-log = logging.getLogger(__name__)
-
-try:
-    from accounts.models import UserProfile  # یا ApprovedCoach
-except Exception:
-    UserProfile = None
 
 class CoachApprovalApproveView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1696,8 +1921,7 @@ class CoachApprovalApproveView(APIView):
     def post(self, request, public_id: str):
         agree = request.data.get("agree", True)
         if agree in (False, "false", "0", 0):
-            return Response({"detail": "پذیرش تعهدنامه الزامی است."},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "پذیرش تعهدنامه الزامی است."}, status=status.HTTP_400_BAD_REQUEST)
 
         comp = get_object_or_404(KyorugiCompetition, public_id=public_id)
 
@@ -1706,129 +1930,57 @@ class CoachApprovalApproveView(APIView):
         if coach is None and UserProfile is not None:
             coach = UserProfile.objects.filter(user=user).first()
         if coach is None:
-            return Response({"detail": "پروفایل مربی پیدا نشد."},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "پروفایل مربی پیدا نشد."}, status=status.HTTP_400_BAD_REQUEST)
 
-        approval, _created = CoachApproval.objects.get_or_create(
-            competition=comp,
-            coach=coach,
-        )
+        approval, _created = CoachApproval.objects.get_or_create(competition=comp, coach=coach)
 
-        # 👇 حتماً اگر کد ندارد، بساز (این مسیر مجازِ تغییر کد است)
         if not approval.code:
             approval.set_fresh_code(save=True, force=True)
 
-        now = timezone.now()
+        now_ts = timezone.now()
         CoachApproval.objects.filter(pk=approval.pk).update(
-            terms_accepted=True,
-            is_active=True,
-            approved_at=now,
+            terms_accepted=True, is_active=True, approved_at=now_ts
         )
         approval.refresh_from_db(fields=("code", "terms_accepted", "is_active", "approved_at"))
 
-        return Response(
-            {"code": approval.code, "approved_at": approval.approved_at},
-            status=status.HTTP_200_OK,
-        )
+        return Response({"code": approval.code, "approved_at": approval.approved_at}, status=status.HTTP_200_OK)
 
-
-# ---------- جزئیات مسابقه (کیوروگی/پومسه) ----------
-
-
-def _as_date(val):
-    """
-    هر نوع تاریخ را (date/datetime/str شمسی یا میلادی) به date تبدیل می‌کند.
-    اگر نشد → None
-    """
-    if not val:
-        return None
-    # اگر خودِ date است (و datetime نیست)
-    if isinstance(val, date_cls) and not isinstance(val, dt_cls):
-        return val
-    # اگر datetime است
-    if isinstance(val, dt_cls):
-        return val.date()
-    # اگر رشته است: YYYY-MM-DD یا YYYY/MM/DD یا شمسی
-    try:
-        s = str(val).strip().replace('-', '/')
-        y, m, d = [int(x) for x in s.split('/')[:3]]
-        if y < 1700:  # شمسی
-            return jdatetime.date(y, m, d).togregorian()
-        return date_cls(y, m, d)
-    except Exception:
-        return None
-
-
-
-class CompetitionDetailAnyView(views.APIView):
+# ============================= Views: Competition detail =====================
+class CompetitionDetailAnyView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [permissions.AllowAny]
 
-    # -------- helpers --------
+    # --- local helpers for this view ---
     @staticmethod
     def _as_date(val):
-        if not val:
-            return None
-        if isinstance(val, date_cls) and not isinstance(val, dt_cls):
-            return val
-        if isinstance(val, dt_cls):
-            return val.date()
-        try:
-            s = str(val).strip().replace("-", "/")
-            y, m, d = [int(x) for x in s.split("/")[:3]]
-            if y < 1700:
-                return jdatetime.date(y, m, d).togregorian()
-            return date_cls(y, m, d)
-        except Exception:
-            return None
+        return _as_date(val)
 
-
-
-
-    _RTL = r"[\u200e\u200f\u202a-\u202e\u2066-\u2069\u200c]"
-    _TBL = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
-
-    def _find_birth_source(player, user=None):
-        """از روی چند نامِ رایج، تاریخ تولد را پیدا می‌کند."""
-        candidates = [
-            "birth_date", "birthDate", "date_of_birth", "dob",
-            "birth", "birthday",
-        ]
-        for name in candidates:
+    def _find_birth_source(self, player, user=None):
+        for name in ["birth_date", "birthDate", "date_of_birth", "dob", "birth", "birthday"]:
             v = getattr(player, name, None)
             if v:
                 return v
-        # فالبک: از خود user هم امتحان کن
         if user is not None:
-            for name in candidates:
+            for name in ["birth_date", "birthDate", "date_of_birth", "dob", "birth", "birthday"]:
                 v = getattr(user, name, None)
                 if v:
                     return v
         return None
 
-    def _parse_birth_to_gregorian(value):
-
-
+    def _parse_birth_to_gregorian(self, value):
+        _d, _dt = date_cls, dt_cls
         if isinstance(value, _d) and not isinstance(value, _dt):
             return value
         if isinstance(value, _dt):
             return value.date()
 
-        s = str(value or "").strip()
+        s = _dequote(_fa2en(_strip_rtl(value or "")))
         if not s:
             return None
-        # پاکسازی
-        s = re.sub(_RTL, "", s)
-        s = s.translate(_TBL)
-        s = s.replace("-", "/")
-        # اگر تاریخ/زمان است، فقط بخش تاریخ را بگیر
-        s = s.split("T", 1)[0].strip()
+        s = s.replace("-", "/").split("T", 1)[0].strip()
 
-        # استخراج y/m/d
         m = re.match(r"^\s*(\d{3,4})[\/\.](\d{1,2})[\/\.](\d{1,2})", s)
         if not m:
-            # شاید ISO کامل بوده (2024-09-01) که قبلاً با / جایگزین کردیم؛
-            # دوباره امتحان با ISO از 10 کاراکتر اول:
             try:
                 return _d.fromisoformat(s.replace("/", "-")[:10])
             except Exception:
@@ -1836,10 +1988,10 @@ class CompetitionDetailAnyView(views.APIView):
 
         y, mo, d = map(int, m.groups())
         try:
-            if y < 1700:  # جلالی
+            if y < 1700:
                 g = jdatetime.date(y, mo, d).togregorian()
                 return _d(g.year, g.month, g.day)
-            else:  # میلادی با اسلش
+            else:
                 return _d(y, mo, d)
         except Exception:
             return None
@@ -1858,7 +2010,6 @@ class CompetitionDetailAnyView(views.APIView):
         except Exception:
             return str(f) if f else None
 
-    # داخل CompetitionDetailAnyView
     def _poomsae_user_eligible(self, comp, user):
         if not user or not getattr(user, "is_authenticated", False):
             return None
@@ -1867,7 +2018,7 @@ class CompetitionDetailAnyView(views.APIView):
         if not prof:
             return False
 
-        rg = _required_gender_for_comp(comp)  # ⬅️ اصلاح
+        rg = _required_gender_for_comp(comp)
         pg = _norm_gender(getattr(prof, "gender", None))
         gender_ok = True if rg in (None, "", "both") else bool(pg and (pg == rg))
 
@@ -1884,23 +2035,22 @@ class CompetitionDetailAnyView(views.APIView):
         belt_ok = True if not allowed else bool(player_belt_code and player_belt_code in allowed)
         return bool(gender_ok and belt_ok)
 
-    # -------- GET --------
+    # --- GET ---
     def get(self, request, key):
         comp = _get_comp_any_by_key(key)
 
-        # ----------------------- پومسه -----------------------
+        # ---------- Poomsae ----------
         if PoomsaeCompetition and isinstance(comp, PoomsaeCompetition):
-            # گروه‌های کمربندی (برچسب برای نمایش)
+            # belt groups (labels)
             belt_labels = []
             try:
                 if hasattr(comp, "belt_groups") and comp.belt_groups.exists():
-                    belt_labels = list(
-                        comp.belt_groups.values_list("label", flat=True)
-                    ) or list(comp.belt_groups.values_list("name", flat=True))
+                    belt_labels = list(comp.belt_groups.values_list("label", flat=True)) \
+                                  or list(comp.belt_groups.values_list("name", flat=True))
             except Exception:
                 belt_labels = []
 
-            # گروه‌های سنی (نمایشی – در صورت وجود)
+            # age groups (display)
             age_groups = []
             for fld in ("age_groups", "age_categories"):
                 rel = getattr(comp, fld, None)
@@ -1910,7 +2060,7 @@ class CompetitionDetailAnyView(views.APIView):
                     if age_groups:
                         break
 
-            # شهر، نشانی، پوستر/تصاویر/فایل‌ها
+            # city / address / images / files
             city = getattr(comp, "city", "") or getattr(comp, "location_city", "")
             address = (
                 getattr(comp, "address", "") or
@@ -1951,10 +2101,14 @@ class CompetitionDetailAnyView(views.APIView):
                                 "url": fu,
                             })
 
-            # تاریخ‌ها
             rs = self._as_date(getattr(comp, "registration_start", None))
             re_ = self._as_date(getattr(comp, "registration_end", None))
             cd = self._as_date(getattr(comp, "competition_date", None))
+
+            dd_raw = self._as_date(getattr(comp, "draw_date", None))
+            ld_raw = self._as_date(getattr(comp, "lottery_date", None))
+            dd = dd_raw or ld_raw
+            ld = ld_raw or dd_raw
 
             data = {
                 "id": comp.id,
@@ -1970,6 +2124,10 @@ class CompetitionDetailAnyView(views.APIView):
                 "registration_end_jalali": self._to_jalali_str(re_),
                 "competition_date_jalali": self._to_jalali_str(cd),
 
+                "draw_date": dd,
+                "lottery_date": ld,
+                "draw_date_jalali": self._to_jalali_str(dd),
+                "lottery_date_jalali": self._to_jalali_str(ld),
                 "entry_fee": getattr(comp, "entry_fee", 0),
                 "gender_display": getattr(comp, "get_gender_display", lambda: "")() or None,
 
@@ -1988,23 +2146,19 @@ class CompetitionDetailAnyView(views.APIView):
                 "files": files_built,
             }
 
-            # can_register = ثبت‌نام باز + داخل بازه (یا اگر تاریخ‌ها خالی‌اند، فقط فلگ باز بودن)
-            today = timezone.localdate()
-            in_window = bool(rs and re_ and (rs <= today <= re_))
+            today_local = timezone.localdate()
+            in_window = bool(rs and re_ and (rs <= today_local <= re_))
             if not (rs and re_):
                 in_window = bool(data["registration_open"])
             data["can_register"] = bool(data["registration_open"] and in_window)
 
-            # -------- صلاحیت پومسه: جنسیت + کمربند (بدون شرط سن) --------
             eligible = self._poomsae_user_eligible(comp, request.user)
             data["user_eligible_self"] = eligible
 
-            # (اختیاری) دیباگ
             if str(request.query_params.get("debug") or "").lower() in {"1", "true", "yes"}:
-                prof = (UserProfile.objects.filter(user=request.user, role__in=["player","both"]).first()
+                prof = (UserProfile.objects.filter(user=request.user, role__in=["player", "both"]).first()
                         if request.user and request.user.is_authenticated else None)
 
-                # کمربندهای مجاز نرمال‌شده
                 allowed_belts_norm = set()
                 if getattr(comp, "belt_groups", None) and comp.belt_groups.exists():
                     for g in comp.belt_groups.all().prefetch_related("belts"):
@@ -2020,138 +2174,43 @@ class CompetitionDetailAnyView(views.APIView):
                     "player_belt": _player_belt_code_from_profile(prof) if prof else None,
                     "allowed_belts_norm": sorted(list(allowed_belts_norm)) if allowed_belts_norm else "(no belt limit)",
                     "gender_ok": None if eligible is None else (
-                        True if _norm_gender(getattr(comp, "gender", None)) in (None,"","both")
+                        True if _norm_gender(getattr(comp, "gender", None)) in (None, "", "both")
                         else (_norm_gender(getattr(prof, "gender", None)) == _norm_gender(getattr(comp, "gender", None)) if prof else False)
                     ),
                 }
-
             return Response(data, status=status.HTTP_200_OK)
 
-        # ----------------------- کیوروگی -----------------------
+        # ---------- Kyorugi ----------
         ser = KyorugiCompetitionDetailSerializer(comp, context={"request": request})
         data = dict(ser.data)
 
-        # وضعیت ثبت‌نام خودِ بازیکن (اگر لاگین کرده)
         if request.user and request.user.is_authenticated:
             player = UserProfile.objects.filter(user=request.user, role__in=["player", "both"]).first()
             if player:
                 enr = Enrollment.objects.filter(competition=comp, player=player).order_by("-id").first()
                 if enr:
                     data["my_enrollment"] = {"id": enr.id, "status": enr.status}
-                    data["card_ready"] = enr.status in {"paid", "confirmed", "approved", "accepted", "completed"}
+                    data["card_ready"] = enr.status in CARD_READY_STATUSES
                 else:
                     data["my_enrollment"] = None
                     data["card_ready"] = False
 
         return Response(data, status=status.HTTP_200_OK)
 
-
-def _resolve_enrollment_model_for(comp_obj_or_cls=None):
-    """
-    مدلی را برمی‌گرداند که FK به کلاس مسابقهٔ داده‌شده داشته باشد
-    (ترجیح: PoomsaeEnrollment برای پومسه).
-    """
-    target_cls = None
-    if comp_obj_or_cls is not None:
-        target_cls = comp_obj_or_cls if isinstance(comp_obj_or_cls, type) else comp_obj_or_cls.__class__
-
-    preferred_labels = [
-        # اول پومسه‌ها
-        "competitions.PoomsaeEnrollment",
-        "enrollments.PoomsaeEnrollment",
-        # بعد جنریک/قدیمی
-        "competitions.Enrollment",
-        "enrollments.Enrollment",
-        "competitions.CompetitionEnrollment",
-        "enrollments.CompetitionEnrollment",
-    ]
-
-    # 1) تلاش با لیبل‌های شناخته‌شده و تایید FK به کلاس هدف
-    for label in preferred_labels:
-        try:
-            m = apps.get_model(label)
-            if not m:
-                continue
-            if target_cls is None:
-                return m
-            for f in m._meta.get_fields():
-                if isinstance(f, ForeignKey) and f.related_model is target_cls:
-                    return m
-        except Exception:
-            continue
-
-    # 2) اسکن همهٔ مدل‌ها و یافتن هر مدلی که FK به کلاس هدف دارد
-    if target_cls is not None:
-        for m in apps.get_models():
-            for f in m._meta.get_fields():
-                if isinstance(f, ForeignKey) and f.related_model is target_cls:
-                    return m
-
-    return None
-
-
-def _try_get_playerish_instance(user):
-    """
-    سعی می‌کند یک آبجکت «پروفایل بازیکن‌مانند» مربوط به user برگرداند،
-    و اگر چیزی پیدا نشد خود user را برمی‌گرداند.
-    """
-    # رایج‌ترین اتریبیوت‌ها روی User
-    for attr in ("playerprofile", "athleteprofile", "profile", "userprofile"):
-        inst = getattr(user, attr, None)
-        if inst:
-            return inst
-
-    # جست‌وجوی مدل‌های پروفایلی که OneToOne/FK به User دارند
-    User = get_user_model()
-    for Model in apps.get_models():
-        name = Model.__name__.lower()
-        if "profile" not in name and "athlete" not in name and "player" not in name:
-            continue
-        for f in Model._meta.get_fields():
-            if isinstance(f, (OneToOneField, ForeignKey)) and f.related_model is User:
-                try:
-                    return Model.objects.get(**{f.name: user})
-                except Model.DoesNotExist:
-                    continue
-
-    # فالبک: خود user
-    return user
-
-
-def _fk_name_pointing_to(model_cls, target_obj):
-    """نام فیلد FK که به کلاس target_obj اشاره می‌کند را پیدا کن."""
-    from django.db.models import ForeignKey as FK
-    for f in model_cls._meta.get_fields():
-        if isinstance(f, FK) and f.related_model is target_obj.__class__:
-            return f.name
-    return None
-
-
-def _first_existing_attr(obj, names, default=None):
-    for n in names:
-        if hasattr(obj, n):
-            return getattr(obj, n)
-    return default
-
-
+# ============================= Views: Poomsae – my enrollment ================
 class PoomsaeMyEnrollmentView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, public_id):
-        # 1) مسابقه پومسه
         comp = get_object_or_404(PoomsaeCompetition, public_id=public_id)
-
-        # 2) مدل ثبت‌نام متناظر با همین مسابقه
         Enr = _resolve_enrollment_model_for(comp)
         if Enr is None:
             return Response({"enrollment_id": None, "status": None, "can_show_card": False}, status=200)
 
-        # 3) آبجکت بازیکن‌مانند (پروفایل) یا خودِ User
         playerish = _try_get_playerish_instance(request.user)
         User = get_user_model()
 
-        # 4) کشف نام فیلدهای FK به مسابقه و بازیکن/یوزر
         fk_comp = _fk_name_pointing_to(Enr, comp) or next(
             (g for g in ("poomsae_competition", "competition", "comp", "competition_obj") if hasattr(Enr, g)), None
         )
@@ -2159,7 +2218,6 @@ class PoomsaeMyEnrollmentView(APIView):
             (g for g in ("player", "athlete", "profile", "user_profile") if hasattr(Enr, g)), None
         )
 
-        # اگر FK به پروفایل نبود، امتحان کن مستقیم به User باشد
         if fk_player is None:
             for f in Enr._meta.get_fields():
                 if isinstance(f, ForeignKey) and f.related_model is User:
@@ -2170,23 +2228,19 @@ class PoomsaeMyEnrollmentView(APIView):
         if not fk_comp or not fk_player:
             return Response({"enrollment_id": None, "status": None, "can_show_card": False}, status=200)
 
-        # 5) فیلتر و آخرین ثبت‌نامِ کاربر
         try:
             qs = Enr.objects.filter(**{fk_comp: comp, fk_player: playerish})
-            # اگر فیلد زمان/ایجاد داشت از آن مرتب کن، وگرنه بر اساس id
             order_field = "-created_at" if hasattr(Enr, "created_at") else "-id"
             enr = qs.order_by(order_field).first()
         except Exception:
-            # هر مشکل در فیلترکردن/کست‌کردن → graceful بازگشت
             return Response({"enrollment_id": None, "status": None, "can_show_card": False}, status=200)
 
         if not enr:
             return Response({"enrollment_id": None, "status": None, "can_show_card": False}, status=200)
 
-        # 6) وضعیت و اجازه نمایش کارت
         status_value = _first_existing_attr(enr, ("status", "state", "enrollment_status"), None)
         status_str = (str(status_value) if status_value is not None else "").lower()
-        can_show = status_str in CARD_READY_STATUSES  # استفاده از ثابت سراسری
+        can_show = status_str in CARD_READY_STATUSES
 
         return Response(
             {
@@ -2197,9 +2251,7 @@ class PoomsaeMyEnrollmentView(APIView):
             status=200,
         )
 
-
-
-
+# ============================= ViewSet: Poomsae competitions =================
 class PoomsaeCompetitionViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = PoomsaeCompetition.objects.all()
     lookup_field = "public_id"
@@ -2211,316 +2263,83 @@ class PoomsaeCompetitionViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
-        ctx["request"] = self.request  # ← مهم برای user_eligible_self
+        ctx["request"] = self.request  # important for user_eligible_self
         return ctx
+
     @action(detail=True, methods=["get"], url_path="eligibility-debug")
     def eligibility_debug(self, request, public_id=None):
         comp = self.get_object()
-        ser  = PoomsaeCompetitionDetailSerializer(comp, context={"request": request})
+        ser = PoomsaeCompetitionDetailSerializer(comp, context={"request": request})
         return Response({
             "can_register": ser.get_can_register(comp),
             "user_eligible_self": ser.get_user_eligible_self(comp),
             "eligibility_debug": ser.get_eligibility_debug(comp),
         })
-# views.py
 
-
-
-def _parse_jalali_date(s: str):
-    if not s:
-        return None
-    try:
-        s = str(s).strip().replace('-', '/')
-        y, m, d = [int(x) for x in s.split('/')[:3]]
-        return jdatetime.date(y, m, d).togregorian() if y < 1700 else date_cls(y, m, d)
-    except Exception:
-        return None
-
-
-
-
-
+# ============================= Views: Poomsae – self register/prefill ========
+# ثبت‌نام انفرادی پومسه (Self)
 class PoomsaeRegisterSelfView(APIView):
-
-    permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
-
-    @staticmethod
-    def _fa2en(s: str) -> str:
-        fa = "۰۱۲۳۴۵۶۷۸۹"
-        ar = "٠١٢٣٤٥٦٧٨٩"
-        out = []
-        for ch in str(s):
-            if ch in fa:
-                out.append(str(fa.index(ch)))
-            elif ch in ar:
-                out.append(str(ar.index(ch)))
-            else:
-                out.append(ch)
-        return "".join(out)
-
-    @staticmethod
-    def _div(a, b):
-        return int(a // b)
-
-    _jal_breaks = [-61,9,38,199,426,686,756,818,1111,1181,1210,1635,2060,2097,2192,2262,2324,2394,2456,3178]
-
-    @classmethod
-    def _jal_cal(cls, jy):
-        gy = jy + 621
-        leapJ = -14
-        jp = cls._jal_breaks[0]
-        for jm in cls._jal_breaks[1:]:
-            jump = jm - jp
-            if jy < jm:
-                break
-            leapJ += cls._div(jump, 33) * 8 + cls._div(jump % 33, 4)
-            jp = jm
-        n = jy - jp
-        leapJ += cls._div(n, 33) * 8 + cls._div(n % 33, 4)
-        leapG = cls._div(gy, 4) - cls._div(cls._div(gy, 100) + 1, 4) + cls._div(gy, 400) - 70
-        march = 20 + leapJ - leapG
-        return gy, march
-
-    @classmethod
-    def _g2d(cls, gy, gm, gd):
-        a = cls._div(14 - gm, 12)
-        y = gy + 4800 - a
-        m = gm + 12 * a - 3
-        return gd + cls._div(153 * m + 2, 5) + 365 * y + cls._div(y, 4) - cls._div(y, 100) + cls._div(y, 400) - 32045
-
-    @classmethod
-    def _d2g(cls, jdn):
-        j = jdn + 32044
-        g = cls._div(j, 146097)
-        dg = j % 146097
-        c = cls._div((cls._div(dg, 36524) + 1) * 3, 4)
-        dc = dg - c * 36524
-        b = cls._div(dc, 1461)
-        db = dc % 1461
-        a = cls._div((cls._div(db, 365) + 1) * 3, 4)
-        da = db - a * 365
-        y = g * 400 + c * 100 + b * 4 + a
-        m = cls._div(5 * da + 308, 153) - 2
-        d = da - cls._div(153 * (m + 2) + 2, 5) + 1
-        y = y - 4800 + cls._div(m + 2, 12)
-        m = (m + 2) % 12 + 1
-        return y, m, d
-
-    @classmethod
-    def _j2d(cls, jy, jm, jd):
-        gy, march = cls._jal_cal(jy)
-        return cls._g2d(gy, 3, march) + (jm - 1) * 31 - cls._div(jm, 7) * (jm - 7) + jd - 1
-
-    @classmethod
-    def _jalali_to_gregorian(cls, jy, jm, jd):
-        return cls._d2g(cls._j2d(jy, jm, jd))
-
-
-    @classmethod
-    def _parse_date_any(cls, v) -> date:
-        """
-        ورودی: datetime/date/str (ISO یا جلالی، با ارقام فارسی/عربی/انگلیسی)
-        خروجی: date میلادی
-        """
-        if isinstance(v, date) and not isinstance(v, datetime):
-            return v
-        if isinstance(v, datetime):
-            return v.date()
-
-        s = cls._fa2en(str(v or "").strip())
-        if not s:
-            raise ValueError("empty date")
-
-        # 1) ISO YYYY-MM-DD
-        try:
-            return date.fromisoformat(s[:10])
-        except Exception:
-            pass
-
-        # 2) YYYY/MM/DD (جلالی یا میلادی با اسلش)
-        t = s.replace("-", "/")
-        parts = t.split("/")
-        if len(parts) >= 3 and all(p.isdigit() for p in parts[:3]):
-            y, m, d = map(int, parts[:3])
-            if y < 1700:  # ← فقط سال‌های کوچک‌تر از 1700 را جلالی بگیر
-                gy, gm, gd = cls._jalali_to_gregorian(y, m, d)
-                return date(gy, gm, gd)
-            else:
-                return date(y, m, d)  # میلادی با اسلش
-
-        raise ValueError(f"bad date format: {v}")
+    permission_classes = [permissions.IsAuthenticated, IsPlayer]
 
     @transaction.atomic
-    def post(self, request, public_id):
-        user = request.user
-        player = getattr(user, "userprofile", None) or getattr(user, "profile", None)
-        if not player:
-            return Response({"detail": "پروفایل بازیکن یافت نشد."}, status=400)
+    def post(self, request, key):
+        comp = get_object_or_404(
+            PoomsaeCompetition.objects.prefetch_related("age_categories","belt_groups__belts"),
+            public_id=key
+        )
+        ser = PoomsaeSelfRegistrationSerializer(
+            data=request.data,
+            context={"request": request, "competition": comp}
+        )
+        ser.is_valid(raise_exception=True)
+        entry = ser.save()
+        return Response(ser.data, status=status.HTTP_201_CREATED)
 
-        comp = get_object_or_404(PoomsaeCompetition, public_id=public_id)
 
-        # --- 1) ثبت‌نام باز و داخل بازه
-        today = timezone.localdate()
-        if not getattr(comp, "registration_open", False):
-            return Response({"detail": "ثبت‌نام این مسابقه فعال نیست."}, status=400)
-        rs = getattr(comp, "registration_start", None)
-        re_ = getattr(comp, "registration_end", None)
-        if rs and re_ and not (rs <= today <= re_):
-            return Response({"detail": "خارج از بازهٔ ثبت‌نام هستید."}, status=400)
+# جزئیات مسابقه پومسه (اگر نداری)
+class PoomsaeCompetitionDetailView(APIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = [JWTAuthentication]
 
-        # --- 2) جلوگیری از ثبت‌نام تکراری (با قفل)
-        if PoomsaeEntry.objects.select_for_update().filter(competition=comp, player=player).exists():
-            return Response({"detail": "قبلاً برای این مسابقه ثبت‌نام کرده‌اید."}, status=400)
+    def get(self, request, key):
+        comp = get_object_or_404(
+            PoomsaeCompetition.objects.select_related("terms_template")
+            .prefetch_related("images","files","age_categories","belt_groups__belts"),
+            public_id=key
+        )
+        ser = PoomsaeCompetitionDetailSerializer(comp, context={"request": request})
+        return Response(ser.data, status=status.HTTP_200_OK)
 
-        # --- 3) کد تأیید مربی (الزامی و فقط مربی خود بازیکن)
-        coach_code = (request.data.get("coach_code") or "").strip()
-        if not coach_code:
-            return Response({"coach_code": ["کد تأیید مربی الزامی است."]}, status=400)
 
-        player_coach = getattr(player, "coach", None)
-        if not player_coach:
-            return Response({"detail": "ابتدا مربی شما باید در پروفایل ثبت شود."}, status=400)
-
-        # فقط کد تأیید مربیِ همین بازیکن برای همین مسابقه قابل قبول است
-        appr = PoomsaeCoachApproval.objects.filter(
-            competition=comp,
-            coach=player_coach,
-            is_active=True,
-            terms_accepted=True,
-        ).first()
-
-        if not appr or appr.code != coach_code:
-            return Response({"coach_code": ["کد تأیید مربی نامعتبر است."]}, status=400)
-
-        coach = player_coach  # مربیِ معتبر خودِ بازیکن
-
-        # --- 4) سایر فیلدهای ورودی
-        ins_num = (request.data.get("insurance_number") or "").strip()
-        ins_date_s = (request.data.get("insurance_issue_date") or "").strip()
-
-        if not ins_num:
-            return Response({"insurance_number": ["شماره بیمه الزامی است."]}, status=400)
-        if not ins_date_s:
-            return Response({"insurance_issue_date": ["تاریخ صدور الزامی است."]}, status=400)
-
-        # تاریخ صدور بیمه (جلالی/میلادی)
-        try:
-            ins_date = self._parse_date_any(ins_date_s)  # از همین کلاس
-        except Exception:
-            return Response(
-                {"insurance_issue_date": ["فرمت تاریخ نامعتبر است. (مثلاً ۱۴۰۳/۰۵/۲۰ یا 2025-09-01)"]},
-                status=400
-            )
-
-        # تاریخ برگزاری
-        comp_day = (comp.competition_date.date()
-                    if isinstance(comp.competition_date, datetime)
-                    else comp.competition_date)
-        if not comp_day:
-            return Response({"detail": "تاریخ برگزاری مسابقه تنظیم نشده است."}, status=400)
-
-        # قواعد بیمه
-        if ins_date > (comp_day - timedelta(days=3)):
-            return Response({"insurance_issue_date": ["تاریخ صدور باید حداقل ۷۲ ساعت قبل از روز برگزاری باشد."]},
-                            status=400)
-        if ins_date < (comp_day - timedelta(days=365)):
-            return Response({"insurance_issue_date": ["اعتبار بیمه منقضی است (بیش از یک سال قبل از مسابقه)."]},
-                            status=400)
-
-        # --- 5) تاریخ تولد بازیکن
-        birth_raw = getattr(player, "birth_date", None)
-        if not birth_raw:
-            return Response({"detail": "تاریخ تولد در پروفایل ثبت نشده است."}, status=400)
-        try:
-            birth_dt = self._parse_date_any(birth_raw)  # از همین کلاس
-        except Exception:
-            return Response({"detail": "تاریخ تولد در پروفایل نامعتبر است."}, status=400)
-
-        # --- 6) رده سنی/کمربند/دیویژن
-        age_cat = comp.age_categories.filter(
-            from_date__lte=birth_dt, to_date__gte=birth_dt
-        ).order_by("from_date").first()
-        if not age_cat:
-            return Response({"detail": "با تاریخ تولد شما ردهٔ سنیِ مجاز در این مسابقه یافت نشد."}, status=400)
-
-        belt = None
-        if hasattr(player, "belt_id") and player.belt_id:
-            belt = Belt.objects.filter(id=player.belt_id).first()
-        elif hasattr(player, "belt") and isinstance(getattr(player, "belt"), Belt):
-            belt = player.belt
-        elif hasattr(player, "belt") and isinstance(getattr(player, "belt"), str):
-            belt = Belt.objects.filter(name__iexact=player.belt).first() or \
-                   Belt.objects.filter(label__iexact=player.belt).first()
-        if not belt:
-            return Response({"detail": "کمربند بازیکن در پروفایل مشخص نیست."}, status=400)
-
-        req_gender = _gender_norm(getattr(comp, "gender", None))
-        player_gender = _gender_norm(getattr(player, "gender", None))
-        if req_gender not in ("male", "female"):
-            return Response({"detail": "جنسیت مسابقه به‌درستی تنظیم نشده است."}, status=400)
-        if player_gender != req_gender:
-            return Response({"detail": "جنسیت بازیکن با مسابقه سازگار نیست."}, status=400)
-
-        division = PoomsaeDivision.objects.filter(
-            competition=comp,
-            gender=req_gender,
-            age_category=age_cat,
-            belt=belt
-        ).first()
-        if not division:
-            return Response({"detail": "برای ترکیب رده‌سنی/کمربند شما دیویژنی تعریف نشده است."}, status=400)
-
-        # --- 7) ساخت Entry (coach، همان مربی خود بازیکن)
-        entry_kwargs = dict(competition=comp, player=player, division=division)
-        if hasattr(PoomsaeEntry, "coach"):
-            entry_kwargs["coach"] = coach
-
-        entry = PoomsaeEntry.objects.create(**entry_kwargs)
-
-        if hasattr(entry, "insurance_number"):
-            entry.insurance_number = ins_num
-        if hasattr(entry, "insurance_issue_date"):
-            entry.insurance_issue_date = ins_date
-        try:
-            entry.save()
-        except Exception:
-            pass
-
-        return Response({"enrollment_id": entry.id, "status": "pending_payment"}, status=status.HTTP_201_CREATED)
 class PoomsaeSelfPrefillView(APIView):
     """
-    پیش‌پر کردن فرم ثبت‌نام خودی پومسه.
-    locked.birth_date            → ۱۳۷۲/۰۱/۱۵ (فارسی؛ مناسب نمایش)
-    locked.birthDate             → همان بالا (camelCase)
-    locked.birth_date_jalali     → 1372/01/15  (لاتین)
-    locked.birth_date_jalali_fa  → ۱۳۷۲/۰۱/۱۵  (فارسی)
-    locked.birth_date_iso        → 1993-04-04  (میلادی ISO)
+    Prefill (Poomsae) — مثل کیوروگی:
+      - خواندن از پروفایل کاربر (DB)
+      - اگر تاریخ تولد شمسی معتبر (۱۳xx) رشته‌ای بود همان را برگردان
+      - در صورت امکان مقدارهای مکمل هم بده: birth_date_iso, birth_date_jalali(_fa)
     """
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
     _RTL = r"[\u200e\u200f\u202a-\u202e\u2066-\u2069\u200c]"
-    _DIGMAP_FA2EN = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
-    _DIGMAP_EN2FA = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+    _FA2EN = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+    _EN2FA = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 
-    # ---------- digit/rtl helpers ----------
     @staticmethod
     def _strip_rtl(s: str) -> str:
         return re.sub(PoomsaeSelfPrefillView._RTL, "", str(s or ""))
 
-    @staticmethod
-    def _fa2en(s: str) -> str:
-        return str(s or "").translate(PoomsaeSelfPrefillView._DIGMAP_FA2EN)
+    @classmethod
+    def _fa2en(cls, s: str) -> str:
+        return str(s or "").translate(cls._FA2EN)
+
+    @classmethod
+    def _en2fa(cls, s: str) -> str:
+        return str(s or "").translate(cls._EN2FA)
 
     @staticmethod
-    def _en2fa(s: str) -> str:
-        return str(s or "").translate(PoomsaeSelfPrefillView._DIGMAP_EN2FA)
-
-    # ---------- date helpers ----------
-    @staticmethod
-    def _to_jalali(g: date | None):
-        """ورودی date میلادی → (jalali_en, jalali_fa) به شکل 'YYYY/MM/DD'."""
+    def _to_jalali(g: date | None) -> tuple[str | None, str | None]:
         if not g:
             return None, None
         try:
@@ -2531,10 +2350,7 @@ class PoomsaeSelfPrefillView(APIView):
 
     @classmethod
     def _parse_any_to_gregorian(cls, v) -> date | None:
-        """
-        datetime/date/str (ISO یا جلالی، با ارقام فارسی/عربی/انگلیسی) → date میلادی.
-        شامل «ترمیم سال سه‌رقمی» برای مواردی مثل ۷۷۷/۰۱/۱۵ تا به ۱۳۷۷/۰۱/۱۵ نگاشت شود.
-        """
+        """Date/Datetime/ISO/Jalali(yyyy/mm/dd with fa/en digits) → Gregorian date"""
         if isinstance(v, date) and not isinstance(v, datetime):
             return v
         if isinstance(v, datetime):
@@ -2543,37 +2359,31 @@ class PoomsaeSelfPrefillView(APIView):
         s = cls._fa2en(cls._strip_rtl(v)).strip()
         if not s:
             return None
-        s = s.split("T", 1)[0]  # cut time
+        s = s.split("T", 1)[0]
 
-        # ISO
+        # ISO yyyy-mm-dd
         try:
             return date.fromisoformat(s[:10].replace("/", "-"))
         except Exception:
             pass
 
-        # جلالی یا میلادی با اسلش/نقطه
+        # y/m/d  (ممکن است شمسی باشد)
         t = s.replace("-", "/")
-        m = re.match(r"^\s*(\d{3,4})[\/\.](\d{1,2})[\/\.](\d{1,2})", t)
+        m = re.match(r"^\s*(\d{3,4})[\/\.](\d{1,2})[\/\.](\d{1,2})\s*$", t)
         if not m:
             return None
         y, mo, d = map(int, m.groups())
 
-        # --- Heuristic: repair truncated Jalali years into 1300–1500 if possible ---
-        if y < 1700:  # احتمالاً جلالی
-            if 100 <= y <= 999:
-                cand1 = y + 600   # 777 -> 1377
-                cand2 = y + 1000  # 385 -> 1385
-                if 1300 <= cand1 <= 1500:
-                    y = cand1
-                elif 1300 <= cand2 <= 1500:
-                    y = cand2
+        if y < 1700:
+            # فقط حدس «ایمن» برای سه‌رقمی‌های 700..999
+            if 700 <= y <= 999:
+                y = y + 600  # ۷۷۲ → ۱۳۷۲
             try:
                 g = jdatetime.date(y, mo, d).togregorian()
                 return date(g.year, g.month, g.day)
             except Exception:
                 return None
 
-        # Gregorian with slashes/dots
         try:
             return date(y, mo, d)
         except Exception:
@@ -2581,18 +2391,17 @@ class PoomsaeSelfPrefillView(APIView):
 
     @staticmethod
     def _find_birth_source(player, user=None):
-        for n in ["birth_date", "birthDate", "date_of_birth", "dob", "birth", "birthday"]:
-            v = getattr(player, n, None)
+        for k in ["birth_date", "birthDate", "date_of_birth", "dob", "birth", "birthday"]:
+            v = getattr(player, k, None)
             if v:
                 return v
         if user:
-            for n in ["birth_date", "birthDate", "date_of_birth", "dob", "birth", "birthday"]:
-                v = getattr(user, n, None)
+            for k in ["birth_date", "birthDate", "date_of_birth", "dob", "birth", "birthday"]:
+                v = getattr(user, k, None)
                 if v:
                     return v
         return None
 
-    # ---------- display helpers ----------
     @staticmethod
     def _belt_display(player):
         if hasattr(player, "belt"):
@@ -2633,13 +2442,12 @@ class PoomsaeSelfPrefillView(APIView):
 
     @staticmethod
     def _national_id(player):
-        for f in ("national_id", "national_code", "melli_code", "code_melli"):
+        for f in ("national_id", "national_code", "melli_code", "code_melli", "nationalCode"):
             v = getattr(player, f, None)
             if v:
                 return str(v)
         return None
 
-    # ---------- GET ----------
     def get(self, request, public_id):
         comp = get_object_or_404(PoomsaeCompetition, public_id=public_id)
         user = request.user
@@ -2655,22 +2463,39 @@ class PoomsaeSelfPrefillView(APIView):
             nid        = self._national_id(player)
 
             birth_src  = self._find_birth_source(player, user)
+
+            # مقدار خام DB (فقط برای نمایش)
+            raw_en = self._fa2en(self._strip_rtl(birth_src or "")).strip().strip('"').strip("'").replace("-", "/")
+            m = re.match(r"^\s*(\d{3,4})/(\d{1,2})/(\d{1,2})\s*$", raw_en)
+            jalali_raw_valid = False
+            jalali_raw_en = None
+            jalali_raw_fa = None
+            if m:
+                y, mo, d = map(int, m.groups())
+                # فقط ۱۳۰۰..۱۵۹۹ را شمسی معتبر بدان
+                if 1300 <= y <= 1599:
+                    jalali_raw_en = f"{y:04d}/{mo:02d}/{d:02d}"
+                    jalali_raw_fa = self._en2fa(jalali_raw_en)
+                    jalali_raw_valid = True
+
+            # تبدیل دقیق (اختیاری) برای فیلدهای کمکی
             birth_greg = self._parse_any_to_gregorian(birth_src)
             birth_j_en, birth_j_fa = self._to_jalali(birth_greg)
 
+            # === خروجی قفل‌شده ===
             locked = {
                 "first_name": getattr(player, "first_name", None) or getattr(user, "first_name", None),
                 "last_name":  getattr(player, "last_name",  None) or getattr(user, "last_name",  None),
                 "national_id": nid,
 
-                # نمایش اصلی فرم (شمسی با ارقام فارسی)
-                "birth_date": birth_j_fa,
-                "birthDate":  birth_j_fa,  # camelCase
+                # نمایش: اول مقدار خام DB (اگر شمسی معتبر)، وگرنه تبدیل‌شده
+                "birth_date":  (jalali_raw_fa or birth_j_fa),
+                "birthDate":   (jalali_raw_fa or birth_j_fa),
 
-                # کلیدهای تکمیلی
-                "birth_date_iso":        birth_greg.isoformat() if birth_greg else None,
-                "birth_date_jalali":     birth_j_en,
-                "birth_date_jalali_fa":  birth_j_fa,
+                # کمکی‌ها (بدون اثر روی نمایش)
+                "birth_date_jalali":    (jalali_raw_en if jalali_raw_valid else birth_j_en),
+                "birth_date_jalali_fa": (jalali_raw_fa if jalali_raw_valid else birth_j_fa),
+                "birth_date_iso":       (birth_greg.isoformat() if birth_greg else None),
 
                 "belt":  belt_name,
                 "club":  club_name,
@@ -2689,6 +2514,7 @@ class PoomsaeSelfPrefillView(APIView):
         })
 
 
+# ============================= Views: Poomsae – grouped enrollments ==========
 class PoomsaeEnrollmentsGroupedView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -2699,28 +2525,30 @@ class PoomsaeEnrollmentsGroupedView(APIView):
 
         qs = (
             PoomsaeEntry.objects.filter(competition=comp)
-            .select_related("player", "division__belt", "division__age_category")
+            .select_related("player", "division", "division__belt_group", "division__age_category")
             .order_by(
                 "player__birth_date",
-                "division__belt__name",
+                "division__belt_group__label",
                 "player__last_name", "player__first_name",
             )
         )
-        items = EnrollmentLiteSerializer(qs, many=True, context={"request": request}).data
 
-        # گروه‌بندی: age_category (از خود مسابقه) → belt_group
-        grouped = defaultdict(lambda: defaultdict(list))
-        age_title = getattr(getattr(comp, "age_category", None), "name", "بدون گروه سنی")
-        for it in items:
-            bg = it.get("belt_group_label") or "نامشخص"
-            grouped[age_title][bg].append(it)
+        grouped = {}
+        for e in qs:
+            age_name = getattr(getattr(e.division, "age_category", None), "name", "بدون گروه سنی")
+            belt_name = getattr(getattr(e.division, "belt_group", None), "label", "نامشخص")
+            item = {
+                "id": e.id,
+                "first_name": getattr(e.player, "first_name", ""),
+                "last_name": getattr(e.player, "last_name", ""),
+                "is_paid": getattr(e, "is_paid", False),
+                "paid_amount": getattr(e, "paid_amount", 0),
+            }
+            grouped.setdefault(age_name, {}).setdefault(belt_name, []).append(item)
 
-        # خروجی نهایی
         out = []
         for age_name, belts in grouped.items():
-            belt_list = []
-            for belt_name, people in belts.items():
-                belt_list.append({"belt_group": belt_name, "enrollments": people})
-            out.append({"age_group": age_name, "by_belt": belt_list})
+            by_belt = [{"belt_group": b, "entries": items} for b, items in belts.items()]
+            out.append({"age_group": age_name, "by_belt": by_belt})
 
-        return Response({"groups": out})
+        return Response({"groups": out}, status=200)

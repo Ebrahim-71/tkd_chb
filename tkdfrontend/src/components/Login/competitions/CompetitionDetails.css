@@ -66,8 +66,9 @@
 .cd-hero-body { display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .cd-title { margin: 0; font-size: 20px; line-height: 1.4; font-weight: 800; }
 #sabt{
-      border: 1px dashed #c0c0c0;
+   border: 1px dashed #c0c0c0;
     border-radius: 12px;
+    width: 202%;
 
 }
 .cd-hintbox{

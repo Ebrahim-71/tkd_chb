@@ -4,8 +4,7 @@ from django.db import models, transaction, IntegrityError
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 from datetime import timedelta
-import random
-import string, secrets, jdatetime
+import string, secrets, jdatetime,random
 from django.db.models import Index, CheckConstraint, Q, F
 
 from django.utils import timezone
@@ -19,9 +18,6 @@ from django.conf import settings
 
 
 
-
-# =========================
-# ابزار
 # =========================
 def _gen_public_id(n: int = 10) -> str:
     """شناسه عمومی تصادفی حروف کوچک + رقم (برای URL عمومی)."""
@@ -956,6 +952,13 @@ class SeminarParticipants(SeminarRegistration):
 
 
 # ==================================================================== مسابقه پومسه ==========================================================
+
+
+class PoomsaeType(models.TextChoices):
+    STANDARD = "standard", "استاندارد"
+    CREATIVE = "creative", "ابداعی"
+
+
 class PoomsaeCompetition(models.Model):
     GENDER_CHOICES = [('male', 'آقایان'), ('female', 'بانوان')]
     BELT_LEVEL_CHOICES = [
@@ -1188,38 +1191,92 @@ class PoomsaeCoachApproval(models.Model):
 
 class PoomsaeDivision(models.Model):
     competition = models.ForeignKey(
-        PoomsaeCompetition, on_delete=models.CASCADE, related_name="divisions", verbose_name="مسابقه"
+        PoomsaeCompetition,
+        on_delete=models.CASCADE,
+        related_name="divisions",
+        verbose_name="مسابقه",
     )
-    gender = models.CharField("جنسیت", max_length=10, choices=PoomsaeCompetition.GENDER_CHOICES)
-    age_category = models.ForeignKey(AgeCategory, on_delete=models.PROTECT, verbose_name="رده سنی")
-    belt = models.ForeignKey(Belt, on_delete=models.PROTECT, verbose_name="کمربند")
-
-    # اگر بعداً kind (انفرادی/جفتی/تیمی) خواستی، اینجا اضافه کن
-    # kind = models.CharField(max_length=10, choices=[("individual","انفرادی"),("pair","جفتی"),("team","تیمی")], default="individual")
+    gender = models.CharField(
+        "جنسیت",
+        max_length=10,
+        choices=PoomsaeCompetition.GENDER_CHOICES,
+    )
+    age_category = models.ForeignKey(
+        AgeCategory,
+        on_delete=models.PROTECT,
+        verbose_name="رده سنی",
+    )
+    belt_group = models.ForeignKey(
+        BeltGroup,
+        on_delete=models.PROTECT,
+        verbose_name="گروه کمربندی",
+    )
+    poomsae_type = models.CharField(
+        "نوع پومسه",
+        max_length=16,
+        choices=PoomsaeType.choices,
+        default=PoomsaeType.STANDARD,
+    )
 
     class Meta:
         verbose_name = "دیویژن پومسه"
         verbose_name_plural = "دیویژن‌های پومسه"
         constraints = [
+            # یکتایی هر جدول بر اساس مسابقه + جنسیت + رده سنی + گروه کمربندی + نوع پومسه
             models.UniqueConstraint(
-                fields=["competition", "gender", "age_category", "belt"],
-                name="uniq_poom_division_comp_gender_age_belt",
+                fields=["competition", "gender", "age_category", "belt_group", "poomsae_type"],
+                name="uniq_poom_division_comp_gender_age_beltgroup_type",
             ),
         ]
         indexes = [
-            models.Index(fields=["competition", "gender", "age_category", "belt"]),
+            models.Index(fields=["competition", "gender", "age_category", "belt_group", "poomsae_type"]),
         ]
 
     def __str__(self):
-        return f"{self.competition.title} | {self.get_gender_display()} | {self.age_category} | {self.belt.name}"
+        return f"{self.competition.title} | {self.get_gender_display()} | {self.age_category} | {self.belt_group.name} | {self.get_poomsae_type_display()}"
+
+    def clean(self):
+        """
+        اگر برای مسابقه رده‌های سنی/گروه‌های کمربندی تعیین شده، از خروج از محدوده جلوگیری می‌کند.
+        """
+        errors = {}
+        # اگر مسابقه روی رده‌های سنی محدود شده باشد، age_category باید در همان لیست باشد
+        if self.competition_id and self.age_category_id:
+            if self.competition.age_categories.exists() and not self.competition.age_categories.filter(pk=self.age_category_id).exists():
+                errors["age_category"] = "این ردهٔ سنی در این مسابقه مجاز/تعریف نشده است."
+
+        # اگر مسابقه روی گروه‌های کمربندی محدود شده باشد، belt_group باید در همان لیست باشد
+        if self.competition_id and self.belt_group_id:
+            if self.competition.belt_groups.exists() and not self.competition.belt_groups.filter(pk=self.belt_group_id).exists():
+                errors["belt_group"] = "این گروه کمربندی در این مسابقه مجاز/تعریف نشده است."
+
+        if errors:
+            from django.core.exceptions import ValidationError
+            raise ValidationError(errors)
+
+        return super().clean()
+
 
 
 class PoomsaeEntry(models.Model):
     competition = models.ForeignKey(
-        PoomsaeCompetition, on_delete=models.CASCADE, related_name="entries", verbose_name="مسابقه"
+        PoomsaeCompetition,
+        on_delete=models.CASCADE,
+        related_name="entries",
+        verbose_name="مسابقه",
     )
-    player = models.ForeignKey(UserProfile, on_delete=models.PROTECT, related_name="poomsae_entries", verbose_name="بازیکن")
-    division = models.ForeignKey(PoomsaeDivision, on_delete=models.PROTECT, related_name="entries", verbose_name="دیویژن")
+    player = models.ForeignKey(
+        UserProfile,
+        on_delete=models.PROTECT,
+        related_name="poomsae_entries",
+        verbose_name="بازیکن",
+    )
+    division = models.ForeignKey(
+        PoomsaeDivision,
+        on_delete=models.PROTECT,
+        related_name="entries",
+        verbose_name="دیویژن",
+    )
 
     is_paid = models.BooleanField(default=False)
     paid_amount = models.PositiveIntegerField(default=0)
@@ -1227,10 +1284,31 @@ class PoomsaeEntry(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     insurance_number = models.CharField(max_length=20, blank=True, default="")
     insurance_issue_date = models.DateField(null=True, blank=True)
+
     class Meta:
         verbose_name = "ثبت‌نام پومسه"
         verbose_name_plural = "ثبت‌نام‌های پومسه"
-        unique_together = ("competition", "player")  # هر بازیکن یک ثبت‌نام در هر مسابقه (اگر چند دیویژن لازم داری حذفش کن)
+        # هر بازیکن در هر دیویژن فقط یک‌بار
+        constraints = [
+            models.UniqueConstraint(
+                fields=["division", "player"],
+                name="uniq_poom_entry_division_player",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["competition", "division", "player"]),
+        ]
 
     def __str__(self):
         return f"{self.player} → {self.division}"
+
+    def clean(self):
+        """
+        تطابق اجباری competition روی entry با competition دیویژن
+        """
+        if self.competition_id and self.division_id:
+            if self.division.competition_id != self.competition_id:
+                from django.core.exceptions import ValidationError
+                raise ValidationError({"division": "دیویژن انتخابی به همین مسابقه تعلق ندارد."})
+        return super().clean()
+

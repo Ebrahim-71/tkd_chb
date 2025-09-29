@@ -26,16 +26,26 @@ import persian from "react-date-object/calendars/persian";
 import persian_fa from "react-date-object/locales/persian_fa";
 
 /* ---------- Helpers (digits / dates / urls …) ---------- */
+function birthFaSafe(locked) {
+  if (!locked) return "—";
+  const fa = locked.birth_date_jalali_fa || locked.birthDateJalaliFa || locked.birth_date || locked.birthDate;
+  if (fa) {
+    const s = stripRtlMarks(String(fa)).replace(/-/g, "/").slice(0, 10);
+    return toFa(s);
+  }
+  const iso = locked.birth_date_iso || findBirthISODep(locked);
+  if (iso) return isoToJalaliFa(iso);
+  return "—";
+}
 
-// --- Greg <-> Jalali helpers (for display) ---
 const pad2 = (n) => String(n).padStart(2, "0");
 
 // تبدیل شماره روز ژولیانی به تاریخ جلالی
 function d2j(jdn) {
-  let { gy } = d2g(jdn);              // تاریخ میلادی متناظر
+  let { gy } = d2g(jdn);
   let jy = gy - 621;
   let r = jalCal(jy);
-  let jdn1f = g2d(gy, 3, r.march);    // روز اول فروردین همان سال جلالی
+  let jdn1f = g2d(gy, 3, r.march);
 
   let jd, jm;
   if (jdn >= jdn1f) {
@@ -64,22 +74,15 @@ function gregorianToJalali(gy, gm, gd) {
 function toStringSafe(v){ return v == null ? "" : String(v); }
 
 function isoToJalaliFa(iso) {
-  // نرمال‌سازی قبل از تشخیص
   let s = toStringSafe(iso);
   s = stripRtlMarks(normalizeDigits(s)).trim();
-
   const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (!m) return toFa(s.replace(/-/g, "/").slice(0,10));
-
   const gy = parseInt(m[1], 10), gm = parseInt(m[2], 10), gd = parseInt(m[3], 10);
-  // اگر سال < 1700 بود یعنی همین جلالی بوده که با خط‌تیره آمده
   if (gy < 1700) return toFa(`${gy}/${pad2(gm)}/${pad2(gd)}`);
-
   const { jy, jm, jd } = gregorianToJalali(gy, gm, gd);
   return toFa(`${jy}/${pad2(jm)}/${pad2(jd)}`);
 }
-
-
 
 const toFa = (str) => String(str ?? "").replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
 const fmtDateFa = (val) => {
@@ -89,8 +92,6 @@ const fmtDateFa = (val) => {
   if (/^\d{4}-\d{1,2}-\d{1,2}/.test(norm)) return isoToJalaliFa(norm);
   return toFa(norm.slice(0, 10).replace(/-/g, "/"));
 };
-
-
 
 const isISODate = (s) => {
   if (typeof s !== "string") return false;
@@ -156,9 +157,6 @@ function g2d(gy, gm, gd) {
   const a = div(14 - gm, 12); let y = gy + 4800 - a; let m = gm + 12 * a - 3;
   return gd + div(153 * m + 2, 5) + 365 * y + div(y, 4) - div(y, 100) + div(y, 400) - 32045;
 }
-
-
-
 function d2g(jdn) {
   const j = jdn + 32044; const g = div(j, 146097); const dg = j % 146097;
   const c = div((div(dg, 36524) + 1) * 3, 4); const dc = dg - c * 36524;
@@ -176,19 +174,44 @@ function j2d(jy, jm, jd) {
 }
 function jalaliToGregorian(jy, jm, jd) { return d2g(j2d(jy, jm, jd)); }
 
-// جلالی → Date (تحمل‌پذیر)
+// الگوی ISO برای جست‌وجوی تاریخ در آبجکت
+const ISO_REGEX = /\b(19|20)\d{2}-\d{2}-\d{2}\b/;
+function findBirthISODep(obj) {
+  if (!obj || typeof obj !== "object") return "";
+  for (const k of Object.keys(obj)) {
+    const v = obj[k];
+    if (typeof v === "string" && ISO_REGEX.test(v)) return v.match(ISO_REGEX)[0];
+  }
+  for (const k of Object.keys(obj)) {
+    const v = obj[k];
+    if (v && typeof v === "object") {
+      const f = findBirthISODep(v);
+      if (f) return f;
+    }
+  }
+  return "";
+}
+
+// اصلاح سالهای ناقص رایج (ایمن‌تر)
+function fixJalaliYear(y) {
+  if (y < 0) return y;
+  if (y < 100) return y >= 60 ? 1300 + y : 1400 + y;
+  if (y >= 700 && y <= 999) return y + 600;
+  return y;
+}
+
+// جلالی → Date
 function parseJalaliInputToDate(val) {
   if (!val) return null;
   if (typeof val === "object" && val?.isValid) {
     try { return val.toDate(); } catch {}
   }
-  let t = normalizeDigits(String(val));
-  t = stripRtlMarks(t).trim().replace(/-/g, "/");
-  t = t.replace(/[^\d/]/g, "").replace(/\/+/g, "/");
-  t = t.replace(/^(\d{4})\/(\d{1,2})\/(\d{1,2}).*$/, "$1/$2/$3");
-  const m = t.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
-  if (!m) return null;
-  const jy = parseInt(m[1], 10), jm = parseInt(m[2], 10), jd = parseInt(m[3], 10);
+  const mm = stripRtlMarks(normalizeDigits(String(val)))
+    .trim()
+    .replace(/-/g, "/")
+    .match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  if (!mm) return null;
+  const jy = parseInt(mm[1], 10), jm = parseInt(mm[2], 10), jd = parseInt(mm[3], 10);
   if (jm < 1 || jm > 12 || jd < 1 || jd > 31) return null;
   const { gy, gm, gd } = jalaliToGregorian(jy, jm, jd);
   const d = new Date(gy, gm - 1, gd);
@@ -204,8 +227,6 @@ const toJalaliDO = (s) => {
 
 /* ---------- نمایش تاریخ تولد از prefill (شمسی + ارقام فارسی) ---------- */
 
-// نام‌های احتمالی برای تاریخ تولد در پاسخ API
-// کلیدهای محتمل
 const BIRTH_KEYS = [
   "birth_date_jalali_fa","birthDateJalaliFa",
   "birth_date_jalali","birthDateJalali",
@@ -214,16 +235,13 @@ const BIRTH_KEYS = [
   "birth","birthday"
 ];
 
-// جستجوی بازگشتی داخل آبجکت‌های تودرتو
 const BIRTH_KEY_HINTS = /birth|dob|date.?of.?birth|birthday|taval|tavalod|ولد/i;
 function findBirthValueDeep(obj) {
   if (!obj || typeof obj !== "object") return "";
-  // اول کلیدهای مستقیم با الگوی تاریخ تولد
   for (const k of Object.keys(obj)) {
     const v = obj[k];
     if (BIRTH_KEY_HINTS.test(k) && v != null && String(v).trim() !== "") return v;
   }
-  // بعد در آبجکت‌های تودرتو
   for (const k of Object.keys(obj)) {
     const v = obj[k];
     if (v && typeof v === "object") {
@@ -234,45 +252,70 @@ function findBirthValueDeep(obj) {
   return "";
 }
 
+/* ====== پارسر تاریخ + نمایش شمسی مطمئن برای تولد ====== */
+
+function parseYMDFlexible(raw) {
+  if (!raw) return null;
+  let s = stripRtlMarks(normalizeDigits(String(raw))).trim();
+  s = s.replace(/^["']+|["']+$/g, "");
+  s = s.replace(/[.\-]/g, "/");
+  const m = s.match(/(\d{1,4})\s*\/\s*(\d{1,2})\s*\/\s*(\d{1,4})/);
+  if (!m) return null;
+
+  let a = parseInt(m[1], 10);
+  let b = parseInt(m[2], 10);
+  let c = parseInt(m[3], 10);
+
+  if (a >= 1700) return { y: a, mo: b, d: c, calendar: "greg" };
+  if (c >= 1700) return { y: c, mo: b, d: a, calendar: "greg" };
+
+  const isFirstYear = String(a).length >= 3;
+  return isFirstYear
+    ? { y: a, mo: b, d: c, calendar: "jalali" }
+    : { y: c, mo: b, d: a, calendar: "jalali" };
+}
+
 function pickBirthFa(locked) {
   if (!locked) return "—";
 
-  // 1) تلاش با کلیدهای تخت
+  const directFa =
+    locked?.birth_date_jalali_fa ?? locked?.birthDateJalaliFa;
+  if (directFa) {
+    return toFa(stripRtlMarks(String(directFa)).replace(/-/g, "/").slice(0, 10));
+  }
+
+  const directEn =
+    locked?.birth_date_jalali ?? locked?.birthDateJalali ??
+    locked?.birth_jalali    ?? locked?.birthJalali;
+  if (directEn) {
+    const s = stripRtlMarks(normalizeDigits(String(directEn)))
+      .replace(/-/g, "/")
+      .slice(0, 10);
+    return toFa(s);
+  }
+
+  const isoDeep = findBirthISODep(locked);
+  if (isoDeep) return isoToJalaliFa(isoDeep);
+
   let raw = "";
   for (const k of BIRTH_KEYS) {
     const v = locked?.[k];
     if (v != null && String(v).trim() !== "") { raw = v; break; }
   }
-  // 2) اگر چیزی پیدا نشد، تودرتو بگرد
   if (!raw) raw = findBirthValueDeep(locked);
   if (!raw) return "—";
 
-  // 3) نرمال‌سازی
-  let s = stripRtlMarks(toStringSafe(raw)).trim();
-  s = normalizeDigits(s);
+  const ymd = parseYMDFlexible(raw);
+  if (!ymd) return toFa(String(raw).slice(0, 10).replace(/-/g, "/"));
 
-  // 4) فرمت‌های رایج
-  // 4-الف: ISO با خط‌تیره (ممکنه فارسی بوده باشه که الان نرمال شده)
-  if (/^\d{4}-\d{1,2}-\d{1,2}/.test(s)) {
-    return isoToJalaliFa(s); // خودش فارسی‌سازی هم می‌کند
+  let { y, mo, d, calendar } = ymd;
+  if (calendar === "greg") {
+    const { jy, jm, jd } = gregorianToJalali(y, mo, d);
+    return toFa(`${jy}/${pad2(jm)}/${pad2(jd)}`);
   }
-
-  // 4-ب: با اسلش
-  const m = s.replace(/-/g, "/").match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-  if (m) {
-    const y = parseInt(m[1], 10), mo = parseInt(m[2], 10), d = parseInt(m[3], 10);
-    if (y < 1700) {
-      // همین جلالی بوده
-      return toFa(`${y}/${pad2(mo)}/${pad2(d)}`);
-    }
-    // میلادی → تبدیل دقیق
-    return isoToJalaliFa(`${y}-${pad2(mo)}-${pad2(d)}`);
-  }
-
-  // 5) هر چیز دیگر: فقط فارسی‌سازی ارقام و جداکننده
-  return toFa(s.slice(0, 10).replace(/-/g, "/"));
+  y = fixJalaliYear(y);
+  return toFa(`${y}/${pad2(mo)}/${pad2(d)}`);
 }
-
 
 
 /* ---------- Debug helpers ---------- */
@@ -330,12 +373,10 @@ export default function CompetitionDetails() {
 
   // فرم ثبت‌نام خودی (پومسه)
   const [regP, setRegP] = useState({
-    open: false,
-    loading: false,
-    errors: {},
-    can_register: false,
-    need_coach_code: false,
+    open: false, loading: false, errors: {},
+    can_register: false, need_coach_code: false,
     locked: null,
+    poomsae_type: "standard", // 'standard' | 'creative'
     coach_code: "",
     insurance_number: "",
     insurance_issue_date: "",
@@ -361,6 +402,37 @@ export default function CompetitionDetails() {
 
   // مودال نتایج (رزرو برای آینده)
   const [resultsModal] = useState({ open: false, loading: false, error: "", has: false, rows: [] });
+
+  // لاگ کمکی برای تاریخ تولد
+  useEffect(() => {
+    if (!reg?.locked) return;
+    console.log("locked.birth (kyorugi):", {
+      isoDeep: findBirthISODep(reg.locked),
+      raw:
+        reg.locked?.birth_date ??
+        reg.locked?.birthDate ??
+        reg.locked?.dob ??
+        findBirthValueDeep(reg.locked),
+      locked: reg.locked,
+    });
+  }, [reg.locked]);
+
+  useEffect(() => {
+    if (!regP?.locked) return;
+    console.log("locked.birth (poomsae):", {
+      isoDeep: findBirthISODep(regP.locked),
+      raw:
+        regP.locked?.birth_date ??
+        regP.locked?.birthDate ??
+        regP.locked?.dob ??
+        findBirthValueDeep(regP.locked),
+      locked: regP.locked,
+    });
+  }, [regP.locked]);
+  useEffect(() => {
+    if (!regP?.locked) return;
+    console.log("BIRTH (rendered):", pickBirthFa(regP.locked));
+  }, [regP.locked]);
 
   /* --- لود جزئیات مسابقه --- */
   useEffect(() => {
@@ -680,31 +752,56 @@ export default function CompetitionDetails() {
 
     if (reg.need_coach_code && !String(reg.coach_code).trim()) errors.coach_code = "کد تأیید مربی الزامی است.";
     if (!reg.confirmed) errors.confirmed = "لطفاً صحت اطلاعات را تأیید کنید.";
+    if (!String(reg.insurance_number).trim()) errors.insurance_number = "شماره بیمه الزامی است.";
     return errors;
   };
 
-  const validateFormPoomsae = () => {
-    const errors = {};
+ const validateFormPoomsae = () => {
+  const errors = {};
 
-    if (competitionDate) {
-      const issueDate = parseJalaliInputToDate(regP.insurance_issue_date);
-      if (!issueDate || isNaN(issueDate.getTime())) {
-        errors.insurance_issue_date = "تاریخ صدور نامعتبر است (الگوی ۱۴۰۳/۰۵/۲۰).";
-      } else {
-        const comp = stripTime(competitionDate);
-        const minOk72h = new Date(comp); minOk72h.setDate(minOk72h.getDate() - 3);
-        const oldest1y = new Date(comp); oldest1y.setFullYear(oldest1y.getFullYear() - 1);
+  // نوع مسابقه
+  if (!["standard", "creative"].includes(String(regP.poomsae_type))) {
+    errors.poomsae_type = "نوع مسابقه را انتخاب کنید.";
+  }
 
-        if (issueDate > minOk72h) errors.insurance_issue_date = "تاریخ صدور باید حداقل ۷۲ ساعت قبل از تاریخ مسابقه باشد.";
-        else if (issueDate < oldest1y) errors.insurance_issue_date = "اعتبار کارت بیمه منقضی است (بیش از یک سال قبل از مسابقه).";
+  // تاریخ صدور بیمه
+  if (competitionDate) {
+    const issueDate = parseJalaliInputToDate(regP.insurance_issue_date);
+    if (!issueDate || isNaN(issueDate.getTime())) {
+      errors.insurance_issue_date = "تاریخ صدور نامعتبر است (الگوی ۱۴۰۳/۰۵/۲۰).";
+    } else {
+      const comp = stripTime(competitionDate);
+      const minOk72h = new Date(comp); minOk72h.setDate(minOk72h.getDate() - 3);
+      const oldest1y = new Date(comp); oldest1y.setFullYear(oldest1y.getFullYear() - 1);
+      if (issueDate > minOk72h) {
+        errors.insurance_issue_date = "تاریخ صدور باید حداقل ۷۲ ساعت قبل از تاریخ مسابقه باشد.";
+      } else if (issueDate < oldest1y) {
+        errors.insurance_issue_date = "اعتبار کارت بیمه منقضی است (بیش از یک سال قبل از مسابقه).";
       }
     }
+  }
 
-    if (!String(regP.insurance_number).trim()) errors.insurance_number = "شماره بیمه الزامی است.";
-    if (regP.need_coach_code && !String(regP.coach_code).trim()) errors.coach_code = "کد تأیید مربی الزامی است.";
-    if (!regP.confirmed) errors.confirmed = "لطفاً صحت اطلاعات را تأیید کنید.";
-    return errors;
-  };
+  // شماره بیمه
+  if (!String(regP.insurance_number).trim()) {
+    errors.insurance_number = "شماره بیمه الزامی است.";
+  }
+
+  // کد مربی — اجباری و فقط عدد ۵ تا ۸ رقمی
+  const coachCode = normalizeDigits(regP.coach_code || "").trim();
+  if (!coachCode) {
+    errors.coach_code = "کد تأیید مربی الزامی است.";
+  } else if (!/^\d{5,8}$/.test(coachCode)) {
+    errors.coach_code = "کد تأیید مربی باید عددی ۵ تا ۸ رقمی باشد.";
+  }
+
+  // تایید نهایی
+  if (!regP.confirmed) {
+    errors.confirmed = "لطفاً صحت اطلاعات را تأیید کنید.";
+  }
+
+  return errors;
+};
+
 
   /* ---------- Submit: Kyorugi ---------- */
   const submitRegister = async (e) => {
@@ -769,6 +866,7 @@ export default function CompetitionDetails() {
       if (!issueISO) { setRegP((r) => ({ ...r, loading: false, errors: { insurance_issue_date: "تاریخ نامعتبر است." } })); return; }
 
       const payload = {
+        poomsae_type: regP.poomsae_type,
         insurance_number: normalizeDigits(regP.insurance_number || "").trim(),
         insurance_issue_date: issueISO,
       };
@@ -830,7 +928,6 @@ export default function CompetitionDetails() {
   if (err)     return (<div className="cd-container"><div className="cd-error">{err}</div></div>);
   if (!competition) return (<div className="cd-container"><div className="cd-error">مسابقه یافت نشد.</div></div>);
 
-  // نمایش/عدم نمایش دکمه‌ها
   const showSelfRegBtn    = isPlayer && shouldShowSelfRegister(role);
   const showStudentRegBtn = isCoach && shouldShowStudentRegister(role);
   const studentBtnLabel   = isCoach ? "ثبت‌ نام بازیکن" : "ثبت‌نام شاگرد";
@@ -876,23 +973,18 @@ export default function CompetitionDetails() {
           <InfoRow label="شروع ثبت‌نام" value={fmtDateFa(competition.registration_start_jalali ?? competition.registration_start)} />
           <InfoRow label="پایان ثبت‌نام" value={fmtDateFa(competition.registration_end_jalali ?? competition.registration_end)} />
 
+          {/* تاریخ قرعه‌کشی برای هر دو سبک */}
+          <InfoRow label="تاریخ قرعه‌کشی" value={fmtDateFa(competition.draw_date_jalali ?? competition.draw_date)} />
+
+          {/* کیوروگی: وزن‌کشی */}
           {isKyorugi && (
-            <>
-              <InfoRow label="تاریخ وزن‌کشی" value={fmtDateFa(competition.weigh_date_jalali ?? competition.weigh_date)} />
-              <InfoRow label="تاریخ قرعه‌کشی" value={fmtDateFa(competition.draw_date_jalali ?? competition.draw_date)} />
-            </>
+            <InfoRow label="تاریخ وزن‌کشی" value={fmtDateFa(competition.weigh_date_jalali ?? competition.weigh_date)} />
           )}
 
           <InfoRow label="تاریخ برگزاری" value={fmtDateFa(competition.competition_date_jalali ?? competition.competition_date)} />
 
-          {isPoomsae ? (
-            <InfoRow label="نشانی محل برگزاری" value={addressFull} multiline />
-          ) : (
-            <>
-              <InfoRow label="شهر" value={competition.city || "—"} />
-              <InfoRow label="نشانی محل برگزاری" value={competition.address || "—"} multiline />
-            </>
-          )}
+          {/* نشانی یکپارچه برای هر دو سبک */}
+          <InfoRow label="نشانی محل برگزاری" value={addressFull} multiline />
 
           {isKyorugi && <InfoRow label="تعداد زمین‌ها" value={toFa(competition.mat_count ?? "—")} />}
 
@@ -1065,7 +1157,7 @@ export default function CompetitionDetails() {
             {/* فیلدهای قفل‌شده */}
             {reg.locked ? (
               <div className="cd-grid">
-                <InfoRow label="نام"            value={reg.locked.first_name || "—"} />
+                <InfoRow label="नाम"            value={reg.locked.first_name || "—"} />
                 <InfoRow label="نام خانوادگی"   value={reg.locked.last_name  || "—"} />
                 <InfoRow label="کد ملی"         value={toFa(reg.locked.national_id) || "—"} />
                 <InfoRow label="تاریخ تولد"     value={pickBirthFa(reg.locked)} />
@@ -1202,7 +1294,7 @@ export default function CompetitionDetails() {
                 <InfoRow label="نام"            value={regP.locked.first_name || "—"} />
                 <InfoRow label="نام خانوادگی"   value={regP.locked.last_name  || "—"} />
                 <InfoRow label="کد ملی"         value={toFa(regP.locked.national_id) || "—"} />
-                <InfoRow label="تاریخ تولد"     value={pickBirthFa(regP.locked)} />
+                <InfoRow label="تاریخ تولد"     value={birthFaSafe(regP.locked)} />
                 <InfoRow label="کمربند"         value={regP.locked.belt || "—"} />
                 <InfoRow label="باشگاه"         value={regP.locked.club || "—"} />
                 <InfoRow label="مربی"           value={regP.locked.coach || "—"} />
@@ -1214,6 +1306,37 @@ export default function CompetitionDetails() {
             {/* اطلاعات تکمیلی */}
             <h3 className="cd-section-title">اطلاعات تکمیلی</h3>
             <div className="cd-grid">
+
+              {/* نوع مسابقه: استاندارد / ابداعی */}
+              <div className="cd-row">
+                <label className="cd-label">نوع مسابقه</label>
+                <div className="cd-value">
+                  <label className="cd-radio">
+                    <input
+                      type="radio"
+                      name="poomsae_type"
+                      value="standard"
+                      checked={regP.poomsae_type === "standard"}
+                      onChange={(e) => setRegP(r => ({ ...r, poomsae_type: e.target.value }))}
+                    />
+                    <span>استاندارد</span>
+                  </label>
+                  <label className="cd-radio" style={{ marginInlineStart: 16 }}>
+                    <input
+                      type="radio"
+                      name="poomsae_type"
+                      value="creative"
+                      checked={regP.poomsae_type === "creative"}
+                      onChange={(e) => setRegP(r => ({ ...r, poomsae_type: e.target.value }))}
+                    />
+                    <span>ابداعی</span>
+                  </label>
+                  {regP.errors.poomsae_type && (
+                    <div className="cd-error" style={{ marginTop: 6 }}>{regP.errors.poomsae_type}</div>
+                  )}
+                </div>
+              </div>
+
               {/* شماره بیمه */}
               <div className="cd-row" title="شماره درج‌شده روی کارت بیمه ورزشی.">
                 <label className="cd-label" htmlFor="ins-num-p">شماره بیمه</label>
@@ -1257,9 +1380,7 @@ export default function CompetitionDetails() {
                 </div>
               </div>
 
-              {/* کد تأیید مربی (در صورت نیاز) */}
-              {regP.need_coach_code && (
-                <div className="cd-row" title="این کد را مربی‌تان در داشبورد خودش می‌بیند.">
+                <div className="cd-row" title="این کد باید مربوط به مربیِ خودِ شما باشد.">
                   <label className="cd-label" htmlFor="coach_code_p">کد تأیید مربی</label>
                   <div className="cd-value">
                     <input
@@ -1270,16 +1391,16 @@ export default function CompetitionDetails() {
                       pattern="\d*"
                       className="cd-input"
                       placeholder="مثلاً ۴۵۸۲۷۱"
-                      title="این کد را مربی‌تان در داشبورد خودش می‌بیند."
                       value={regP.coach_code}
                       onChange={(e) => setRegP((r) => ({ ...r, coach_code: e.target.value }))}
                       aria-invalid={!!regP.errors.coach_code}
-                      required={regP.need_coach_code}
+                      required
                     />
-                    {regP.errors.coach_code && (<div className="cd-error" style={{ marginTop: 6 }}>{regP.errors.coach_code}</div>)}
+                    {regP.errors.coach_code && <div className="cd-error" style={{ marginTop: 6 }}>{regP.errors.coach_code}</div>}
                   </div>
                 </div>
-              )}
+
+
             </div>
 
             {/* تأیید صحت اطلاعات */}
