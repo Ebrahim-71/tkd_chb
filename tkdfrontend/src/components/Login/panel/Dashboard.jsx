@@ -93,11 +93,13 @@ const Dashboard = () => {
     }
     setRole(savedRole);
 
-    // اگر نقش URL با نقش ذخیره‌شده نخواند، URL را تصحیح کن
-    if (roleFromRoute && roleFromRoute !== savedRole) {
-      navigate(`/dashboard/${savedRole}${location.search}`, { replace: true });
-      return;
-    }
+    // اگر نقش URL با نقش ذخیره‌شده نخواند، URL را تصحیح کن ولی suffix مسیر را نگه دار
+   if (roleFromRoute && roleFromRoute !== savedRole) {
+     // هرچه بعد از /dashboard/:role آمده را نگه می‌داریم (مثلاً /competitions/xyz/bracket)
+     const suffix = location.pathname.replace(/^\/dashboard\/[^/]+/, "");
+     navigate(`/dashboard/${encodeURIComponent(savedRole)}${suffix}${location.search}`, { replace: true });
+     return;
+   }
 
     const handleResize = () => {
       const nowMobile = window.innerWidth <= 768;

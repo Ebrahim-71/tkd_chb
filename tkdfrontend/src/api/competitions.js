@@ -1,38 +1,39 @@
 // src/api/competitions.js
-// هماهنگ با بک‌اند کیوروگی/پومسه و فیکس تایید تعهدنامه مربی
+// فقط کیوروگی + پومسه + اندپوینت‌های جنریک (هماهنگ با urls.py و views.py شما)
 
 /* ---------------- Base URLs ---------------- */
 export const API_BASE = (process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
-// ریشه‌ها (با فرض mount زیر /api/competitions/)
-const KY_PUBLIC_ROOT = `${API_BASE}/api/competitions/kyorugi`;           // عمومی (public_id) - کیوروگی
-const KY_AUTH_ROOT   = `${API_BASE}/api/competitions/auth/kyorugi`;      // نیازمند احراز هویت - کیوروگی
-const PO_AUTH_ROOT   = `${API_BASE}/api/competitions/auth/poomsae`;      // نیازمند احراز هویت - پومسه
+// Kyorugi roots
+const KY_PUBLIC_ROOT = `${API_BASE}/api/competitions/kyorugi`;
+const KY_AUTH_ROOT   = `${API_BASE}/api/competitions/auth/kyorugi`;
 
-// برای سازگاری با کدهای قدیمی که از نام COMP_* استفاده می‌کردند
-const COMP_PUBLIC_ROOT = KY_PUBLIC_ROOT;
-const COMP_AUTH_ROOT   = KY_AUTH_ROOT;
+// Poomsae roots
+const POOM_PUBLIC_ROOT = `${API_BASE}/api/competitions/poomsae`;
+const POOM_AUTH_ROOT   = `${API_BASE}/api/competitions/auth/poomsae`;
 
-// داشبورد — مسیر اصلی و فالبک
-const DASHBOARD_KY_URL_PRIMARY  = `${API_BASE}/api/competitions/auth/dashboard/kyorugi/`;   // ✅ اصلی
-const DASHBOARD_KY_URL_FALLBACK = `${API_BASE}/api/auth/dashboard/kyorugi/`;                // فالبک
-const DASHBOARD_ALL_URL         = `${API_BASE}/api/competitions/auth/dashboard/all/`;
+// Generic (any model)
+const ANY_PUBLIC_ROOT = `${API_BASE}/api/competitions`;
+
+// Dashboard
+const DASHBOARD_KY_AUTH  = `${API_BASE}/api/competitions/auth/dashboard/kyorugi/`;
+const DASHBOARD_ALL_AUTH = `${API_BASE}/api/competitions/auth/dashboard/all/`;
 
 /* ---------------- Token & Headers ---------------- */
 function pickToken() {
   const role = (localStorage.getItem("user_role") || "").toLowerCase().trim();
   const keys = [
-    "coach_token",
+    role ? `${role}_token` : null,
     "both_token",
-    `${role}_token`,
-    "access_token",
-    "referee_token",
+    "coach_token",
     "player_token",
+    "referee_token",
     "club_token",
     "heyat_token",
     "board_token",
+    "access_token",
     "token",
-  ];
+  ].filter(Boolean);
   for (const k of keys) {
     const v = localStorage.getItem(k);
     if (v) return v;
@@ -62,8 +63,6 @@ function requireAuthHeaders() {
 }
 
 /* ---------------- Fetch helpers ---------------- */
-const BAD_APPROVAL_RE = /\/coach-approvals\/[^/]+\/(accept|approve)\/?$/;
-
 async function parseJSONorThrow(res) {
   if (res.status === 204 || res.status === 205) return null;
   const ct = (res.headers.get("content-type") || "").toLowerCase();
@@ -91,9 +90,6 @@ async function parseJSONorThrow(res) {
 }
 
 async function safeFetch(url, options = {}) {
-  if (BAD_APPROVAL_RE.test(String(url))) {
-    throw new Error("❌ مسیر قدیمی coach-approvals/accept|approve فراخوانی شد. از مسیر جدید استفاده کنید.");
-  }
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), options.timeoutMs || 15000);
   try {
@@ -107,13 +103,24 @@ async function safeFetch(url, options = {}) {
   }
 }
 
-async function tryFirst(urls, options) {
+// چند URL را تست می‌کند و اولین موفق را برمی‌گرداند؛ 404 ها را نادیده می‌گیرد
+async function tryFirst(urls, options = {}) {
   let lastErr;
+  const tried = [];
   for (const u of urls) {
-    try { return await safeFetch(u, options); }
-    catch (e) { lastErr = e; }
+    try {
+      if (options.__debugUrls) console.debug("[tryFirst]", options.method || "GET", u);
+      return await safeFetch(u, options);
+    } catch (e) {
+      tried.push({ url: u, status: e?.status, message: e?.message });
+      lastErr = e;
+      if (e?.status && e.status !== 404) break; // غیر از 404 متوقف شو
+    }
   }
-  throw lastErr || new Error("No endpoint responded");
+  if (options.__debugUrls) console.warn("[tryFirst] all candidates failed:", tried);
+  const err = lastErr || new Error("No endpoint responded");
+  err.tried = tried;
+  throw err;
 }
 
 function normalizeList(res) {
@@ -132,68 +139,52 @@ export function isClubLike(role = getCurrentRole()) {
   const r = (role || "").toLowerCase();
   return r === "club" || r === "heyat" || r === "board";
 }
-export function shouldShowSelfRegister(role = getCurrentRole()) {
-  return !isClubLike(role);
-}
-export function shouldShowStudentRegister(role = getCurrentRole()) {
-  const r = String(role || getCurrentRole() || "").toLowerCase();
-  return r === "coach" || r === "both";
-}
-
-/* ---------------- User Id helper (برای کلید تعهدنامه پومسه) ---------------- */
-export function getUserId() {
-  const keys = ["user_id", "profile_id", "uid", "id"];
-  for (const k of keys) {
-    const v = localStorage.getItem(k);
-    if (v && String(v).trim()) return String(v).trim();
+export function shouldShowSelfRegister(competitionOrRole = getCurrentRole(), userRoleIfAny) {
+  if (typeof competitionOrRole === "object" && competitionOrRole) {
+    const c = competitionOrRole;
+    const can =
+      Boolean(c.registration_open_effective ?? c.registration_open ?? c.can_register ?? c.canRegister);
+    const role = String(userRoleIfAny || getCurrentRole()).toLowerCase();
+    return can && !(role && isClubLike(role));
   }
-  return "anon";
+  return !isClubLike(String(competitionOrRole || getCurrentRole()));
+}
+export function shouldShowStudentRegister(competitionOrRole = getCurrentRole(), userRoleIfAny) {
+  const role = typeof competitionOrRole === "object"
+    ? String(userRoleIfAny || getCurrentRole()).toLowerCase()
+    : String(competitionOrRole || getCurrentRole()).toLowerCase();
+  return role === "coach" || role === "both";
 }
 
 /* ---------------- Terms (تعهدنامه) ---------------- */
-export function poomsaeConsentKey(publicId, userId = getUserId()) {
-  return `poomsae_consent_${publicId}_${userId}`;
-}
-export function hasPoomsaeConsent(publicId, userId = getUserId()) {
-  try { return localStorage.getItem(poomsaeConsentKey(publicId, userId)) === "ok"; } catch { return false; }
-}
-export function setPoomsaeConsent(publicId, userId = getUserId()) {
-  try { localStorage.setItem(poomsaeConsentKey(publicId, userId), "ok"); } catch {}
-}
-
 export async function getCompetitionTerms(key) {
   const headers = authHeaders();
+  const k = encodeURIComponent(String(key || "").trim());
   return tryFirst(
     [
-      `${API_BASE}/api/competitions/${encodeURIComponent(key)}/terms/`,                // جنریک (هر دو سبک)
-      `${KY_PUBLIC_ROOT}/${encodeURIComponent(key)}/terms/`,                           // کیوروگی
-      `${API_BASE}/api/competitions/competitions/${encodeURIComponent(key)}/terms/`,   // قدیمی
+      `${ANY_PUBLIC_ROOT}/by-public/${k}/terms/`,            // جنریک صحیح
+      `${ANY_PUBLIC_ROOT}/${k}/terms/`,                      // جنریک کوتاه
+      `${KY_PUBLIC_ROOT}/${k}/terms/`,                       // کیوروگی
+      `${ANY_PUBLIC_ROOT}/competitions/kyorugi/${k}/terms/`, // سازگاری قدیمی
     ],
-    { method: "GET", headers, credentials: "omit" }
+    { method: "GET", headers, credentials: "omit", __debugUrls: true }
   );
 }
 
-
-
-
-/* ---------------- Competition detail (public_id) ---------------- */
-export async function getCompetitionDetail(publicId) {
+/* ---------------- Competition detail (public_id/slug/id) ---------------- */
+// مطابق urls.py: by-public/<key>/  و  <key>/  و مسیرهای اختصاصی
+export async function getCompetitionDetail(key) {
   const headers = authHeaders();
+  const k = encodeURIComponent(String(key || "").trim());
   return tryFirst(
     [
-      // ✅ اندپوینت جنریک جدید (هر دو سبک)
-      `${API_BASE}/api/competitions/${encodeURIComponent(publicId)}/`,
-
-      // پومسه اختصاصی (اگر هنوز دارید)
-      `${API_BASE}/api/competitions/poomsae/${encodeURIComponent(publicId)}/`,
-
-      // کیوروگی قدیمی
-      `${KY_PUBLIC_ROOT}/${encodeURIComponent(publicId)}/`,
-
-      // کامپت قدیمی
-      `${API_BASE}/api/competitions/competitions/${encodeURIComponent(publicId)}/`,
+      `${ANY_PUBLIC_ROOT}/by-public/${k}/`,    // ✅ ویوی جنریک برای هر دو مدل
+      `${ANY_PUBLIC_ROOT}/${k}/`,              // ✅ جنریک کوتاه
+      `${KY_PUBLIC_ROOT}/${k}/`,               // اختصاصی کیوروگی
+      `${POOM_PUBLIC_ROOT}/${k}/`,             // اختصاصی پومسه
+      `${ANY_PUBLIC_ROOT}/competitions/${k}/`, // سازگاری قدیمی
     ],
-    { method: "GET", headers, credentials: "omit" }
+    { method: "GET", headers, credentials: "omit", __debugUrls: true }
   );
 }
 
@@ -204,8 +195,6 @@ export async function getCoachApprovalStatus(publicId) {
     method: "GET", headers, credentials: "omit"
   });
 }
-
-// تنها مسیر صحیح تایید مربی در کیوروگی
 export async function approveCompetition(publicId) {
   const headers = requireAuthHeaders();
   return safeFetch(`${KY_AUTH_ROOT}/${encodeURIComponent(publicId)}/coach-approval/approve/`, {
@@ -213,26 +202,61 @@ export async function approveCompetition(publicId) {
   });
 }
 
-/* ---------------- Register self ---------------- */
-export async function registerSelf(publicId, payload) {
+/* ---------------- Coach approval (پومسه) ---------------- */
+export async function getPoomsaeCoachApprovalStatus(publicId) {
   const headers = requireAuthHeaders();
-  return safeFetch(`${KY_AUTH_ROOT}/${encodeURIComponent(publicId)}/register/self/`, {
-    method: "POST",
-    headers,
-    credentials: "omit",
-    body: JSON.stringify({
-      coach_code: payload.coach_code,
-      declared_weight: String(payload.declared_weight ?? "").trim(),
-      insurance_number: payload.insurance_number,
-      insurance_issue_date: payload.insurance_issue_date,
-    }),
+  return safeFetch(`${POOM_AUTH_ROOT}/${encodeURIComponent(publicId)}/coach-approval/status/`, {
+    method: "GET", headers, credentials: "omit"
+  });
+}
+export async function approvePoomsaeCompetition(publicId) {
+  const headers = requireAuthHeaders();
+  return safeFetch(`${POOM_AUTH_ROOT}/${encodeURIComponent(publicId)}/coach-approval/approve/`, {
+    method: "POST", headers, credentials: "omit", body: JSON.stringify({ agree: true })
   });
 }
 
+/* ---------------- Register self (کیوروگی) ---------------- */
+// مطابق urls.py: auth/kyorugi/<key>/prefill/  و  auth/kyorugi/<key>/register/self/
 export async function getRegisterSelfPrefill(publicId) {
   const headers = requireAuthHeaders();
   return safeFetch(`${KY_AUTH_ROOT}/${encodeURIComponent(publicId)}/prefill/`, {
     method: "GET", headers, credentials: "omit"
+  });
+}
+export async function registerSelf(publicId, payload) {
+  const headers = requireAuthHeaders();
+  const body = JSON.stringify({
+    coach_code: (payload?.coach_code ?? "").trim(),
+    declared_weight: String(payload?.declared_weight ?? "").trim(),
+    insurance_number: (payload?.insurance_number ?? "").trim(),
+    insurance_issue_date: (payload?.insurance_issue_date ?? "").trim(), // YYYY-MM-DD
+  });
+  return safeFetch(`${KY_AUTH_ROOT}/${encodeURIComponent(publicId)}/register/self/`, {
+    method: "POST", headers, credentials: "omit", body
+  });
+}
+
+/* ---------------- Register self (پومسه) ---------------- */
+
+// مثل کیوروگی: auth/poomsae/<key>/prefill/ و auth/poomsae/<key>/register/self/
+export async function getPoomsaeRegisterSelfPrefill(publicId) {
+  const headers = requireAuthHeaders();
+  return safeFetch(`${POOM_AUTH_ROOT}/${encodeURIComponent(publicId)}/prefill/`, {
+    method: "GET", headers, credentials: "omit"
+  });
+}
+
+export async function registerSelfPoomsae(publicId, payload) {
+  const headers = requireAuthHeaders();
+  const body = JSON.stringify({
+    coach_code: (payload?.coach_code ?? "").trim(),
+    poomsae_type: (payload?.poomsae_type ?? "").trim(),           // "standard" | "creative"
+    insurance_number: (payload?.insurance_number ?? "").trim(),
+    insurance_issue_date: (payload?.insurance_issue_date ?? "").trim(), // "YYYY/MM/DD" یا "YYYY-MM-DD"
+  });
+  return safeFetch(`${POOM_AUTH_ROOT}/${encodeURIComponent(publicId)}/register/self/`, {
+    method: "POST", headers, credentials: "omit", body
   });
 }
 
@@ -243,25 +267,22 @@ export async function getCoachEligibleStudents(key) {
     method: "GET", headers, credentials: "omit"
   });
 }
-
-// itemsOrPayload: آرایه‌ی آیتم‌ها یا {students:[...]} یا {student_ids:[...]}
 export async function registerStudentsBulk(key, itemsOrPayload) {
   const headers = requireAuthHeaders();
-  let payload = [];
-  if (Array.isArray(itemsOrPayload)) payload = itemsOrPayload;
-  else if (Array.isArray(itemsOrPayload?.students)) payload = itemsOrPayload.students;
-  else if (Array.isArray(itemsOrPayload?.student_ids)) payload = itemsOrPayload.student_ids;
-
-  const ids = (payload || []).map((x) => {
-    if (x == null) return null;
-    if (typeof x === "number" || typeof x === "string") return x;
-    return x.id ?? x.user_id ?? x.profile_id ?? x.student_id ?? null;
-  }).filter(Boolean);
-
-  const body = ids.length ? { student_ids: ids } : (Array.isArray(payload) ? { students: payload } : itemsOrPayload || {});
-
+  let students = [];
+  if (Array.isArray(itemsOrPayload?.students)) {
+    students = itemsOrPayload.students;
+  } else if (Array.isArray(itemsOrPayload)) {
+    students = itemsOrPayload;
+  }
+  if (!Array.isArray(students) || !students.length) {
+    throw new Error("payload باید شامل آرایه students باشد (هر عضو حداقل player_id دارد).");
+  }
   return safeFetch(`${KY_AUTH_ROOT}/${encodeURIComponent(key)}/coach/register/students/`, {
-    method: "POST", headers, credentials: "omit", body: JSON.stringify(body)
+    method: "POST",
+    headers,
+    credentials: "omit",
+    body: JSON.stringify({ students })
   });
 }
 
@@ -271,7 +292,6 @@ export async function requestBulkCards(enrollmentIds) {
     method: "POST", headers, credentials: "omit", body: JSON.stringify({ enrollment_ids: enrollmentIds })
   });
 }
-
 export async function downloadBulkCards(enrollmentIds) {
   const headers = requireAuthHeaders();
   const url = `${API_BASE}/api/competitions/auth/enrollments/cards/bulk/`;
@@ -289,102 +309,65 @@ export async function downloadBulkCards(enrollmentIds) {
 }
 
 /* ---------------- Dashboard list ---------------- */
-export async function listAllCompetitionsPublic() {
-  const headers = authHeaders();
+export async function getKyorugiListFromDashboard() {
+  const headers = requireAuthHeaders();
   const res = await tryFirst(
-    [
-      `${KY_PUBLIC_ROOT}/?published=1&ordering=-created_at`,
-      `${KY_PUBLIC_ROOT}/?ordering=-created_at`,
-      `${KY_PUBLIC_ROOT}/list/`,
-      `${KY_PUBLIC_ROOT}/`,
-      `${API_BASE}/api/competitions/kyorugi-open/`,
-    ],
-    { method: "GET", headers, credentials: "omit" }
+    [DASHBOARD_ALL_AUTH, DASHBOARD_KY_AUTH],
+    { method: "GET", headers, credentials: "omit", __debugUrls: true }
   );
   return normalizeList(res);
 }
-
-export async function getKyorugiListFromDashboard(roleArg) {
-  const role = (roleArg || getCurrentRole()).toLowerCase();
-  const headers = authHeaders();
+export async function getCompetitionsForRole() {
   try {
-    const res = await tryFirst(
-      [DASHBOARD_KY_URL_PRIMARY, DASHBOARD_ALL_URL, DASHBOARD_KY_URL_FALLBACK],
-      { method: "GET", headers, credentials: "omit" }
-    );
-    const arr = normalizeList(res);
-    if (arr.length > 0 || !isClubLike(role)) return arr;
-  } catch (e) {
-    if (!isClubLike(role)) throw e;
+    return await getKyorugiListFromDashboard();
+  } catch {
+    return []; // اندپوینت عمومی لیست در بک‌اند فعلی نداریم
   }
-  return await listAllCompetitionsPublic();
-}
-
-export async function getCompetitionsForRole(roleArg) {
-  const role = (roleArg || getCurrentRole()).toLowerCase();
-  if (isClubLike(role)) return listAllCompetitionsPublic();
-  return getKyorugiListFromDashboard(role);
 }
 
 /* ---------------- Player/Referee ---------------- */
-// ⚠️ این دو اندپوینت در بک‌اند «auth» هستند؛ قبلاً به مسیر public می‌رفت و 404/401 می‌داد.
 export async function getPlayerOpenCompetitions() {
   const headers = requireAuthHeaders();
-  return safeFetch(`${KY_AUTH_ROOT}/player/competitions/`, { method: "GET", headers, credentials: "omit" });
+  return safeFetch(`${API_BASE}/api/competitions/kyorugi/player/competitions/`, {
+    method: "GET", headers, credentials: "omit"
+  });
 }
 export async function getRefereeOpenCompetitions() {
   const headers = requireAuthHeaders();
-  return safeFetch(`${KY_AUTH_ROOT}/referee/competitions/`, { method: "GET", headers, credentials: "omit" });
+  return safeFetch(`${API_BASE}/api/competitions/kyorugi/referee/competitions/`, {
+    method: "GET", headers, credentials: "omit"
+  });
 }
 
 /* ---------------- Enrollment card & my enrollment ---------------- */
+// مطابق urls.py: auth/kyorugi/<key>/my-enrollment/
 export async function getEnrollmentCard(enrollmentId) {
   const headers = requireAuthHeaders();
   return safeFetch(`${API_BASE}/api/competitions/auth/enrollments/${encodeURIComponent(enrollmentId)}/card/`, {
     method: "GET", headers, credentials: "omit"
   });
 }
-
 export async function getMyEnrollment(publicId) {
   const headers = requireAuthHeaders();
-  return tryFirst(
-    [
-      `${KY_AUTH_ROOT}/${encodeURIComponent(publicId)}/my-enrollment/`,   // کیوروگی
-      `${PO_AUTH_ROOT}/${encodeURIComponent(publicId)}/my-enrollment/`,   // پومسه
-    ],
-    { method: "GET", headers, credentials: "omit" }
-  );
+  return safeFetch(`${KY_AUTH_ROOT}/${encodeURIComponent(publicId)}/my-enrollment/`, {
+    method: "GET", headers, credentials: "omit"
+  });
+}
+// پومسه my-enrollment نداریم
+export async function getMyEnrollmentPoomsae() {
+  const e = new Error("برای پومسه اندپوینت my-enrollment تعریف نشده است.");
+  e.status = 404; e.payload = { detail: e.message }; throw e;
 }
 
-/* نسخه‌ی اختصاصی پومسه */
-export async function getMyEnrollmentPoomsae(publicId) {
-  const headers = requireAuthHeaders();
-  const url = `${PO_AUTH_ROOT}/${encodeURIComponent(publicId)}/my-enrollment/`;
-  return safeFetch(url, { method: "GET", headers, credentials: "omit" });
-}
-
-/* نسخه‌ی ترکیبی: اول کیوروگی، اگر نشد پومسه */
-export async function getMyEnrollmentAny(publicId) {
-  const headers = requireAuthHeaders();
-  return tryFirst(
-    [
-      `${KY_AUTH_ROOT}/${encodeURIComponent(publicId)}/my-enrollment/`,
-      `${PO_AUTH_ROOT}/${encodeURIComponent(publicId)}/my-enrollment/`,
-    ],
-    { method: "GET", headers, credentials: "omit" }
-  );
-}
-
-/* ---------------- Bracket (جدول مسابقات) ---------------- */
+/* ---------------- Bracket & Results (کیوروگی/جنریک) ---------------- */
 export async function getBracket(publicId) {
   const headers = authHeaders();
   const data = await tryFirst(
     [
       `${KY_PUBLIC_ROOT}/${encodeURIComponent(publicId)}/bracket/`,
-      `${API_BASE}/api/competitions/competitions/${encodeURIComponent(publicId)}/bracket/`,
-      `${API_BASE}/api/competitions/${encodeURIComponent(publicId)}/bracket/`, // جنریک
+      `${ANY_PUBLIC_ROOT}/by-public/${encodeURIComponent(publicId)}/bracket/`,
     ],
-    { method: "GET", headers, credentials: "omit" }
+    { method: "GET", headers, credentials: "omit", __debugUrls: true }
   );
   return {
     ready: data?.competition?.bracket_ready ?? true,
@@ -393,16 +376,15 @@ export async function getBracket(publicId) {
     competition: data?.competition ?? {},
   };
 }
-
 export async function getCompetitionResults(publicId) {
   const headers = authHeaders();
   const data = await tryFirst(
     [
       `${KY_PUBLIC_ROOT}/${encodeURIComponent(publicId)}/results/`,
-      `${API_BASE}/api/competitions/competitions/${encodeURIComponent(publicId)}/results/`,
-      `${API_BASE}/api/competitions/${encodeURIComponent(publicId)}/results/`, // جنریک
+      `${ANY_PUBLIC_ROOT}/by-public/${encodeURIComponent(publicId)}/results/`,
+      `${ANY_PUBLIC_ROOT}/competitions/${encodeURIComponent(publicId)}/results/`, // سازگاری قدیمی
     ],
-    { method: "GET", headers, credentials: "omit" }
+    { method: "GET", headers, credentials: "omit", __debugUrls: true }
   );
   const results = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
   return { results, count: Number.isFinite(data?.count) ? data.count : results.length };
@@ -417,12 +399,10 @@ export async function listSeminars(params = {}) {
   const url = `${API_BASE}/api/competitions/seminars/${qs.toString() ? "?" + qs.toString() : ""}`;
   return safeFetch(url, { method: "GET", headers: { Accept: "application/json" }, credentials: "omit" });
 }
-
 export async function getSeminarDetail(publicId) {
   const url = `${API_BASE}/api/competitions/seminars/${encodeURIComponent(publicId)}/`;
   return safeFetch(url, { method: "GET", headers: { Accept: "application/json" }, credentials: "omit" });
 }
-
 export async function registerSeminar(publicId, payload) {
   const headers = requireAuthHeaders();
   const url = `${API_BASE}/api/competitions/auth/seminars/${encodeURIComponent(publicId)}/register/`;
@@ -438,57 +418,7 @@ export async function registerSeminar(publicId, payload) {
   });
 }
 
-/* ---------------- Poomsae Coach Approval ---------------- */
-export async function getPoomsaeCoachApprovalStatus(publicId) {
-  const headers = requireAuthHeaders();
-  // مسیر صحیح + فالبک سازگاری
-  const urls = [
-    `${PO_AUTH_ROOT}/${encodeURIComponent(publicId)}/coach-approval/status/`, // ✅ صحیح
-    `${API_BASE}/api/competitions/competitions/auth/poomsae/${encodeURIComponent(publicId)}/coach-approval/status/`, // قدیمی/اشتباه
-  ];
-  return tryFirst(urls, { method: "GET", headers, credentials: "omit" });
-}
-
-export async function approvePoomsaeCompetition(publicId) {
-  const headers = requireAuthHeaders();
-  const urls = [
-    `${PO_AUTH_ROOT}/${encodeURIComponent(publicId)}/coach-approval/approve/`, // ✅ صحیح
-    `${API_BASE}/api/competitions/competitions/auth/poomsae/${encodeURIComponent(publicId)}/coach-approval/approve/`, // قدیمی/اشتباه
-  ];
-  return tryFirst(urls, { method: "POST", headers, credentials: "omit", body: JSON.stringify({}) });
-}
-
 /* ---------------- Legacy aliases (backward compatibility) ---------------- */
 export const getEligibleStudentsForCoach = getCoachEligibleStudents;
 export async function coachStudentsList(key) { return getCoachEligibleStudents(key); }
 export async function coachRegisterStudents(key, payload) { return registerStudentsBulk(key, payload); }
-
-// --- Status (any) ---
-export async function getCoachApprovalStatusAny(publicId) {
-  const headers = requireAuthHeaders();
-  return tryFirst(
-    [
-      // Kyorugi
-      `${KY_AUTH_ROOT}/${encodeURIComponent(publicId)}/coach-approval/status/`,
-      // Poomsae
-      `${PO_AUTH_ROOT}/${encodeURIComponent(publicId)}/coach-approval/status/`,
-    ],
-    { method: "GET", headers, credentials: "omit" }
-  );
-}
-
-// --- Approve (any) ---
-export async function approveCompetitionAny(publicId) {
-  const headers = requireAuthHeaders();
-  return tryFirst(
-    [
-      // Kyorugi
-      `${KY_AUTH_ROOT}/${encodeURIComponent(publicId)}/coach-approval/approve/`,
-      // Poomsae
-      `${PO_AUTH_ROOT}/${encodeURIComponent(publicId)}/coach-approval/approve/`,
-      // legacy aliases if any (آخر بیاد تا اشتباهی نخوریم)
-      `${API_BASE}/api/competitions/coach-approvals/${encodeURIComponent(publicId)}/accept/`,
-    ],
-    { method: "POST", headers, credentials: "omit", body: JSON.stringify({}) }
-  );
-}

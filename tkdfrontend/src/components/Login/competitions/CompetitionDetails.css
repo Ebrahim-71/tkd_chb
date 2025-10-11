@@ -65,15 +65,16 @@
 }
 .cd-hero-body { display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .cd-title { margin: 0; font-size: 20px; line-height: 1.4; font-weight: 800; }
-#sabt{
-   border: 1px dashed #c0c0c0;
-    border-radius: 12px;
-    width: 202%;
 
+/* کادر متنی بالای لیست (در صورت وجود) */
+#sabt{
+  border: 1px dashed #c0c0c0;
+  border-radius: 12px;
+  /* عرض اضافی که باعث بیرون‌زدگی می‌شد حذف شد */
 }
-.cd-hintbox{
-  margin: 30px;
-}
+
+.cd-hintbox{ margin: 30px; }
+
 /* چیپ‌ها */
 .cd-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .cd-chip {
@@ -98,12 +99,8 @@
 }
 .cd-chip:not(.ok):not(.nok):hover,
 .cd-chip:not(.ok):not(.nok):focus-visible{ background: var(--cd-chip-bg-hover); }
-.cd-chip.ok {
-  background: rgba(5,150,105,.08);
-  border-color: rgba(5,150,105,.25);
-  color: var(--cd-success);
-}
-.cd-chip.nok { background: #f3f4f6; color: var(--cd-muted); }
+.cd-chip.ok  { background: #e7f6ec; color: #12824c; } /* سبز ملایم */
+.cd-chip.nok { background: #fde8e8; color: #b42318; } /* قرمز ملایم */
 
 /* ========== سکشن‌ها ========== */
 .cd-section { margin-top: 22px; }
@@ -123,9 +120,14 @@
   display:grid; grid-template-columns:180px 1fr; align-items:center; gap:10px;
   background:#fff; border:1px dashed #c0c0c0; border-radius:12px; padding:10px 12px;
 }
-.cd-row-multi .cd-value { white-space: pre-wrap; }
+.cd-row-multi{ padding: 14px 16px; } /* کمی فضای بیشتر برای متن‌های بلند */
+.cd-row-multi .cd-value{
+  white-space: normal;      /* اجازه چندخطی کامل */
+  display: block;           /* تمام عرض ستون را بگیرد */
+  width: 100%;
+}
 .cd-label { color: var(--cd-muted); font-size: 13px; }
-.cd-value { font-size: 14px; }
+.cd-value { font-size: 14px; min-width: 0; }
 
 /* ========== زمین‌ها / اوزان ========== */
 .cd-mats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
@@ -173,11 +175,11 @@
 
 /* آیتم تصویر (button) */
 .cd-attachment.img{
-  display:flex; flex-direction:column; align-items:center; gap:8px;
+  display:flex; height: 270px; flex-direction:column; align-items:center; gap:8px;
   border:1px solid var(--cd-border); border-radius:12px; padding:10px; background:#fff; cursor:pointer;
 }
 .cd-thumb{
-  width:100%; height:160px; object-fit:cover; border-radius:8px;
+  width:50%; height:230px; object-fit:cover; border-radius:8px;
   border:1px solid var(--cd-border); background:#f3f4f6;
 }
 
@@ -270,7 +272,7 @@
 .btn-primary{
   background:#2563eb !important;
   border-color:#2563eb !important;
-  color:#fff; /* اصلاح متن */
+  color:#fff;
   box-shadow:0 3px 10px rgba(37,99,235,.15);
 }
 .btn-primary:hover:not(:disabled){
@@ -288,10 +290,9 @@
   box-shadow:0 5px 14px rgba(124,58,237,.22)!important;
 }
 .btn-outline{
-    background: #4f46e5!important;
-    color: #fff!important;
-    border-color: #4f46e5!important;
-    
+  background:#4f46e5!important;
+  color:#fff!important;
+  border-color:#4f46e5!important;
 }
 .btn-outline:hover:not(:disabled){
   background:#f8fafc;
@@ -373,12 +374,39 @@
 .cd-row > .cd-checkbox input{ width:18px; height:18px; }
 .cd-row > .cd-checkbox span{ font-size:14px; line-height:1.9; }
 
+/* ===== تذکر/یادداشت (استایل جداگانه) =====
+   برای استفاده: مقدارِ ردیف را با
+   <span class="cd-note cd-note--poomsae">...</span>
+   بپیچید تا ظاهر متمایز بگیرد. */
+.cd-note{
+  display:block;
+  width:85%;
+  padding:12px 14px;
+  border-radius:12px;
+  border:1px dashed #f59e0b;   /* کهربایی */
+  background:#fff7ed;          /* نارنجی خیلی روشن */
+  color:#7c2d12;
+  font-weight:800;             /* بولدتر */
+  line-height:1.9;
+}
+.cd-note::before{
+  content:"⚠️";
+  margin-left:8px;
+  font-size:1.05em;
+}
+.cd-note--poomsae{
+  /* اگر بخواهی مخصوص پومسه تفاوت رنگی بدهی */
+  border-color:#f59e0b;
+  background:#fff7ed;
+  color:#7c2d12;
+}
+
 /* ===== Print: فقط محتوای اصلی ===== */
 @media print{
   .dashboard-container{ display:block !important; }
   .dashboard-container > :not(.dashboard-main){ display:none !important; }
-  .dashboard-main > :not(#print-root):not(.cd-container){ display:none !important; }
-  .cd-actions, .toggle-sidebar-btn, nav, header, footer{ display:none !important; }
+  .dashboard-main > :not(#print-root):not(.cd-container){ display:none !重要; }
+  .cd-actions, .toggle-sidebar-btn, nav, header, footer{ display:none !重要; }
 }
 
 /* ===== Dark mode ===== */
@@ -402,4 +430,11 @@
   }
   .btn-primary{ background:#2563eb; border-color:#2563eb; color:#fff; }
   .btn-secondary{ background:#7c3aed; border-color:#7c3aed; color:#fff; }
+
+  /* کانترست مناسب برای تذکر در دارک‌مود */
+  .cd-note{
+    border-color:#b45309;
+    background:#2a1c0a;
+    color:#fbbf24;
+  }
 }

@@ -1,38 +1,92 @@
 // src/components/Login/panel/maincontentpanel/MatchCard.jsx
 import React from "react";
 import { Link } from "react-router-dom";
+import "../../../../api/competitions";
+import { API_BASE as API_ROOT } from "../../../../api/competitions";
 import "./MatchCard.css";
 
-const toPersianDigits = (str) => String(str ?? "").replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
+// --- helpers (لوکال) ---
+const toPersianDigits = (str) =>
+  String(str ?? "").replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
+
 const fmtDateFa = (val) => {
   if (!val) return "—";
   const s = String(val).slice(0, 10).replace(/-/g, "/");
   return toPersianDigits(s);
 };
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
-
 function getRole() {
-  return localStorage.getItem("user_role") || "player"; // fallback امن
+  return localStorage.getItem("user_role") || "player";
 }
 
 function isKyorugi(match) {
-  const s = String(match?.style_display || "").trim();
-  return s === "کیوروگی";
+  const s = String(match?.style_display || match?.style || "")
+    .trim()
+    .toLowerCase();
+  return s.includes("کیوروگی") || s.includes("kyorugi") || s.includes("kyor");
+}
+
+function pickImageSrc(match) {
+  const poster =
+    match?.poster_url ??
+    match?.poster ??
+    match?.cover ??
+    match?.image ??
+    "";
+
+  if (typeof poster === "string" && poster.startsWith("http")) return poster;
+  if (typeof poster === "string" && poster.startsWith("/"))
+    return `${API_ROOT}${poster}`;
+  return "/placeholder.jpg";
 }
 
 const MatchCard = ({ match, onDetailsClick }) => {
-  const imageSrc = match?.poster?.startsWith("http")
-    ? match.poster
-    : match?.poster
-    ? `${API_BASE}${match.poster}`
-    : "/placeholder.jpg";
-
-  const slug = match?.public_id;        // کلید عمومی
+  const slug = match?.public_id;
   const role = getRole();
+  const ky = isKyorugi(match);
+
+  // عنوان
+  const title = match?.title || match?.name || "—";
+
+  // کمربند
+  const beltText = ky
+    ? match?.belt_level_display ||
+      match?.belt_group_name ||
+      match?.belt_groups_display ||
+      "—"
+    : match?.belt_groups_display ||
+      match?.belt_group_name ||
+      match?.belt_level_display ||
+      "—";
+
+  // 👇 گروه سنی فقط برای پومسه
+  const ageText = !ky
+    ? match?.age_group_display ||
+      match?.age_categories_display ||
+      match?.age_category_name ||
+      "—"
+    : null;
+
+  const imageSrc = pickImageSrc(match);
+
+  const drawDate = match?.draw_date_jalali ?? match?.draw_date ?? null;
+
+  // محل برگزاری: فقط شهر
+  const city = match?.city || "";
+
+  // مبلغ ورودی
+  const fee = match?.entry_fee != null ? Number(match.entry_fee) : null;
+
+  // وزن‌کشی (هر دو نام را پوشش بده)
+  const weighDateRaw =
+    match?.weigh_date_jalali ??
+    match?.weigh_in_date_jalali ??
+    match?.weigh_date ??
+    match?.weigh_in_date ??
+    null;
 
   return (
-    <div className="match-card">
+    <div className="match-card" dir="rtl">
       <img
         src={imageSrc}
         alt="پوستر مسابقه"
@@ -40,33 +94,57 @@ const MatchCard = ({ match, onDetailsClick }) => {
         onError={(e) => (e.currentTarget.src = "/placeholder.jpg")}
       />
 
-      <h3 className="match-title">{match?.title || "—"}</h3>
+      <h3 className="match-title">{title}</h3>
 
       <div className="match-details">
         <p>سبک مسابقه: {match?.style_display || "—"}</p>
-        <p>رده سنی: {match?.age_category_name || "—"}</p>
-        <p>رده کمربندی: {match?.belt_level_display || "—"}</p>
+
+        {/* گروه سنی: فقط پومسه */}
+        {!ky && <p>گروه سنی: {ageText}</p>}
+
+        <p>رده کمربندی: {beltText}</p>
         <p>جنسیت: {match?.gender_display || "—"}</p>
 
-        <p>شروع ثبت‌نام: {fmtDateFa(match?.registration_start_jalali ?? match?.registration_start)}</p>
-        <p>پایان ثبت‌نام: {fmtDateFa(match?.registration_end_jalali ?? match?.registration_end)}</p>
+        <p>
+          شروع ثبت‌نام:{" "}
+          {fmtDateFa(
+            match?.registration_start_jalali ?? match?.registration_start
+          )}
+        </p>
+        <p>
+          پایان ثبت‌نام:{" "}
+          {fmtDateFa(
+            match?.registration_end_jalali ?? match?.registration_end
+          )}
+        </p>
 
-        {/* وزن‌کشی فقط برای کیوروگی */}
-        {isKyorugi(match) && (
-          <p>تاریخ وزن‌کشی: {fmtDateFa(match?.weigh_date_jalali ?? match?.weigh_date)}</p>
-        )}
+        {/* وزن‌کشی فقط در کیوروگی */}
+        {ky && <p>تاریخ وزن‌کشی: {fmtDateFa(weighDateRaw)}</p>}
 
-        <p>تاریخ قرعه‌کشی: {fmtDateFa(match?.draw_date_jalali ?? match?.draw_date)}</p>
-        <p>تاریخ برگزاری: {fmtDateFa(match?.competition_date_jalali ?? match?.competition_date)}</p>
+        {/* قرعه‌کشی اگر مقدار دارد */}
+        {drawDate ? <p>تاریخ قرعه‌کشی: {fmtDateFa(drawDate)}</p> : null}
+
+        <p>
+          تاریخ برگزاری:{" "}
+          {fmtDateFa(
+            match?.competition_date_jalali ??
+              match?.competition_date ??
+              match?.start_date
+          )}
+        </p>
 
         <p>
           مبلغ ورودی:{" "}
-          {match?.entry_fee ? `${toPersianDigits(Number(match.entry_fee).toLocaleString())} تومان` : "رایگان"}
+          {fee != null
+            ? fee > 0
+              ? `${toPersianDigits(fee.toLocaleString())} تومان`
+              : "رایگان"
+            : "—"}
         </p>
-        <p>محل برگزاری: {match?.city || "—"}</p>
+
+        <p>محل برگزاری: {city || "—"}</p>
       </div>
 
-      {/* اگر والد onDetailsClick داده، همون رو صدا بزن؛ وگرنه لینک داخل داشبورد */}
       {onDetailsClick ? (
         <button className="match-button" onClick={() => onDetailsClick(match)}>
           جزئیات بیشتر و ثبت نام
@@ -74,7 +152,9 @@ const MatchCard = ({ match, onDetailsClick }) => {
       ) : slug ? (
         <Link
           className="match-button"
-          to={`/dashboard/${encodeURIComponent(role)}/competitions/${encodeURIComponent(slug)}`}
+          to={`/dashboard/${encodeURIComponent(
+            role
+          )}/competitions/${encodeURIComponent(slug)}`}
         >
           جزئیات بیشتر و ثبت نام
         </Link>

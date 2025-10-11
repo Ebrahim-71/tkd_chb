@@ -4,8 +4,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   // مشترک
   getCompetitionDetail,
-  shouldShowSelfRegister,
-  shouldShowStudentRegister,
   // کیوروگی
   getCoachApprovalStatus,
   approveCompetition,
@@ -13,9 +11,11 @@ import {
   getRegisterSelfPrefill,
   getMyEnrollment,
   // پومسه
-  getMyEnrollmentPoomsae,
   getPoomsaeCoachApprovalStatus,
   approvePoomsaeCompetition,
+  // اضافه برای فرم «ثبت‌نام خودم» در پومسه
+  getPoomsaeRegisterSelfPrefill,
+  registerSelfPoomsae,
 } from "../../../api/competitions";
 import "./CompetitionDetails.css";
 
@@ -26,100 +26,62 @@ import persian from "react-date-object/calendars/persian";
 import persian_fa from "react-date-object/locales/persian_fa";
 
 /* ---------- Helpers (digits / dates / urls …) ---------- */
-function birthFaSafe(locked) {
-  if (!locked) return "—";
-  const fa = locked.birth_date_jalali_fa || locked.birthDateJalaliFa || locked.birth_date || locked.birthDate;
-  if (fa) {
-    const s = stripRtlMarks(String(fa)).replace(/-/g, "/").slice(0, 10);
-    return toFa(s);
+
+// --- نرمال‌سازی پروفایل قفل‌شده از هر ساختاری ---
+function pickFrom(o, keys) {
+  if (!o) return "";
+  for (const k of keys) {
+    if (o[k] != null && o[k] !== "") return String(o[k]);
   }
-  const iso = locked.birth_date_iso || findBirthISODep(locked);
-  if (iso) return isoToJalaliFa(iso);
-  return "—";
+  return "";
+}
+function normalizeLockedProfile(src) {
+  if (!src || typeof src !== "object") return null;
+  // منابع رایج که بعضی بک‌اندها داخلش می‌گذارند
+  const sources = [
+    src,
+    src.profile, src.user, src.player, src.data,
+    src.me, src.me_locked, src.my_locked, src.locked_profile, src.my_profile,
+  ].filter(Boolean);
+
+  const get = (...keys) => {
+    for (const s of sources) {
+      const v = pickFrom(s, keys);
+      if (v) return v;
+    }
+    return "";
+  };
+
+  const locked = {
+    first_name:  get("first_name","firstName","firstNameFa","fname","given_name","name"),
+    last_name:   get("last_name","lastName","lastNameFa","family","family_name","surname"),
+     // پوشش کلیدهای متداول کد ملی
+     national_id:
+     get(
+       "national_id","nationalId","nationalID","national_code","nationalCode",
+       "code_melli","melli_code","melliCode","codeMelli","nid","ssn"
+     ) || findNationalIdDeep(src),
+    // تاریخ ممکنه جلالی/میلادی و با نام‌های مختلف بیاید
+    birth_date:  get("birth_date_jalali_fa","birth_date_jalali","birthDateJalaliFa","birthDateJalali","birth_date","birthDate","dob"),
+    belt:        get("belt","beltName","belt_name","belt_display"),
+    club:        get("club","club_name","clubName","academy","academy_name"),
+    coach:       get("coach","coach_name","coachName","coach_full_name"),
+  };
+
+  const hasAny = Object.values(locked).some(x => x && String(x).trim() !== "");
+  return hasAny ? locked : null;
 }
 
-const pad2 = (n) => String(n).padStart(2, "0");
-
-// تبدیل شماره روز ژولیانی به تاریخ جلالی
-function d2j(jdn) {
-  let { gy } = d2g(jdn);
-  let jy = gy - 621;
-  let r = jalCal(jy);
-  let jdn1f = g2d(gy, 3, r.march);
-
-  let jd, jm;
-  if (jdn >= jdn1f) {
-    jd = jdn - jdn1f + 1;
-  } else {
-    jy -= 1;
-    r = jalCal(jy);
-    jdn1f = g2d(gy - 1, 3, r.march);
-    jd = jdn - jdn1f + 1;
-  }
-  if (jd <= 186) {
-    jm = 1 + Math.floor((jd - 1) / 31);
-    jd = jd - 31 * (jm - 1);
-  } else {
-    jd -= 186;
-    jm = 7 + Math.floor((jd - 1) / 30);
-    jd = jd - 30 * (jm - 7);
-  }
-  return { jy, jm, jd };
-}
-
-function gregorianToJalali(gy, gm, gd) {
-  return d2j(g2d(gy, gm, gd));
-}
-
-function toStringSafe(v){ return v == null ? "" : String(v); }
-
-function isoToJalaliFa(iso) {
-  let s = toStringSafe(iso);
-  s = stripRtlMarks(normalizeDigits(s)).trim();
-  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (!m) return toFa(s.replace(/-/g, "/").slice(0,10));
-  const gy = parseInt(m[1], 10), gm = parseInt(m[2], 10), gd = parseInt(m[3], 10);
-  if (gy < 1700) return toFa(`${gy}/${pad2(gm)}/${pad2(gd)}`);
-  const { jy, jm, jd } = gregorianToJalali(gy, gm, gd);
-  return toFa(`${jy}/${pad2(jm)}/${pad2(jd)}`);
-}
-
+function toStringSafe(v) { return v == null ? "" : String(v); }
 const toFa = (str) => String(str ?? "").replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
-const fmtDateFa = (val) => {
-  if (!val) return "—";
-  let s = String(val);
-  const norm = stripRtlMarks(normalizeDigits(s));
-  if (/^\d{4}-\d{1,2}-\d{1,2}/.test(norm)) return isoToJalaliFa(norm);
-  return toFa(norm.slice(0, 10).replace(/-/g, "/"));
-};
-
-const isISODate = (s) => {
-  if (typeof s !== "string") return false;
-  const norm = stripRtlMarks(normalizeDigits(s));
-  return /^\d{4}-\d{2}-\d{2}/.test(norm);
-};
-const toDateSafe = (s) => {
-  if (typeof s !== "string") return null;
-  const norm = stripRtlMarks(normalizeDigits(s));
-  return /^\d{4}-\d{2}-\d{2}/.test(norm) ? new Date(norm) : null;
-};
-
-const stripTime = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
-const absUrl = (u) => (u ? (u.startsWith?.("http") ? u : `${API_BASE}${u}`) : null);
-const fileNameFromUrl = (u) => {
-  try { return decodeURIComponent(String(u).split("/").pop()); } catch { return "فایل"; }
-};
-const pickToken = (role) =>
-  localStorage.getItem("coach_token") ||
-  localStorage.getItem("both_token") ||
-  localStorage.getItem(`${role}_token`) ||
-  localStorage.getItem("access_token") ||
-  "";
 const normalizeDigits = (s = "") =>
   String(s)
     .replace(/[۰-۹]/g, (d) => "0123456789"["۰۱۲۳۴۵۶۷۸۹".indexOf(d)])
     .replace(/[٠-٩]/g, (d) => "0123456789"["٠١٢٣٤٥٦٧٨٩".indexOf(d)]);
+const stripRtlMarks = (s = "") => s.replace(/[\u200e\u200f\u200c\u202a-\u202e]/g, "");
+const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+const absUrl = (u) => (u ? (u.startsWith?.("http") ? u : `${API_BASE}${u}`) : null);
+const fileNameFromUrl = (u) => { try { return decodeURIComponent(String(u).split("/").pop()); } catch { return "فایل"; } };
 const sanitizeWeight = (raw = "") => {
   let t = normalizeDigits(raw);
   t = t.replace(/[\/٫,،]/g, ".");
@@ -127,54 +89,169 @@ const sanitizeWeight = (raw = "") => {
   t = t.replace(/(\..*)\./g, "$1");
   return t;
 };
+const stripTime = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const isISODate = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}/.test(stripRtlMarks(normalizeDigits(s)));
+const toDateSafe = (s) => (isISODate(s) ? new Date(stripRtlMarks(normalizeDigits(s))) : null);
 
-// کاراکترهای نامرئی RTL
-const stripRtlMarks = (s = "") => s.replace(/[\u200e\u200f\u200c\u202a-\u202e]/g, "");
-
-/* —— تبدیل جلالی به میلادی —— */
+/* —— تبدیل تاریخ میلادی/جلالی برای نمایش —— */
+const pad2 = (n) => String(n).padStart(2, "0");
 const div = (a, b) => Math.trunc(a / b);
 const jalBreaks = [-61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210, 1635, 2060, 2097, 2192, 2262, 2324, 2394, 2456, 3178];
-function jalCal(jy) {
-  let bl = jalBreaks.length, gy = jy + 621, leapJ = -14, jp = jalBreaks[0], jm, jump = 0, n, i;
-  if (jy < jp || jy >= jalBreaks[bl - 1]) return { gy, march: 20, leap: false };
-  for (i = 1; i < bl; i++) {
-    jm = jalBreaks[i];
-    jump = jm - jp;
-    if (jy < jm) break;
-    leapJ += div(jump, 33) * 8 + div(jump % 33, 4);
-    jp = jm;
-  }
-  n = jy - jp;
-  leapJ += div(n, 33) * 8 + div(n % 33, 4);
-  if (jump % 33 === 4 && jump - n === 4) leapJ++;
-  const leapG = div(gy, 4) - div(div(gy, 100) + 1, 4) + div(gy, 400) - 70;
-  const march = 20 + leapJ - leapG;
-  let leap = false;
-  if (n >= 0) if ([1, 5, 9, 13, 17, 22, 26, 30].includes(n % 33)) leap = true;
-  return { gy, march, leap };
-}
-function g2d(gy, gm, gd) {
-  const a = div(14 - gm, 12); let y = gy + 4800 - a; let m = gm + 12 * a - 3;
-  return gd + div(153 * m + 2, 5) + 365 * y + div(y, 4) - div(y, 100) + div(y, 400) - 32045;
-}
-function d2g(jdn) {
-  const j = jdn + 32044; const g = div(j, 146097); const dg = j % 146097;
-  const c = div((div(dg, 36524) + 1) * 3, 4); const dc = dg - c * 36524;
-  const b = div(dc, 1461); const db = dc % 1461;
-  const a = div((div(db, 365) + 1) * 3, 4); const da = db - a * 365;
-  let y = g * 400 + c * 100 + b * 4 + a;
-  let m = div(5 * da + 308, 153) - 2;
-  const d = da - div(153 * (m + 2) + 2, 5) + 1;
-  y = y - 4800 + div(m + 2, 12); m = (m + 2) % 12 + 1;
-  return { gy: y, gm: m, gd: d };
-}
-function j2d(jy, jm, jd) {
-  const r = jalCal(jy);
-  return g2d(r.gy, 3, r.march) + (jm - 1) * 31 - div(jm, 7) * (jm - 7) + jd - 1;
-}
-function jalaliToGregorian(jy, jm, jd) { return d2g(j2d(jy, jm, jd)); }
+function jalCal(jy) { let bl = jalBreaks.length, gy = jy + 621, leapJ = -14, jp = jalBreaks[0], jm, jump = 0, n, i; if (jy < jp || jy >= jalBreaks[bl - 1]) return { gy, march: 20, leap: false }; for (i = 1; i < bl; i++) { jm = jalBreaks[i]; jump = jm - jp; if (jy < jm) break; leapJ += div(jump, 33) * 8 + div(jump % 33, 4); jp = jm } n = jy - jp; leapJ += div(n, 33) * 8 + div(n % 33, 4); if (jump % 33 === 4 && jump - n === 4) leapJ++; const leapG = div(gy, 4) - div(div(gy, 100) + 1, 4) + div(gy, 400) - 70; const march = 20 + leapJ - leapG; let leap = false; if (n >= 0) if ([1, 5, 9, 13, 17, 22, 26, 30].includes(n % 33)) leap = true; return { gy, march, leap } }
+function g2d(gy, gm, gd) { const a = div(14 - gm, 12); let y = gy + 4800 - a; let m = gm + 12 * a - 3; return gd + div(153 * m + 2, 5) + 365 * y + div(y, 4) - div(y, 100) + div(y, 400) - 32045 }
+function d2g(jdn) { const j = jdn + 32044; const g = div(j, 146097); const dg = j % 146097; const c = div((div(dg, 36524) + 1) * 3, 4); const dc = dg - c * 36524; const b = div(dc, 1461); const db = dc % 1461; const a = div((div(db, 365) + 1) * 3, 4); const da = db - a * 365; let y = g * 400 + c * 100 + b * 4 + a; let m = div(5 * da + 308, 153) - 2; const d = da - div(153 * (m + 2) + 2, 5) + 1; y = y - 4800 + div(m + 2, 12); m = (m + 2) % 12 + 1; return { gy: y, gm: m, gd: d } }
+function j2d(jy, jm, jd) { const r = jalCal(jy); return g2d(r.gy, 3, r.march) + (jm - 1) * 31 - div(jm, 7) * (jm - 7) + jd - 1 }
+function d2j(jdn) { let { gy } = d2g(jdn); let jy = gy - 621; let r = jalCal(jy); let jdn1f = g2d(gy, 3, r.march); let jd, jm; if (jdn >= jdn1f) { jd = jdn - jdn1f + 1 } else { jy -= 1; r = jalCal(jy); jdn1f = g2d(gy - 1, 3, r.march); jd = jdn - jdn1f + 1 } if (jd <= 186) { jm = 1 + Math.floor((jd - 1) / 31); jd = jd - 31 * (jm - 1) } else { jd -= 186; jm = 7 + Math.floor((jd - 1) / 30); jd = jd - 30 * (jm - 7) } return { jy, jm, jd } }
+function gregorianToJalali(gy, gm, gd) { return d2j(g2d(gy, gm, gd)) }
+function isoToJalaliFa(iso) { let s = toStringSafe(iso); s = stripRtlMarks(normalizeDigits(s)).trim(); const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if (!m) return toFa(s.replace(/-/g, "/").slice(0, 10)); const gy = parseInt(m[1], 10), gm = parseInt(m[2], 10), gd = parseInt(m[3], 10); if (gy < 1700) return toFa(`${gy}/${pad2(gm)}/${pad2(gd)}`); const { jy, jm, jd } = gregorianToJalali(gy, gm, gd); return toFa(`${jy}/${pad2(jm)}/${pad2(jd)}`) }
 
-// الگوی ISO برای جست‌وجوی تاریخ در آبجکت
+/* ====== جنسیت/کمربند و صلاحیت ====== */
+const _GENDER_MAP = {
+  male: "male", m: "male", man: "male", "آقا": "male", "اقا": "male", "مرد": "male", "آقایان": "male", "آقايان": "male", "اقایان": "male",
+  female: "female", f: "female", woman: "female", "زن": "female", "خانم": "female", "بانو": "female", "بانوان": "female", "خانم‌ها": "female", "خانمها": "female",
+  both: "both", "مختلط": "both", "mix": "both", "mixed": "both"
+};
+function normGender(v) {
+  if (v == null) return null;
+  const t = String(v).trim().toLowerCase().replace(/ي/g, "ی").replace(/ك/g, "ک").replace(/\u200c/g, "").replace(/-/g, "");
+  return _GENDER_MAP[t] || t;
+}
+
+// پاک‌سازی متن رده/گروه سنی
+function cleanAgeText(s) {
+  if (!s) return "—";
+  let t = stripRtlMarks(String(s))
+    .replace(/ي/g, "ی")
+    .replace(/ك/g, "ک");
+  t = t.replace(/(?:^|\s)(?:رده|گروه)[\s\u200c]*سنی\s*[:：٫،\-]?\s*/gi, "");
+  t = t.replace(/^[\s:：٫،\-]+/, "");
+  t = t.replace(/\s*،\s*/g, "، ").replace(/\s{2,}/g, " ").trim();
+  return t || "—";
+}
+
+// استخراج کمربندهای مجاز
+function allowedBeltsFromCompetition(c) {
+  if (!c) return null;
+  if (Array.isArray(c.allowed_belts) && c.allowed_belts.length) return new Set(c.allowed_belts.map(String));
+  if (Array.isArray(c.belt_names) && c.belt_names.length) return new Set(c.belt_names.map(String));
+  if (Array.isArray(c.belts) && c.belts.length) return new Set(c.belts.map(String));
+  if (Array.isArray(c.belt_groups)) {
+    const s = new Set();
+    c.belt_groups.forEach(g => {
+      const arr = Array.isArray(g?.belts) ? g.belts : [];
+      arr.forEach(b => b?.name && s.add(String(b.name)));
+    });
+    if (s.size) return s;
+  }
+  return null;
+}
+
+function beltHeaderTextFromComp(c) {
+  const direct =
+    c?.belt_level_display ||
+    c?.belt_category_display ||
+    c?.belt_level_name ||
+    c?.belt_category_name ||
+    c?.belt_level_text ||
+    c?.belt_range_display;
+  if (direct) return direct;
+
+  const enumMap = {
+    "yellow_blue": "زرد تا آبی",
+    "red_black": "قرمز تا مشکی",
+    "all": "همهٔ کمربندها",
+    "any": "همهٔ کمربندها",
+  };
+  const lvl = String(c?.belt_level || c?.belt_category || "").trim().toLowerCase();
+  if (enumMap[lvl]) return enumMap[lvl];
+
+  if (Array.isArray(c?.belt_names) && c.belt_names.length) return c.belt_names.join("، ");
+  if (Array.isArray(c?.belts) && c.belts.length) return c.belts.join("، ");
+  return "—";
+}
+// پیدا کردن کدملی در عمق‌های مختلف و با کلیدهای متنوع (انگلیسی/فارسی)
+function findNationalIdDeep(obj) {
+  if (!obj || typeof obj !== "object") return "";
+  for (const [k, v] of Object.entries(obj)) {
+    const key = String(k)
+      .toLowerCase()
+      .replace(/[\u200c\s\-]/g, "") // حذف فاصله و ZWNJ
+      .replace(/ي/g, "ی")
+      .replace(/ك/g, "ک");
+
+    // الگوهای متداول کلید
+    const isNatKey =
+      key.includes("nationalid") ||
+      key.includes("nationalcode") ||
+      key.includes("nationalidnumber") ||
+      key.includes("mellicode") ||
+      key.includes("codemelli") ||
+      key.includes("melli") && key.includes("code") ||
+      key === "nid" || key === "ssn" ||
+      key.includes("کدملی") || key.includes("كدملی") || key.includes("کدملی") ||
+      key.includes("کد") && key.includes("ملی");
+
+    if (isNatKey && v != null && String(v).trim() !== "") {
+      return String(v);
+    }
+    if (v && typeof v === "object") {
+      const inner = findNationalIdDeep(v);
+      if (inner) return inner;
+    }
+  }
+  return "";
+}
+
+// فقط گروه سنی
+function ageGroupsTextFromComp(c) {
+  if (!c) return "—";
+  const direct = c?.age_groups_display ?? c?.ageGroupsDisplay;
+  if (direct) return direct;
+
+  const arr = c?.age_categories ?? c?.ageCategories ?? [];
+  if (Array.isArray(arr) && arr.length) {
+    const list = arr
+      .map(a => a?.name || `${fmtDateFa(a?.from_date || a?.fromDate)}–${fmtDateFa(a?.to_date || a?.toDate)}`)
+      .filter(Boolean);
+    if (list.length) return list.join("، ");
+  }
+  return "—";
+}
+
+function genderFaLabel(g) {
+  const n = normGender(g);
+  if (n === "male") return "آقایان";
+  if (n === "female") return "بانوان";
+  if (n === "both") return "مختلط";
+  return (typeof g === "string" && /[آ-ی]/.test(g)) ? g : "—";
+}
+
+function fmtDateFa(val) {
+  if (!val) return "—";
+  let s = String(val);
+  const norm = stripRtlMarks(normalizeDigits(s));
+  if (/^\d{4}-\d{1,2}-\d{1,2}/.test(norm)) return isoToJalaliFa(norm);
+  return toFa(norm.slice(0, 10).replace(/-/g, "/"));
+}
+
+// سعی می‌کنیم جنسیت/کمربند کاربر را از منابع مختلف بخوانیم
+function extractPlayerFromCompOrForm(comp, lockedFromForm) {
+  const candidates = [
+    lockedFromForm,
+    comp?.me_locked, comp?.my_locked, comp?.locked,
+    comp?.my_profile, comp?.me, comp?.user, comp?.player
+  ];
+  for (const obj of candidates) {
+    if (obj && (obj.belt || obj.beltName || obj.gender || obj.gender_display)) {
+      const belt = obj.belt || obj.beltName || obj.belt_name || "";
+      const gender = normGender(obj.gender || obj.gender_display);
+      return { belt: String(belt || ""), gender: gender || null };
+    }
+  }
+  return { belt: "", gender: null };
+}
+
+/* ====== Jalali helpers for inputs ====== */
 const ISO_REGEX = /\b(19|20)\d{2}-\d{2}-\d{2}\b/;
 function findBirthISODep(obj) {
   if (!obj || typeof obj !== "object") return "";
@@ -191,336 +268,195 @@ function findBirthISODep(obj) {
   }
   return "";
 }
-
-// اصلاح سالهای ناقص رایج (ایمن‌تر)
-function fixJalaliYear(y) {
-  if (y < 0) return y;
-  if (y < 100) return y >= 60 ? 1300 + y : 1400 + y;
-  if (y >= 700 && y <= 999) return y + 600;
-  return y;
-}
-
-// جلالی → Date
-function parseJalaliInputToDate(val) {
-  if (!val) return null;
-  if (typeof val === "object" && val?.isValid) {
-    try { return val.toDate(); } catch {}
+function mergeLockedProfiles(oldL, newL) {
+  if (!oldL) return newL || null;
+  if (!newL) return oldL;
+  const keys = ["first_name","last_name","national_id","birth_date","belt","club","coach"];
+  const out = { ...oldL };
+  for (const k of keys) {
+    const v = newL[k];
+    if (v != null && String(v).trim() !== "") out[k] = String(v);
   }
-  const mm = stripRtlMarks(normalizeDigits(String(val)))
-    .trim()
-    .replace(/-/g, "/")
-    .match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
-  if (!mm) return null;
-  const jy = parseInt(mm[1], 10), jm = parseInt(mm[2], 10), jd = parseInt(mm[3], 10);
-  if (jm < 1 || jm > 12 || jd < 1 || jd > 31) return null;
-  const { gy, gm, gd } = jalaliToGregorian(jy, jm, jd);
-  const d = new Date(gy, gm - 1, gd);
-  return isNaN(d.getTime()) ? null : d;
+  return out;
 }
-const toJalaliDO = (s) => {
+
+function toJalaliDO(s) {
   if (!s) return null;
   try {
     const t = stripRtlMarks(normalizeDigits(String(s))).replace(/-/g, "/");
     return new DateObject({ date: t, calendar: persian, locale: persian_fa, format: "YYYY/MM/DD" });
   } catch { return null; }
-};
-
-/* ---------- نمایش تاریخ تولد از prefill (شمسی + ارقام فارسی) ---------- */
-
-const BIRTH_KEYS = [
-  "birth_date_jalali_fa","birthDateJalaliFa",
-  "birth_date_jalali","birthDateJalali",
-  "birth_jalali","birthJalali",
-  "birth_date","birthDate","date_of_birth","dateOfBirth","dob",
-  "birth","birthday"
-];
-
-const BIRTH_KEY_HINTS = /birth|dob|date.?of.?birth|birthday|taval|tavalod|ولد/i;
-function findBirthValueDeep(obj) {
-  if (!obj || typeof obj !== "object") return "";
-  for (const k of Object.keys(obj)) {
-    const v = obj[k];
-    if (BIRTH_KEY_HINTS.test(k) && v != null && String(v).trim() !== "") return v;
-  }
-  for (const k of Object.keys(obj)) {
-    const v = obj[k];
-    if (v && typeof v === "object") {
-      const found = findBirthValueDeep(v);
-      if (found) return found;
-    }
-  }
-  return "";
 }
-
-/* ====== پارسر تاریخ + نمایش شمسی مطمئن برای تولد ====== */
-
-function parseYMDFlexible(raw) {
-  if (!raw) return null;
-  let s = stripRtlMarks(normalizeDigits(String(raw))).trim();
-  s = s.replace(/^["']+|["']+$/g, "");
-  s = s.replace(/[.\-]/g, "/");
-  const m = s.match(/(\d{1,4})\s*\/\s*(\d{1,2})\s*\/\s*(\d{1,4})/);
-  if (!m) return null;
-
-  let a = parseInt(m[1], 10);
-  let b = parseInt(m[2], 10);
-  let c = parseInt(m[3], 10);
-
-  if (a >= 1700) return { y: a, mo: b, d: c, calendar: "greg" };
-  if (c >= 1700) return { y: c, mo: b, d: a, calendar: "greg" };
-
-  const isFirstYear = String(a).length >= 3;
-  return isFirstYear
-    ? { y: a, mo: b, d: c, calendar: "jalali" }
-    : { y: c, mo: b, d: a, calendar: "jalali" };
-}
-
 function pickBirthFa(locked) {
   if (!locked) return "—";
-
-  const directFa =
-    locked?.birth_date_jalali_fa ?? locked?.birthDateJalaliFa;
-  if (directFa) {
-    return toFa(stripRtlMarks(String(directFa)).replace(/-/g, "/").slice(0, 10));
+  const dfa = locked?.birth_date_jalali_fa ?? locked?.birthDateJalaliFa;
+  if (dfa) return toFa(stripRtlMarks(String(dfa)).replace(/-/g, "/").slice(0, 10));
+  // اگر بک‌اند تاریخ جلالی را مستقیم در birth_date گذاشته باشد (و ISO نباشد)
+  if (locked?.birth_date && !ISO_REGEX.test(String(locked.birth_date))) {
+    return toFa(stripRtlMarks(String(locked.birth_date)).replace(/-/g, "/").slice(0, 10));
   }
-
-  const directEn =
-    locked?.birth_date_jalali ?? locked?.birthDateJalali ??
-    locked?.birth_jalali    ?? locked?.birthJalali;
-  if (directEn) {
-    const s = stripRtlMarks(normalizeDigits(String(directEn)))
-      .replace(/-/g, "/")
-      .slice(0, 10);
-    return toFa(s);
-  }
-
-  const isoDeep = findBirthISODep(locked);
-  if (isoDeep) return isoToJalaliFa(isoDeep);
-
-  let raw = "";
-  for (const k of BIRTH_KEYS) {
-    const v = locked?.[k];
-    if (v != null && String(v).trim() !== "") { raw = v; break; }
-  }
-  if (!raw) raw = findBirthValueDeep(locked);
-  if (!raw) return "—";
-
-  const ymd = parseYMDFlexible(raw);
-  if (!ymd) return toFa(String(raw).slice(0, 10).replace(/-/g, "/"));
-
-  let { y, mo, d, calendar } = ymd;
-  if (calendar === "greg") {
-    const { jy, jm, jd } = gregorianToJalali(y, mo, d);
-    return toFa(`${jy}/${pad2(jm)}/${pad2(jd)}`);
-  }
-  y = fixJalaliYear(y);
-  return toFa(`${y}/${pad2(mo)}/${pad2(d)}`);
+  const iso = findBirthISODep(locked);
+  return iso ? isoToJalaliFa(iso) : "—";
 }
 
 
-/* ---------- Debug helpers ---------- */
-const _GENDER_MAP = {
-  male: "male", m: "male", man: "male", "آقا": "male", "اقا": "male", "مرد": "male",
-  "آقایان": "male", "آقايان": "male", "اقایان": "male",
-  female: "female", f: "female", woman: "female", "زن": "female", "خانم": "female",
-  "بانو": "female", "بانوان": "female", "خانم‌ها": "female", "خانمها": "female",
-};
-function normGender(v) {
-  if (v == null) return null;
-  const t = String(v).trim().toLowerCase().replace(/ي/g, "ی").replace(/ك/g, "ک").replace(/\u200c/g, "").replace(/-/g, "");
-  return _GENDER_MAP[t] || t;
-}
-function dumpEligibility(data) {
-  console.groupCollapsed("🧪 Eligibility debug");
-  console.log("style_display:", data?.style_display);
-  console.log("gender_display(raw):", data?.gender_display, "→ norm:", normGender(data?.gender_display));
-  console.log("can_register:", data?.can_register);
-  console.log("user_eligible_self:", data?.user_eligible_self);
-  if (data?.eligibility_debug) console.log("eligibility_debug:", data.eligibility_debug);
-  else console.warn("eligibility_debug نبود. فیلدهای موجود:", Object.keys(data || {}));
-  if (Array.isArray(data?.allowed_belts)) console.log("allowed_belts:", data.allowed_belts);
-  if (data?.age_from || data?.age_to) console.log("age_from/to:", data.age_from, data.age_to);
-  console.groupEnd();
+/* ====== تشخیص دیسیپلین ====== */
+function inferDiscipline(comp) {
+  const k = String(comp?.kind || "").trim().toLowerCase();
+  if (k === "poomsae") return "poomsae";
+  if (k === "kyorugi") return "kyorugi";
+  const s = String(comp?.style_display || comp?.style || comp?.type || "").trim().toLowerCase();
+  if (s.includes("پومسه") || s.includes("poom")) return "poomsae";
+  if (s.includes("کیوروگی") || s.includes("kyor")) return "kyorugi";
+  return "kyorugi";
 }
 
-/* ---------- Component ---------- */
+/* ====== Fallback قفل‌شده از خودِ competition ====== */
+function lockedFromCompetition(comp) {
+  if (!comp) return null;
+  const me =
+    comp.locked ||
+    comp.my_locked ||
+    comp.me_locked ||
+    comp.my_profile ||
+    comp.me ||
+    comp.user ||
+    comp.player ||
+    null;
+  return normalizeLockedProfile(me);
+}
+
 export default function CompetitionDetails() {
   const { slug, role: roleFromRoute } = useParams();
   const navigate = useNavigate();
 
   const role = (roleFromRoute || localStorage.getItem("user_role") || "guest").toLowerCase();
   const isPlayer = role === "player" || role === "both";
-  const isCoach  = role === "coach"  || role === "both";
+  const isCoach = role === "coach" || role === "both";
+  const isRef = role === "referee";
 
   const [competition, setCompetition] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // فرم ثبت‌نام خودی (کیوروگی)
+  // فرم ثبت‌نام خودی کیوروگی
   const [reg, setReg] = useState({
-    open: false,
-    loading: false,
-    errors: {},
-    can_register: false,
-    need_coach_code: false,
-    locked: null,
-    coach_code: "",
-    weight: "",
-    insurance_number: "",
-    insurance_issue_date: "", // شمسی YYYY/MM/DD
-    confirmed: false,
+    open: false, loading: false, errors: {},
+    can_register: false, need_coach_code: true, locked: null,
+    coach_code: "", weight: "", insurance_number: "", insurance_issue_date: "", confirmed: false,
   });
 
-  // فرم ثبت‌نام خودی (پومسه)
+  // فرم ثبت‌نام خودی پومسه
   const [regP, setRegP] = useState({
     open: false, loading: false, errors: {},
-    can_register: false, need_coach_code: false,
-    locked: null,
-    poomsae_type: "standard", // 'standard' | 'creative'
+    can_register: false, need_coach_code: true, locked: null,
     coach_code: "",
-    insurance_number: "",
-    insurance_issue_date: "",
+    poomsae_type: "", // 'standard' | 'creative'
+    insurance_number: "", insurance_issue_date: "",
     confirmed: false,
   });
 
   // مودال کد مربی
-  const [codeModal, setCodeModal] = useState({
-    open: false,
-    loading: true,
-    code: null,
-    approved: false,
-    error: "",
-  });
+  const [codeModal, setCodeModal] = useState({ open: false, loading: true, code: null, approved: false, error: "" });
 
-  // وضعیت کارت
-  const [cardInfo, setCardInfo] = useState({
-    loading: false, checked: false, enrollmentId: null, status: null, canShow: false,
-  });
+  // وضعیت کارت (فقط کیوروگی)
+  const [cardInfo, setCardInfo] = useState({ loading: false, checked: false, enrollmentId: null, status: null, canShow: false });
 
-  // لایت‌باکس تصاویر
+  // لایت‌باکس
   const [lightbox, setLightbox] = useState(null);
-
-  // مودال نتایج (رزرو برای آینده)
-  const [resultsModal] = useState({ open: false, loading: false, error: "", has: false, rows: [] });
-
-  // لاگ کمکی برای تاریخ تولد
-  useEffect(() => {
-    if (!reg?.locked) return;
-    console.log("locked.birth (kyorugi):", {
-      isoDeep: findBirthISODep(reg.locked),
-      raw:
-        reg.locked?.birth_date ??
-        reg.locked?.birthDate ??
-        reg.locked?.dob ??
-        findBirthValueDeep(reg.locked),
-      locked: reg.locked,
-    });
-  }, [reg.locked]);
-
-  useEffect(() => {
-    if (!regP?.locked) return;
-    console.log("locked.birth (poomsae):", {
-      isoDeep: findBirthISODep(regP.locked),
-      raw:
-        regP.locked?.birth_date ??
-        regP.locked?.birthDate ??
-        regP.locked?.dob ??
-        findBirthValueDeep(regP.locked),
-      locked: regP.locked,
-    });
-  }, [regP.locked]);
-  useEffect(() => {
-    if (!regP?.locked) return;
-    console.log("BIRTH (rendered):", pickBirthFa(regP.locked));
-  }, [regP.locked]);
 
   /* --- لود جزئیات مسابقه --- */
   useEffect(() => {
     let mounted = true;
     setLoading(true); setErr("");
-    getCompetitionDetail(slug, { debug: true })
-      .then((data) => {
-        if (!mounted) return;
-        setCompetition(data);
-        window.__lastCompetition = data;
-        dumpEligibility(data);
-        if (typeof data?.user_eligible_self === "boolean") {
-          console.log(`✅ Eligibility = ${data.user_eligible_self ? "TRUE" : "FALSE"}`, data.eligibility_debug || {});
-        }
-      })
+    getCompetitionDetail(slug)
+      .then((data) => { if (mounted) { setCompetition(data); window.__lastCompetition = data; } })
       .catch((e) => { if (mounted) setErr(e?.message || "خطا در دریافت اطلاعات مسابقه"); })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
   }, [slug]);
 
-  /* --- تشخیص سبک --- */
-  const styleRaw = useMemo(() => String(competition?.style_display || competition?.style || "").trim(), [competition]);
-  const isKyorugi = styleRaw === "کیوروگی" || /kyorugi|kyŏrugi|sparring/i.test(styleRaw);
-  const isPoomsae = styleRaw === "پومسه"   || /poomsae|poom-se|forms/i.test(styleRaw);
+  const discipline = useMemo(() => inferDiscipline(competition), [competition]);
+  const isKyorugi = discipline === "kyorugi";
+  const isPoomsae = discipline === "poomsae";
 
-  /* --- بررسی ثبت‌نام کاربر برای کارت --- */
+  //* --- بررسی ثبت‌نام کاربر برای کارت (هر دو سبک) --- */
   useEffect(() => {
     let mounted = true;
-
     if (!isPlayer || !competition) {
       setCardInfo((s) => ({ ...s, checked: true, enrollmentId: null, status: null }));
       return () => { mounted = false; };
     }
-
     setCardInfo({ loading: true, checked: false, enrollmentId: null, status: null, canShow: false });
-
-    const fn = (String(competition?.style_display || competition?.style || "") === "پومسه")
-      ? getMyEnrollmentPoomsae
-      : getMyEnrollment;
-
-    fn(slug)
-      .then((res) => {
-        if (!mounted) return;
-        setCardInfo({
-          loading: false,
-          checked: true,
-          enrollmentId: res?.enrollment_id || null,
-          status: res?.status || null,
-          canShow: !!res?.can_show_card,
-        });
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setCardInfo({ loading: false, checked: true, enrollmentId: null, status: null, canShow: false });
-      });
-
+    getMyEnrollment(slug)
+      .then((res) => { if (mounted) setCardInfo({ loading: false, checked: true, enrollmentId: res?.enrollment_id || null, status: res?.status || null, canShow: !!res?.can_show_card }); })
+      .catch(() => { if (mounted) setCardInfo({ loading: false, checked: true, enrollmentId: null, status: null, canShow: false }); });
     return () => { mounted = false; };
   }, [slug, isPlayer, competition]);
 
   // تاریخ‌ها
   const registrationStart = useMemo(() => toDateSafe(competition?.registration_start), [competition]);
-  const registrationEnd   = useMemo(() => toDateSafe(competition?.registration_end), [competition]);
-  const competitionDate   = useMemo(() => toDateSafe(competition?.competition_date), [competition]);
+  const registrationEnd = useMemo(() => toDateSafe(competition?.registration_end), [competition]);
+  const competitionDate = useMemo(
+    () => (isKyorugi ? toDateSafe(competition?.competition_date) : (toDateSafe(competition?.start_date) || toDateSafe(competition?.competition_date))),
+    [competition, isKyorugi]
+  );
 
-  const { can_register, user_eligible_self } = competition || {};
   const today = stripTime(new Date());
-
   const inRegWindow = useMemo(() => {
     if (registrationStart && registrationEnd) {
       const s = stripTime(registrationStart);
       const e = stripTime(registrationEnd);
       return today >= s && today <= e;
     }
+    if (typeof competition?.registration_open === "boolean") return competition.registration_open;
     return !!competition?.registration_open;
   }, [registrationStart, registrationEnd, competition?.registration_open, today]);
 
-  const registrationOpen = useMemo(() => {
-    if (typeof can_register === "boolean" && typeof user_eligible_self === "boolean") return can_register && user_eligible_self;
-    if (typeof can_register === "boolean") return can_register;
+  const statusSaysOpen = useMemo(() => {
+    const st = String(competition?.status || "").toLowerCase();
+    return ["open", "registration_open", "reg_open", "opened"].includes(st);
+  }, [competition?.status]);
+
+  // برای پومسه از registration_open هم استفاده کن
+ const regOpenEff = competition?.registration_open_effective ?? competition?.registration_open;
+  const regManual = (competition?.registration_manual ?? competition?.registration_manual_open);
+  const can_register_flag = competition?.can_register;
+
+  // ✅ آیا ثبت‌نام مسابقه باز است؟
+  const registrationOpenBase = useMemo(() => {
+    if (typeof regOpenEff === "boolean") return regOpenEff;
+    if (regManual === true) return true;
+    if (regManual === false) return false;
+    if (typeof can_register_flag === "boolean") return can_register_flag;
+    if (statusSaysOpen) return true;
     return inRegWindow;
-  }, [can_register, user_eligible_self, inRegWindow]);
+  }, [regOpenEff, regManual, can_register_flag, statusSaysOpen, inRegWindow]);
 
-  const canRegisterOthers = useMemo(() => (typeof can_register === "boolean" ? can_register : inRegWindow), [can_register, inRegWindow]);
+  // ✅ محاسبه صلاحیت
+  const eligibility = useMemo(() => {
+    if (typeof competition?.user_eligible_self === "boolean") {
+      return { ok: !!competition.user_eligible_self };
+    }
+    const compGender = normGender(competition?.gender || competition?.gender_display) || "both";
+    const allowedBelts = allowedBeltsFromCompetition(competition);
+    const player = extractPlayerFromCompOrForm(competition, reg.locked || regP.locked);
+    if (!player.gender && !player.belt) return { ok: null };
+    const genderOK = compGender === "both" || (player.gender && compGender === player.gender);
+    let beltOK = true;
+    if (allowedBelts instanceof Set) {
+      beltOK = player.belt ? allowedBelts.has(String(player.belt)) : false;
+    }
+    return { ok: !!genderOK && !!beltOK };
+  }, [competition, reg.locked, regP.locked]);
 
-  const isPastCompetition = useMemo(() => {
-    if (competitionDate) return today > stripTime(competitionDate);
-    return false;
-  }, [competitionDate, today]);
+  // ✅ دکمه «ثبت‌نام خودم»
+  const canClickSelf = (registrationOpenBase === true) && (eligibility.ok === true);
+
+  // ✅ دکمه‌های مربی
+  const canClickCoachRegister = registrationOpenBase === true;
+
+  const isPastCompetition = useMemo(() => (competitionDate ? today > stripTime(competitionDate) : false), [competitionDate, today]);
 
   const canSeeCard = useMemo(() => {
     if (!isPlayer || !cardInfo.enrollmentId) return false;
@@ -529,12 +465,11 @@ export default function CompetitionDetails() {
     return ["paid", "confirmed", "approved", "accepted", "completed"].includes(st);
   }, [isPlayer, cardInfo.enrollmentId, cardInfo.status, cardInfo.canShow]);
 
-  const disableReason =
-    typeof can_register === "boolean" && !can_register
-      ? "ثبت‌نام این مسابقه فعال نیست یا خارج از بازه است"
-      : typeof user_eligible_self === "boolean" && !user_eligible_self
-      ? "صلاحیت شما (جنسیت/کمربند) با شرایط مسابقه هم‌خوانی ندارد"
-      : "ثبت‌نام برای شما مجاز نیست";
+  const coachDisableReason = useMemo(() => {
+    if (regManual === false) return "ثبت‌نام توسط ادمین بسته شده است";
+    if (!registrationOpenBase) return inRegWindow ? "ثبت‌نام این مسابقه فعال نیست" : "خارج از بازه ثبت‌نام";
+    return "";
+  }, [regManual, registrationOpenBase, inRegWindow]);
 
   const beltGroupsDisplay = useMemo(() => {
     const groups = competition?.belt_groups || competition?.belt_groups_display || [];
@@ -544,47 +479,49 @@ export default function CompetitionDetails() {
     return groups || "—";
   }, [competition]);
 
-  const beltHeaderText = useMemo(
-    () => (isPoomsae ? beltGroupsDisplay || "—" : competition?.belt_level_display || "—"),
-    [isPoomsae, beltGroupsDisplay, competition]
-  );
+  const beltHeaderText = useMemo(() => beltHeaderTextFromComp(competition), [competition]);
 
-  const ageGroupsDisplay = useMemo(() => {
-    if (competition?.age_groups_display) return competition.age_groups_display;
-    const arr = Array.isArray(competition?.age_groups) ? competition.age_groups : [];
-    return arr.filter(Boolean).join("، ") || "—";
+  const ageHeaderText = useMemo(() => {
+    const raw =
+      competition?.age_category_name ??
+      competition?.ageCategoryName ??
+      competition?.age_category_display ??
+      competition?.ageCategoryDisplay ??
+      "";
+    return cleanAgeText(raw) || "—";
   }, [competition]);
 
-  const matAssignments = useMemo(() => (Array.isArray(competition?.mat_assignments) ? competition.mat_assignments : []), [competition]);
-
-  const posterSrc = useMemo(() => absUrl(competition?.poster?.url || competition?.poster) || "/placeholder.jpg", [competition]);
-
-  const addressFull = useMemo(() => {
-    if (competition?.address_full) return competition.address_full;
-    const city = competition?.city || "";
-    const addr = competition?.address || "";
-    if (city && addr) return `${city}، ${addr}`;
-    return city || addr || "—";
+  const ageGroupsValue = useMemo(() => {
+    const raw =
+      competition?.age_groups_display ??
+      competition?.ageGroupsDisplay ??
+      ageGroupsTextFromComp(competition);
+    return cleanAgeText(raw);
   }, [competition]);
 
-  const beltGroupsRowValue = useMemo(() => beltGroupsDisplay || "—", [beltGroupsDisplay]);
+  const genderLabel = useMemo(() => competition?.gender_display || competition?.gender || "—", [competition]);
 
-  const poomsaeAgeRowValue = useMemo(() => {
-    const txt = ageGroupsDisplay || "—";
-    return (<>{txt}{isPoomsae && (<span className="cd-hint" style={{ fontSize: 12, opacity: 0.8 }}> </span>)}</>);
-  }, [ageGroupsDisplay, isPoomsae]);
+  // --- نمایش دکمه‌ها برای پومسه هم ---
+  const showBracketBtn = isKyorugi || isPoomsae;
+  const showResultsBtn = isKyorugi || isPoomsae;
+  const showCoachCardBtnPoomsae = isPoomsae && isCoach;
+  const showPlayerCardBtnPoomsae = isPoomsae && isPlayer;
+
+  // مسیرها
+  const navigateRole = (p) => navigate(`/dashboard/${encodeURIComponent(role)}${p}`);
+  const goBackToDashboardList = () => navigate(`/dashboard/${encodeURIComponent(role)}`);
+  const goRegisterAthlete = () => navigateRole(`/competitions/${encodeURIComponent(slug)}/register/athlete`);
+  const goRegisterTeam = () => navigateRole(`/competitions/${encodeURIComponent(slug)}/register/team`);
+  const goBracket = () => navigateRole(`/competitions/${encodeURIComponent(slug)}/bracket`);
+  const goResults = () => navigateRole(`/competitions/${encodeURIComponent(slug)}/results`);
 
   /* ---------- Coach code modal actions ---------- */
   const onOpenCoachCode = async () => {
     const token = localStorage.getItem("coach_token") || localStorage.getItem("both_token");
-    if (!token) {
-      alert("برای مشاهده کد باید با حساب مربی وارد شوید.");
-      navigate(`/dashboard/${encodeURIComponent(role)}`);
-      return;
-    }
+    if (!token) { alert("برای مشاهده کد باید با حساب مربی وارد شوید."); navigate(`/dashboard/${encodeURIComponent(role)}`); return; }
     setCodeModal({ open: true, loading: true, code: null, approved: false, error: "" });
     try {
-      const data = isPoomsae ? await getPoomsaeCoachApprovalStatus(slug) : await getCoachApprovalStatus(slug);
+      const data = isKyorugi ? await getCoachApprovalStatus(slug) : await getPoomsaeCoachApprovalStatus(slug);
       setCodeModal({ open: true, loading: false, code: data?.code || null, approved: !!data?.approved, error: "" });
     } catch (e) {
       setCodeModal({ open: true, loading: false, code: null, approved: false, error: e.message || "خطا" });
@@ -594,7 +531,7 @@ export default function CompetitionDetails() {
   const approveAndGetCode = async () => {
     try {
       setCodeModal((m) => ({ ...m, loading: true, error: "" }));
-      const res = isPoomsae ? await approvePoomsaeCompetition(slug) : await approveCompetition(slug);
+      const res = isKyorugi ? await approveCompetition(slug) : await approvePoomsaeCompetition(slug);
       setCodeModal({ open: true, loading: false, code: res?.code || null, approved: true, error: "" });
     } catch (e) {
       setCodeModal((m) => ({ ...m, loading: false, error: e.message || "خطا در دریافت کد" }));
@@ -602,17 +539,16 @@ export default function CompetitionDetails() {
   };
 
   const copyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(String(codeModal.code || ""));
-      alert("کد کپی شد.");
-    } catch {
-      window.prompt("برای کپی، کد را انتخاب و کپی کنید:", String(codeModal.code || ""));
-    }
+    try { await navigator.clipboard.writeText(String(codeModal.code || "")); alert("کد کپی شد."); }
+    catch { window.prompt("برای کپی، کد را انتخاب و کپی کنید:", String(codeModal.code || "")); }
   };
 
-  /* ---------- Register self (فرم کیوروگی) ---------- */
+  /* ---------- Register self (KY) ---------- */
   const openRegisterForm = async () => {
-    if (!registrationOpen || !isPlayer || !shouldShowSelfRegister(role)) return;
+    if (!isKyorugi) return;
+    if (!registrationOpenBase) return;
+    if (eligibility.ok !== true) return;
+
     setReg((r) => ({ ...r, open: true, loading: true, errors: {} }));
     try {
       const data = await getRegisterSelfPrefill(slug);
@@ -620,8 +556,9 @@ export default function CompetitionDetails() {
         ...r,
         loading: false,
         can_register: !!data?.can_register,
-        need_coach_code: !!data?.need_coach_code,
-        locked: data?.locked || null,
+        need_coach_code: (isCoach || isRef) ? false : !!data?.need_coach_code,
+        locked: mergeLockedProfiles(r.locked, normalizeLockedProfile(data?.locked)),
+
         weight: data?.suggested?.weight ?? "",
         insurance_number: data?.suggested?.insurance_number ?? "",
         insurance_issue_date: data?.suggested?.insurance_issue_date ?? "",
@@ -631,107 +568,75 @@ export default function CompetitionDetails() {
     }
   };
 
-  /* ---------- Register self (فرم پومسه) ---------- */
+  /* ---------- Register self (POOMSAE) ---------- */
   const openRegisterFormPoomsae = async () => {
-    if (!registrationOpen || !isPlayer || !shouldShowSelfRegister(role)) return;
-    setRegP((r) => ({ ...r, open: true, loading: true, errors: {} }));
+    if (!isPoomsae) return;
+    if (!registrationOpenBase) return;
+    if (eligibility.ok !== true) return;
 
-    const token = pickToken(role);
-    const shortUrl = `${API_BASE}/api/competitions/auth/poomsae/${encodeURIComponent(slug)}/prefill/`;
-    const longUrl  = `${API_BASE}/api/competitions/competitions/auth/poomsae/${encodeURIComponent(slug)}/prefill/`;
+    // 1) فرم را فورا با fallback از competition باز کن
+    const fallbackLocked = lockedFromCompetition(competition);
+    setRegP((r) => ({
+      ...r,
+      open: true,
+      loading: true,
+      errors: {},
+      can_register: competition?.registration_open_effective ?? competition?.registration_open ?? true,
+      need_coach_code: (isCoach || isRef) ? false : true,
+      locked: fallbackLocked,
+      poomsae_type: "",
+      insurance_number: "",
+      insurance_issue_date: "",
+    }));
 
-    async function doGet(url) {
-      const res = await fetch(url, {
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
-      });
-      const data = await res.json().catch(() => ({}));
-      return { res, data };
-    }
-
+    // 2) تلاش برای prefill از API (اگر بود)
     try {
-      let { res, data } = await doGet(shortUrl);
-      if (res.status === 404) ({ res, data } = await doGet(longUrl));
-
-      if (res.status === 401) {
-        setRegP((r) => ({
-          ...r,
-          open: true,
-          loading: false,
-          can_register: true,
-          need_coach_code: !!competition?.coach_approval_required,
-          locked: null,
-          insurance_number: "",
-          insurance_issue_date: "",
-          confirmed: false,
-          errors: { __all__: "برای دیدن مشخصات باید لاگین کنید." },
-        }));
-        return;
-      }
-
-      if (res.ok) {
-        setRegP((r) => ({
-          ...r,
-          open: true,
-          loading: false,
-          can_register: data?.can_register ?? true,
-          need_coach_code: data?.need_coach_code ?? !!competition?.coach_approval_required,
-          locked: data?.locked || null,
-          coach_code: "",
-          insurance_number: data?.suggested?.insurance_number ?? "",
-          insurance_issue_date: data?.suggested?.insurance_issue_date ?? "",
-          confirmed: false,
-          errors: {},
-        }));
-      } else {
-        setRegP((r) => ({
-          ...r,
-          open: true,
-          loading: false,
-          can_register: true,
-          need_coach_code: !!competition?.coach_approval_required,
-          locked: null,
-          coach_code: "",
-          insurance_number: "",
-          insurance_issue_date: "",
-          confirmed: false,
-        }));
-      }
-    } catch {
+      const data = await getPoomsaeRegisterSelfPrefill(slug);
       setRegP((r) => ({
         ...r,
-        open: true,
         loading: false,
-        can_register: true,
-        need_coach_code: !!competition?.coach_approval_required,
-        locked: null,
-        coach_code: "",
-        insurance_number: "",
-        insurance_issue_date: "",
-        confirmed: false,
+        can_register: (data?.can_register ?? data?.registration_open ?? r.can_register ?? true),
+        need_coach_code: (isCoach || isRef) ? false : !!data?.need_coach_code,
+        locked: mergeLockedProfiles(
+          r.locked,
+          normalizeLockedProfile(data?.locked || data?.locked_profile || data?.me_locked || data?.my_profile)
+        ),
+
+        poomsae_type: data?.suggested?.poomsae_type || r.poomsae_type,
+        insurance_number: data?.suggested?.insurance_number ?? r.insurance_number,
+        insurance_issue_date: data?.suggested?.insurance_issue_date ?? r.insurance_issue_date,
       }));
+    } catch (_e) {
+      setRegP((r) => ({ ...r, loading: false }));
     }
   };
 
-  // حداکثر تاریخ مجاز صدور = ۳ روز قبل از مسابقه
+  // محدودیت تاریخ بیمه (هر دو سبک)
   const maxIssueDO = useMemo(() => {
     if (!competitionDate) return null;
     const d = new DateObject({ date: competitionDate, calendar: persian, locale: persian_fa });
     return d.subtract(3, "days");
   }, [competitionDate]);
 
-  // حداقل تاریخ مجاز صدور = ۱ سال قبل از مسابقه
   const minIssueDO = useMemo(() => {
     if (!competitionDate) return null;
     const d = new DateObject({ date: competitionDate, calendar: persian, locale: persian_fa });
     return d.subtract(1, "year");
   }, [competitionDate]);
 
-  /* ---------- Validation ---------- */
-  const validateForm = () => {
+  /* ---------- Validation shared ---------- */
+  const parseJalaliInputToDate = (val) => {
+    if (!val) return null;
+    if (typeof val === "object" && val?.isValid) { try { return val.toDate(); } catch {} }
+    const mm = stripRtlMarks(normalizeDigits(String(val))).trim().replace(/-/g, "/").match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+    if (!mm) return null;
+    const jy = parseInt(mm[1], 10), jm = parseInt(mm[2], 10), jd = parseInt(mm[3], 10);
+    const { gy, gm, gd } = d2g(j2d(jy, jm, jd));
+    const d = new Date(gy, gm - 1, gd);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const validateKY = () => {
     const errors = {};
     const w = sanitizeWeight(reg.weight);
     if (!w || isNaN(Number(w))) errors.weight = "وزن نامعتبر است.";
@@ -744,7 +649,6 @@ export default function CompetitionDetails() {
         const comp = stripTime(competitionDate);
         const minOk72h = new Date(comp); minOk72h.setDate(minOk72h.getDate() - 3);
         const oldest1y = new Date(comp); oldest1y.setFullYear(oldest1y.getFullYear() - 1);
-
         if (issueDate > minOk72h) errors.insurance_issue_date = "تاریخ صدور باید حداقل ۷۲ ساعت قبل از تاریخ مسابقه باشد.";
         else if (issueDate < oldest1y) errors.insurance_issue_date = "اعتبار کارت بیمه منقضی است (بیش از یک سال قبل از مسابقه).";
       }
@@ -756,57 +660,33 @@ export default function CompetitionDetails() {
     return errors;
   };
 
- const validateFormPoomsae = () => {
-  const errors = {};
+  const validatePO = () => {
+    const errors = {};
+    if (!regP.poomsae_type) errors.poomsae_type = "نوع مسابقه را انتخاب کنید.";
 
-  // نوع مسابقه
-  if (!["standard", "creative"].includes(String(regP.poomsae_type))) {
-    errors.poomsae_type = "نوع مسابقه را انتخاب کنید.";
-  }
-
-  // تاریخ صدور بیمه
-  if (competitionDate) {
-    const issueDate = parseJalaliInputToDate(regP.insurance_issue_date);
-    if (!issueDate || isNaN(issueDate.getTime())) {
-      errors.insurance_issue_date = "تاریخ صدور نامعتبر است (الگوی ۱۴۰۳/۰۵/۲۰).";
-    } else {
-      const comp = stripTime(competitionDate);
-      const minOk72h = new Date(comp); minOk72h.setDate(minOk72h.getDate() - 3);
-      const oldest1y = new Date(comp); oldest1y.setFullYear(oldest1y.getFullYear() - 1);
-      if (issueDate > minOk72h) {
-        errors.insurance_issue_date = "تاریخ صدور باید حداقل ۷۲ ساعت قبل از تاریخ مسابقه باشد.";
-      } else if (issueDate < oldest1y) {
-        errors.insurance_issue_date = "اعتبار کارت بیمه منقضی است (بیش از یک سال قبل از مسابقه).";
+    if (competitionDate) {
+      const issueDate = parseJalaliInputToDate(regP.insurance_issue_date);
+      if (!issueDate || isNaN(issueDate.getTime())) {
+        errors.insurance_issue_date = "تاریخ صدور نامعتبر است (الگوی ۱۴۰۳/۰۵/۲۰).";
+      } else {
+        const comp = stripTime(competitionDate);
+        const minOk72h = new Date(comp); minOk72h.setDate(minOk72h.getDate() - 3);
+        const oldest1y = new Date(comp); oldest1y.setFullYear(oldest1y.getFullYear() - 1);
+        if (issueDate > minOk72h) errors.insurance_issue_date = "تاریخ صدور باید حداقل ۷۲ ساعت قبل از تاریخ مسابقه باشد.";
+        else if (issueDate < oldest1y) errors.insurance_issue_date = "اعتبار کارت بیمه منقضی است (بیش از یک سال قبل از مسابقه).";
       }
     }
-  }
 
-  // شماره بیمه
-  if (!String(regP.insurance_number).trim()) {
-    errors.insurance_number = "شماره بیمه الزامی است.";
-  }
-
-  // کد مربی — اجباری و فقط عدد ۵ تا ۸ رقمی
-  const coachCode = normalizeDigits(regP.coach_code || "").trim();
-  if (!coachCode) {
-    errors.coach_code = "کد تأیید مربی الزامی است.";
-  } else if (!/^\d{5,8}$/.test(coachCode)) {
-    errors.coach_code = "کد تأیید مربی باید عددی ۵ تا ۸ رقمی باشد.";
-  }
-
-  // تایید نهایی
-  if (!regP.confirmed) {
-    errors.confirmed = "لطفاً صحت اطلاعات را تأیید کنید.";
-  }
-
-  return errors;
-};
-
+    if (regP.need_coach_code && !String(regP.coach_code).trim()) errors.coach_code = "کد تأیید مربی الزامی است.";
+    if (!regP.confirmed) errors.confirmed = "لطفاً صحت اطلاعات را تأیید کنید.";
+    if (!String(regP.insurance_number).trim()) errors.insurance_number = "شماره بیمه الزامی است.";
+    return errors;
+  };
 
   /* ---------- Submit: Kyorugi ---------- */
   const submitRegister = async (e) => {
     e.preventDefault();
-    const errs = validateForm();
+    const errs = validateKY();
     if (Object.keys(errs).length) { setReg((r) => ({ ...r, errors: errs })); return; }
 
     setReg((r) => ({ ...r, loading: true, errors: {} }));
@@ -824,7 +704,7 @@ export default function CompetitionDetails() {
 
       const res = await registerSelf(slug, payload);
       const eid = res?.enrollment_id ?? res?.data?.id ?? null;
-      const st  = res?.status ?? res?.data?.status ?? "pending_payment";
+      const st = res?.status ?? res?.data?.status ?? "pending_payment";
 
       setReg((r) => ({ ...r, loading: false, open: false }));
 
@@ -853,113 +733,98 @@ export default function CompetitionDetails() {
   /* ---------- Submit: Poomsae ---------- */
   const submitRegisterPoomsae = async (e) => {
     e.preventDefault();
-    const errs = validateFormPoomsae();
+    const errs = validatePO();
     if (Object.keys(errs).length) { setRegP((r) => ({ ...r, errors: errs })); return; }
 
     setRegP((r) => ({ ...r, loading: true, errors: {} }));
     try {
-      const token = pickToken(role);
-      const url = `${API_BASE}/api/competitions/auth/poomsae/${encodeURIComponent(slug)}/register/self/`;
-
       const issueDateObj = parseJalaliInputToDate(regP.insurance_issue_date);
       const issueISO = issueDateObj && !isNaN(issueDateObj.getTime()) ? issueDateObj.toISOString().slice(0, 10) : "";
       if (!issueISO) { setRegP((r) => ({ ...r, loading: false, errors: { insurance_issue_date: "تاریخ نامعتبر است." } })); return; }
 
       const payload = {
-        poomsae_type: regP.poomsae_type,
+        coach_code: normalizeDigits(regP.coach_code || "").trim() || undefined,
+        poomsae_type: regP.poomsae_type, // 'standard' | 'creative'
         insurance_number: normalizeDigits(regP.insurance_number || "").trim(),
         insurance_issue_date: issueISO,
       };
-      const coachCode = normalizeDigits(regP.coach_code || "").trim();
-      if (coachCode) payload.coach_code = coachCode;
 
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      let data = {};
-      try { data = await res.json(); } catch { data = {}; }
-
-      if (!res.ok) {
-        const p = data || {};
-        const mapped = {};
-        if (p.coach_code) mapped.coach_code = Array.isArray(p.coach_code) ? p.coach_code.join(" ") : String(p.coach_code);
-        if (p.insurance_number) mapped.insurance_number = Array.isArray(p.insurance_number) ? p.insurance_number.join(" ") : String(p.insurance_number);
-        if (p.insurance_issue_date) mapped.insurance_issue_date = Array.isArray(p.insurance_issue_date) ? p.insurance_issue_date.join(" ") : String(p.insurance_issue_date);
-        if (Array.isArray(p.non_field_errors) && p.non_field_errors.length) mapped.__all__ = p.non_field_errors.join(" ");
-        const fallback = p.detail || (res.status === 500 ? "خطای داخلی سرور" : `خطای ${res.status}`);
-        if (!Object.keys(mapped).length) mapped.__all__ = fallback;
-        setRegP((r) => ({ ...r, loading: false, errors: mapped }));
-        return;
-      }
-
-      const eid = data?.enrollment_id ?? null;
-      const st  = data?.status ?? "pending_payment";
+      const res = await registerSelfPoomsae(slug, payload);
+      const eid = res?.enrollment_id ?? res?.data?.enrollment_id ?? null;
+      const st = res?.status ?? res?.data?.status ?? "paid";
       setRegP((r) => ({ ...r, loading: false, open: false }));
-
-      if (st === "pending_payment") {
-        alert("✅ ثبت‌نام انجام شد. لطفاً پرداخت را تکمیل کنید.");
-        setCardInfo((s) => ({ ...s, enrollmentId: eid || s.enrollmentId, status: st, checked: true }));
-      } else if (["paid", "confirmed"].includes(String(st))) {
+      // فعلاً پرداخت شبیه‌سازی شده → status=paid
+      if (eid && (st === "paid" || st === "confirmed")) {
         navigate(`/dashboard/${encodeURIComponent(role)}/enrollments/${eid}/card`);
       } else {
         alert(`ثبت‌نام انجام شد. وضعیت: ${st}`);
       }
     } catch (e2) {
-      setRegP((r) => ({ ...r, loading: false, errors: { __all__: e2.message || "خطای نامشخص در ثبت‌نام" } }));
+      const p = e2?.payload || {};
+      const mapped = {};
+      if (p.coach_code) mapped.coach_code = Array.isArray(p.coach_code) ? p.coach_code.join(" ") : String(p.coach_code);
+      if (p.poomsae_type) mapped.poomsae_type = Array.isArray(p.poomsae_type) ? p.poomsae_type.join(" ") : String(p.poomsae_type);
+      if (p.insurance_number) mapped.insurance_number = Array.isArray(p.insurance_number) ? p.insurance_number.join(" ") : String(p.insurance_number);
+      if (p.insurance_issue_date) mapped.insurance_issue_date = Array.isArray(p.insurance_issue_date) ? p.insurance_issue_date.join(" ") : String(p.insurance_issue_date);
+      if (Array.isArray(p.non_field_errors) && p.non_field_errors.length) mapped.__all__ = p.non_field_errors.join(" ");
+      const fallback = p.detail || e2.message || "خطای نامشخص در ثبت‌نام";
+      if (!Object.keys(mapped).length) mapped.__all__ = fallback;
+      setRegP((r) => ({ ...r, loading: false, errors: mapped }));
     }
   };
 
-  // مسیرها
-  const goBackToDashboardList = () => navigate(`/dashboard/${encodeURIComponent(role)}`);
-  const goRegisterAthlete      = () => navigate(`/dashboard/${encodeURIComponent(role)}/competitions/${encodeURIComponent(slug)}/register/athlete`);
-  const goRegisterTeam         = () => navigate(`/dashboard/${encodeURIComponent(role)}/competitions/${encodeURIComponent(slug)}/register/team`);
-  const goBracket              = () => navigate(`/dashboard/${encodeURIComponent(role)}/competitions/${encodeURIComponent(slug)}/bracket`);
-  const goResults              = () => navigate(`/dashboard/${encodeURIComponent(role)}/competitions/${encodeURIComponent(slug)}/results`);
-
   if (loading) return (<div className="cd-container"><div className="cd-skeleton">در حال بارگذاری…</div></div>);
-  if (err)     return (<div className="cd-container"><div className="cd-error">{err}</div></div>);
+  if (err) return (<div className="cd-container"><div className="cd-error">{err}</div></div>);
   if (!competition) return (<div className="cd-container"><div className="cd-error">مسابقه یافت نشد.</div></div>);
 
-  const showSelfRegBtn    = isPlayer && shouldShowSelfRegister(role);
-  const showStudentRegBtn = isCoach && shouldShowStudentRegister(role);
-  const studentBtnLabel   = isCoach ? "ثبت‌ نام بازیکن" : "ثبت‌نام شاگرد";
+  const titleText = competition.title || competition.name || "—";
+  const regStartVal = competition.registration_start_jalali ?? competition.registration_start;
+  const regEndVal = competition.registration_end_jalali ?? competition.registration_end;
+  const drawVal = competition.draw_date_jalali ?? competition.draw_date;
+  const weighVal = competition.weigh_date_jalali ?? competition.weigh_date;
+  const compDateVal = isKyorugi
+    ? (competition.competition_date_jalali ?? competition.competition_date)
+    : (competition.start_date_jalali ?? competition.start_date ?? competition.competition_date_jalali ?? competition.competition_date);
+
+  const posterSrc = absUrl(competition?.poster?.url || competition?.poster) || "/placeholder.jpg";
+
+  const addressFull = (() => {
+    if (competition?.address_full) return competition.address_full;
+    const city = competition?.city || "";
+       const addr = competition?.address || "";
+    if (city && addr) return `${city}، ${addr}`;
+    return city || addr || "—";
+  })();
 
   return (
     <div className="cd-container" dir="rtl">
       {/* هدر */}
       <div className="cd-hero">
-        <img className="cd-poster" src={posterSrc} alt={competition.title} onError={(e) => (e.currentTarget.src = "/placeholder.jpg")} />
+        <img className="cd-poster" src={posterSrc} alt={titleText} onError={(e) => (e.currentTarget.src = "/placeholder.jpg")} />
         <div className="cd-hero-body">
-          <h1 className="cd-title">{competition.title}</h1>
+          <h1 className="cd-title">{titleText}</h1>
 
           <div className="cd-chips">
-            <span className="cd-chip">سبک مسابقه: <strong>{competition.style_display || "—"}</strong></span>
-
-            {isKyorugi && (
-              <span className="cd-chip">رده سنی: <strong>{competition.age_category_name || "—"}</strong></span>
-            )}
-
-            <span className="cd-chip">رده کمربندی: <strong>{beltHeaderText}</strong></span>
-            <span className="cd-chip">جنسیت: <strong>{competition.gender_display || "—"}</strong></span>
-
-            <span className={`cd-chip ${competition?.can_register ? "ok" : "nok"}`}>
-              ثبت‌نام: <strong>{competition?.can_register ? "بله" : "خیر"}</strong>
+            <span className="cd-chip">
+              سبک مسابقه: <strong>{isPoomsae ? "پومسه" : "کیوروگی"}</strong>
             </span>
-
-            {typeof competition?.user_eligible_self === "boolean" && (
-              <span className={`cd-chip ${competition?.user_eligible_self ? "ok" : "nok"}`}>
-                صلاحیت: <strong>{competition?.user_eligible_self ? "بله" : "خیر"}</strong>
+            {isKyorugi && (
+              <span className="cd-chip">
+                رده سنی: <strong>{ageHeaderText}</strong>
               </span>
             )}
+            <span className="cd-chip">رده کمربندی: <strong>{beltHeaderText}</strong></span>
+            <span className="cd-chip">جنسیت: <strong>{genderLabel ? genderFaLabel(genderLabel) : "—"}</strong></span>
+            <span className={`cd-chip ${registrationOpenBase ? "ok" : "nok"}`}>
+              ثبت‌نام: <strong>{registrationOpenBase ? "بله" : "خیر"}</strong>
+            </span>
+            <span className={`cd-chip ${eligibility.ok === true ? "ok" : eligibility.ok === false ? "nok" : ""}`}>
+              صلاحیت: <strong>
+                {eligibility.ok === true ? "بله" : eligibility.ok === false ? "خیر" : "نامشخص"}
+              </strong>
+            </span>
           </div>
+
         </div>
       </div>
 
@@ -968,63 +833,27 @@ export default function CompetitionDetails() {
         <h2 className="cd-section-title">جزئیات مسابقه</h2>
         <div className="cd-grid">
           <InfoRow label="مبلغ ورودی" value={competition.entry_fee ? `${toFa(Number(competition.entry_fee).toLocaleString())} تومان` : "رایگان"} />
-          <InfoRow label="گروه‌های کمربندی انتخاب‌شده" value={beltGroupsRowValue} />
 
-          <InfoRow label="شروع ثبت‌نام" value={fmtDateFa(competition.registration_start_jalali ?? competition.registration_start)} />
-          <InfoRow label="پایان ثبت‌نام" value={fmtDateFa(competition.registration_end_jalali ?? competition.registration_end)} />
+          <InfoRow label="گروه‌های کمربندی انتخاب‌شده" value={beltGroupsDisplay || "—"} />
+          {isPoomsae && <InfoRow label="گروه سنی" value={ageGroupsValue} />}
 
-          {/* تاریخ قرعه‌کشی برای هر دو سبک */}
-          <InfoRow label="تاریخ قرعه‌کشی" value={fmtDateFa(competition.draw_date_jalali ?? competition.draw_date)} />
+          <InfoRow label="شروع ثبت‌نام" value={fmtDateFa(regStartVal)} />
+          <InfoRow label="پایان ثبت‌نام" value={fmtDateFa(regEndVal)} />
 
-          {/* کیوروگی: وزن‌کشی */}
-          {isKyorugi && (
-            <InfoRow label="تاریخ وزن‌کشی" value={fmtDateFa(competition.weigh_date_jalali ?? competition.weigh_date)} />
-          )}
+          {drawVal && <InfoRow label="تاریخ قرعه‌کشی" value={fmtDateFa(drawVal)} />}
+          {isKyorugi && <InfoRow label="تاریخ وزن‌کشی" value={fmtDateFa(weighVal)} />}
 
-          <InfoRow label="تاریخ برگزاری" value={fmtDateFa(competition.competition_date_jalali ?? competition.competition_date)} />
+          <InfoRow label="تاریخ برگزاری" value={fmtDateFa(compDateVal)} />
 
-          {/* نشانی یکپارچه برای هر دو سبک */}
           <InfoRow label="نشانی محل برگزاری" value={addressFull} multiline />
 
           {isKyorugi && <InfoRow label="تعداد زمین‌ها" value={toFa(competition.mat_count ?? "—")} />}
 
-          {isPoomsae && <InfoRow label="گروه‌های سنی" value={poomsaeAgeRowValue} multiline />}
           {isPoomsae && (
-            <div id="sabt">
-              <div className="cd-hintbox"><span>ثبت‌نام پومسه تیمی بر عهده مربی می‌باشد</span></div>
-            </div>
+            <InfoRow label="تیم پومسه" value={<span className="cd-note cd-note--poomsae">{competition?.team_registration_note ?? competition?.teamRegistrationNote ?? "ثبت نام تیم پومسه بر عهده مربی می‌باشد"}</span>} multiline />
           )}
         </div>
       </section>
-
-      {/* تخصیص وزن‌ها به زمین‌ها (فقط کیوروگی) */}
-      {isKyorugi && (
-        <section className="cd-section">
-          <h2 className="cd-section-title">تخصیص وزن‌ها به زمین‌ها</h2>
-          {Array.isArray(matAssignments) && matAssignments.length > 0 ? (
-            <div className="cd-mats">
-              {matAssignments.map((m) => (
-                <div className="cd-mat-card" key={m.id || m.mat_number}>
-                  <div className="cd-mat-header">زمین {toFa(m.mat_number)}</div>
-                  {Array.isArray(m.weights) && m.weights.length > 0 ? (
-                    <ul className="cd-weight-list">
-                      {m.weights.map((w) => (
-                        <li key={w.id}>
-                          <span className="cd-weight-name">{w.name}</span>
-                          <span className="cd-weight-range">
-                            {toFa(w.min_weight)}–{toFa(w.max_weight)} kg{" "}
-                            <em>({w.gender === "male" ? "مرد" : w.gender === "female" ? "زن" : "—"})</em>
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (<div className="cd-muted">وزنی ثبت نشده.</div>)}
-                </div>
-              ))}
-            </div>
-          ) : (<div className="cd-muted">هنوز اطلاعات زمین‌ها وارد نشده است.</div>)}
-        </section>
-      )}
 
       {/* پیوست‌ها */}
       <section className="cd-section">
@@ -1042,7 +871,6 @@ export default function CompetitionDetails() {
 
           return (
             <div className="cd-attachments-wrap">
-              {/* تصاویر */}
               <div className="cd-attachments-block">
                 <div className="cd-block-head"><span>تصاویر</span><span className="cd-count">{toFa(images.length)}</span></div>
                 {images.length === 0 ? (
@@ -1059,7 +887,6 @@ export default function CompetitionDetails() {
                 )}
               </div>
 
-              {/* فایل‌ها */}
               <div className="cd-attachments-block">
                 <div className="cd-block-head"><span>فایل‌ها</span><span className="cd-count">{toFa(files.length)}</span></div>
                 {files.length === 0 ? (
@@ -1093,117 +920,169 @@ export default function CompetitionDetails() {
           {/* مربی: کد مربی */}
           {isCoach && (<button className="btn btn-outline" onClick={onOpenCoachCode}>کد مربی</button>)}
 
-          {/* ثبت‌نام تیم (مربی) */}
+          {/* ثبت‌نام تیمی پومسه (Coach) */}
+          {isCoach && isPoomsae && (
+            <button
+              className="btn btn-secondary"
+              disabled={true}
+              title="ثبت‌نام تیمی پومسه فعلاً غیرفعال است"
+              onClick={goRegisterTeam}
+            >
+              ثبت‌نام تیمی پومسه
+            </button>
+          )}
+
+          {/* ثبت‌ نام بازیکن (Coach هر دو) */}
           {isCoach && (
-            <button className="btn btn-secondary" disabled={!canRegisterOthers} title={!canRegisterOthers ? "ثبت‌نام این مسابقه فعال نیست یا خارج از بازه است" : ""} onClick={goRegisterTeam}>
-              ثبت‌نام تیم
+            <button
+              className="btn btn-primary"
+              disabled={!canClickCoachRegister}
+              title={!canClickCoachRegister ? coachDisableReason : ""}
+              onClick={goRegisterAthlete}
+            >
+              ثبت‌ نام بازیکن
             </button>
           )}
 
-          {/* ثبت‌نام دیگران (مربی) */}
-          {showStudentRegBtn && (
-            <button className="btn btn-primary" disabled={!canRegisterOthers} title={!canRegisterOthers ? "ثبت‌نام این مسابقه فعال نیست یا خارج از بازه است" : ""} onClick={goRegisterAthlete}>
-              {studentBtnLabel}
+          {/* ثبت‌نام خودم */}
+          {(isPlayer || isCoach || isRef) && (
+            <button
+              className="btn btn-primary"
+              disabled={!canClickSelf}
+              title={
+                !registrationOpenBase
+                  ? "ثبت‌نام این مسابقه فعال نیست"
+                  : (eligibility.ok !== true)
+                    ? "صلاحیت شما با شرایط مسابقه هم‌خوانی ندارد"
+                    : ""
+              }
+              onClick={() => (isPoomsae ? openRegisterFormPoomsae() : openRegisterForm())}
+            >
+              ثبت‌نام خودم
             </button>
           )}
 
-          {/* بازیکن: ثبت‌نام خودم — هر دو سبک */}
-          {showSelfRegBtn && (isKyorugi ? (
-            <button className="btn btn-primary" disabled={!registrationOpen} title={!registrationOpen ? disableReason || "ثبت‌نام برای شما مجاز نیست" : ""} onClick={openRegisterForm}>
-              ثبت‌نام خودم
-            </button>
-          ) : (
-            <button className="btn btn-primary" disabled={!registrationOpen} title={!registrationOpen ? disableReason || "ثبت‌نام برای شما مجاز نیست" : ""} onClick={openRegisterFormPoomsae}>
-              ثبت‌نام خودم
-            </button>
-          ))}
-
-          {/* کارت من */}
-          {isPlayer && (
+          {/* کارت من (فقط KY برای بازیکن) */}
+          {isKyorugi && isPlayer && (
             <button
               className="btn btn-secondary"
               onClick={() => cardInfo.enrollmentId && navigate(`/dashboard/${encodeURIComponent(role)}/enrollments/${cardInfo.enrollmentId}/card`)}
               disabled={!canSeeCard || cardInfo.loading}
               title={
                 cardInfo.loading ? "در حال بررسی وضعیت ثبت‌نام…" :
-                !cardInfo.checked ? "" :
-                !cardInfo.enrollmentId ? "هنوز ثبت‌نامی برای شما ثبت نشده است." :
-                cardInfo.status === "pending_payment" ? "ثبت‌نام شما انجام شده ولی پرداخت تکمیل نشده است." :
-                "پس از پرداخت موفق فعال می‌شود."
+                  !cardInfo.checked ? "" :
+                    !cardInfo.enrollmentId ? "هنوز ثبت‌نامی برای شما ثبت نشده است." :
+                      cardInfo.status === "pending_payment" ? "ثبت‌نام شما انجام شده ولی پرداخت تکمیل نشده است." :
+                        "پس از پرداخت موفق فعال می‌شود."
               }
             >
               {cardInfo.loading ? "در حال بررسی…" : "مشاهده آیدی کارت"}
             </button>
           )}
 
-          {/* جدول (فقط کیوروگی) */}
-          {isKyorugi && (<button className="btn btn-ghost" onClick={goBracket}>مشاهده جدول</button>)}
+          {/* مشاهده آیدی کارت برای مربی در پومسه (غیرفعال) */}
+          {showCoachCardBtnPoomsae && (
+            <button className="btn btn-secondary" disabled title="آیدی کارت در مسابقات پومسه فعلاً فعال نیست">
+              مشاهده آیدی کارت
+            </button>
+          )}
+          {/* مشاهده آیدی کارت (هر دو سبک) */}
+         {isPlayer && isPoomsae && (
+           <button
+             className="btn btn-secondary"
+             onClick={() => cardInfo.enrollmentId && navigate(`/dashboard/${encodeURIComponent(role)}/enrollments/${cardInfo.enrollmentId}/card`)}
+             disabled={!canSeeCard || cardInfo.loading}
+             title={
+               cardInfo.loading ? "در حال بررسی وضعیت ثبت‌نام…" :
+                 !cardInfo.checked ? "" :
+                   !cardInfo.enrollmentId ? "هنوز ثبت‌نامی برای شما ثبت نشده است." :
+                     cardInfo.status === "pending_payment" ? "ثبت‌نام انجام شده ولی پرداخت تکمیل نشده است." :
+                       ""
+             }
+           >
+             {cardInfo.loading ? "در حال بررسی…" : "مشاهده آیدی کارت"}
+           </button>
+         )}
 
-          {/* نتایج (هر دو سبک) */}
-          <button className="btn btn-secondary" disabled={!isPastCompetition} title={!isPastCompetition ? "هنوز مسابقه برگزار نشده" : ""} onClick={goResults}>
-            نتایج مسابقه
-          </button>
+          {/* مشاهده جدول */}
+          {showBracketBtn && (
+            <button
+              className="btn btn-ghost"
+              onClick={isKyorugi ? goBracket : undefined}
+              disabled={isPoomsae}
+              title={isPoomsae ? "مشاهده جدول فعلاً فقط برای کیوروگی فعال است" : ""}
+            >
+              مشاهده جدول
+            </button>
+          )}
+
+          {/* نتایج مسابقه */}
+          {showResultsBtn && (
+            <button
+              className="btn btn-secondary"
+              onClick={isKyorugi ? goResults : undefined}
+              disabled={isPoomsae || !isPastCompetition}
+              title={
+                isPoomsae
+                  ? "نتایج مسابقه در پومسه فعلاً فعال نیست"
+                  : (!isPastCompetition ? "هنوز مسابقه برگزار نشده" : "")
+              }
+            >
+              نتایج مسابقه
+            </button>
+          )}
         </div>
       </div>
 
-      {/* فرم ثبت‌نام خودی (کیوروگی) */}
-      {reg.open && isKyorugi && (
+      {/* پیام راهنما (وقتی فرم باز نیست) */}
+      {isPoomsae && !regP.open && registrationOpenBase === false && (
+        <div className="cd-note cd-note--poomsae" style={{ marginTop: 12 }}>
+          ثبت‌نام فردی این مسابقه غیرفعال است (ثبت‌نام تیمی با مربی).
+        </div>
+      )}
+
+      {/* فرم ثبت‌نام خودی (KY) */}
+      {isKyorugi && reg.open && (
         <section className="cd-section">
           <h2 className="cd-section-title">فرم ثبت‌نام</h2>
 
           {reg.errors.__all__ && <div className="cd-error" style={{ marginBottom: 12 }}>{reg.errors.__all__}</div>}
 
           <form className="cd-form" onSubmit={submitRegister}>
-            {/* فیلدهای قفل‌شده */}
             {reg.locked ? (
               <div className="cd-grid">
-                <InfoRow label="नाम"            value={reg.locked.first_name || "—"} />
-                <InfoRow label="نام خانوادگی"   value={reg.locked.last_name  || "—"} />
-                <InfoRow label="کد ملی"         value={toFa(reg.locked.national_id) || "—"} />
-                <InfoRow label="تاریخ تولد"     value={pickBirthFa(reg.locked)} />
-                <InfoRow label="کمربند"         value={reg.locked.belt || "—"} />
-                <InfoRow label="باشگاه"         value={reg.locked.club || "—"} />
-                <InfoRow label="مربی"           value={reg.locked.coach || "—"} />
+                <InfoRow label="نام" value={reg.locked.first_name || "—"} />
+                <InfoRow label="نام خانوادگی" value={reg.locked.last_name || "—"} />
+                <InfoRow label="کد ملی" value={toFa(reg.locked.national_id) || "—"} />
+                <InfoRow label="تاریخ تولد" value={pickBirthFa(reg.locked)} />
+                <InfoRow label="کمربند" value={reg.locked.belt || "—"} />
+                <InfoRow label="باشگاه" value={reg.locked.club || "—"} />
+                <InfoRow label="مربی" value={reg.locked.coach || "—"} />
               </div>
             ) : (<div className="cd-muted" style={{ marginBottom: 12 }}>در حال بارگذاری اطلاعات پروفایل…</div>)}
 
-            {/* اطلاعات تکمیلی */}
             <h3 className="cd-section-title">اطلاعات تکمیلی</h3>
             <div className="cd-grid">
-              {/* وزن اعلامی */}
               <div className="cd-row" title="برای ممیز از علامت «.» استفاده کنید. تا ۲۰۰ گرم ارفاق لحاظ می‌شود.">
                 <label className="cd-label" htmlFor="weight">وزن (کیلوگرم)</label>
                 <div className="cd-value">
                   <input
-                    id="weight"
-                    className="cd-input"
-                    type="text"
-                    dir="ltr"
-                    inputMode="decimal"
+                    id="weight" className="cd-input" type="text" dir="ltr" inputMode="decimal"
                     placeholder="مثلاً ۶۲.۵ یا ۶۲/۵"
-                    title="برای ممیز از علامت «.» استفاده کنید. تا ۲۰۰ گرم ارفاق لحاظ می‌شود."
                     value={reg.weight}
                     onChange={(e) => setReg((r) => ({ ...r, weight: sanitizeWeight(e.target.value) }))}
-                    aria-invalid={!!reg.errors.weight}
-                    required
+                    aria-invalid={!!reg.errors.weight} required
                   />
                   {reg.errors.weight && <div className="cd-error" style={{ marginTop: 6 }}>{reg.errors.weight}</div>}
                 </div>
               </div>
 
-              {/* شماره بیمه */}
               <div className="cd-row" title="شماره درج‌شده روی کارت بیمه ورزشی.">
                 <label className="cd-label" htmlFor="ins-num">شماره بیمه</label>
                 <div className="cd-value">
                   <input
-                    id="ins-num"
-                    className="cd-input"
-                    type="text"
-                    dir="ltr"
-                    inputMode="numeric"
-                    pattern="\d*"
+                    id="ins-num" className="cd-input" type="text" dir="ltr" inputMode="numeric" pattern="\d*"
                     placeholder="مثلاً ۱۲۳۴۵۶۷۸۹۰"
-                    title="شماره درج‌شده روی کارت بیمه ورزشی."
                     value={reg.insurance_number}
                     onChange={(e) => setReg((r) => ({ ...r, insurance_number: normalizeDigits(e.target.value) }))}
                     required
@@ -1212,46 +1091,31 @@ export default function CompetitionDetails() {
                 </div>
               </div>
 
-              {/* تاریخ صدور بیمه‌نامه (شمسی) */}
-              <div className="cd-row" title="تاریخ صدور کارت بیمه باید حداقل ۷۲ ساعت قبل و حداکثر یک‌سال قبل از تاریخ برگزاری مسابقه باشد.">
+              <div className="cd-row">
                 <label className="cd-label" htmlFor="ins-date">تاریخ صدور بیمه‌نامه</label>
                 <div className="cd-value">
                   <DatePicker
-                    id="ins-date"
-                    inputClass="cd-input"
-                    containerClassName="cd-date"
-                    calendar={persian}
-                    locale={persian_fa}
-                    format="YYYY/MM/DD"
+                    id="ins-date" inputClass="cd-input" containerClassName="cd-date"
+                    calendar={persian} locale={persian_fa} format="YYYY/MM/DD"
                     value={toJalaliDO(reg.insurance_issue_date)}
                     onChange={(v) => setReg((r) => ({ ...r, insurance_issue_date: v ? normalizeDigits(v.format("YYYY/MM/DD")) : "" }))}
-                    calendarPosition="bottom-right"
-                    editable={false}
-                    maxDate={maxIssueDO}
-                    minDate={minIssueDO}
+                    calendarPosition="bottom-right" editable={false}
+                    maxDate={maxIssueDO} minDate={minIssueDO}
                   />
                   {reg.errors.insurance_issue_date && (<div className="cd-error" style={{ marginTop: 6 }}>{reg.errors.insurance_issue_date}</div>)}
                 </div>
               </div>
 
-              {/* کد تأیید مربی */}
               {reg.need_coach_code && (
                 <div className="cd-row" title="این کد را مربی‌تان در داشبورد خودش می‌بیند.">
                   <label className="cd-label" htmlFor="coach_code">کد تأیید مربی</label>
                   <div className="cd-value">
                     <input
-                      id="coach_code"
-                      name="coach_code"
-                      dir="ltr"
-                      inputMode="numeric"
-                      pattern="\d*"
-                      className="cd-input"
-                      placeholder="مثلاً ۴۵۸۲۷۱"
-                      title="این کد را مربی‌تان در داشبورد خودش می‌بیند."
+                      id="coach_code" name="coach_code" dir="ltr" inputMode="numeric" pattern="\d*"
+                      className="cd-input" placeholder="مثلاً ۴۵۸۲۷۱"
                       value={reg.coach_code}
                       onChange={(e) => setReg((r) => ({ ...r, coach_code: e.target.value }))}
-                      aria-invalid={!!reg.errors.coach_code}
-                      required={reg.need_coach_code}
+                      aria-invalid={!!reg.errors.coach_code} required={reg.need_coach_code}
                     />
                     {reg.errors.coach_code && (<div className="cd-error" style={{ marginTop: 6 }}>{reg.errors.coach_code}</div>)}
                   </div>
@@ -1259,8 +1123,7 @@ export default function CompetitionDetails() {
               )}
             </div>
 
-            {/* تأیید صحت اطلاعات */}
-            <div className="cd-row cd-row-multi" title="با تأیید این گزینه مسئولیت صحت اطلاعات را می‌پذیرید.">
+            <div className="cd-row cd-row-multi">
               <label className="cd-checkbox">
                 <input type="checkbox" checked={reg.confirmed} onChange={(e) => setReg((r) => ({ ...r, confirmed: e.target.checked }))} />
                 <span>تمام اطلاعات واردشده را صحیح می‌دانم و مسئولیت آن را می‌پذیرم.</span>
@@ -1280,76 +1143,64 @@ export default function CompetitionDetails() {
         </section>
       )}
 
-      {/* فرم ثبت‌نام خودی (پومسه) */}
-      {regP.open && isPoomsae && (
+      {/* فرم ثبت‌نام خودی (POOMSAE) */}
+      {isPoomsae && regP.open && (
         <section className="cd-section">
           <h2 className="cd-section-title">فرم ثبت‌نام</h2>
 
           {regP.errors.__all__ && <div className="cd-error" style={{ marginBottom: 12 }}>{regP.errors.__all__}</div>}
 
           <form className="cd-form" onSubmit={submitRegisterPoomsae}>
-            {/* فیلدهای قفل‌شده (در صورت نیاز) */}
             {regP.locked ? (
               <div className="cd-grid">
-                <InfoRow label="نام"            value={regP.locked.first_name || "—"} />
-                <InfoRow label="نام خانوادگی"   value={regP.locked.last_name  || "—"} />
-                <InfoRow label="کد ملی"         value={toFa(regP.locked.national_id) || "—"} />
-                <InfoRow label="تاریخ تولد"     value={birthFaSafe(regP.locked)} />
-                <InfoRow label="کمربند"         value={regP.locked.belt || "—"} />
-                <InfoRow label="باشگاه"         value={regP.locked.club || "—"} />
-                <InfoRow label="مربی"           value={regP.locked.coach || "—"} />
+                <InfoRow label="نام" value={regP.locked.first_name || "—"} />
+                <InfoRow label="نام خانوادگی" value={regP.locked.last_name || "—"} />
+                <InfoRow label="کد ملی" value={toFa(regP.locked.national_id) || "—"} />
+                <InfoRow label="تاریخ تولد" value={pickBirthFa(regP.locked)} />
+                <InfoRow label="کمربند" value={regP.locked.belt || "—"} />
+                <InfoRow label="باشگاه" value={regP.locked.club || "—"} />
+                <InfoRow label="مربی" value={regP.locked.coach || "—"} />
               </div>
-            ) : (
-              <div className="cd-muted" style={{ marginBottom: 12 }}>در حال بارگذاری اطلاعات پروفایل…</div>
-            )}
+            ) : (<div className="cd-muted" style={{ marginBottom: 12 }}>در حال بارگذاری اطلاعات پروفایل…</div>)}
 
-            {/* اطلاعات تکمیلی */}
             <h3 className="cd-section-title">اطلاعات تکمیلی</h3>
             <div className="cd-grid">
-
-              {/* نوع مسابقه: استاندارد / ابداعی */}
+              {/* نوع مسابقه */}
               <div className="cd-row">
                 <label className="cd-label">نوع مسابقه</label>
                 <div className="cd-value">
-                  <label className="cd-radio">
-                    <input
-                      type="radio"
-                      name="poomsae_type"
-                      value="standard"
-                      checked={regP.poomsae_type === "standard"}
-                      onChange={(e) => setRegP(r => ({ ...r, poomsae_type: e.target.value }))}
-                    />
-                    <span>استاندارد</span>
-                  </label>
-                  <label className="cd-radio" style={{ marginInlineStart: 16 }}>
-                    <input
-                      type="radio"
-                      name="poomsae_type"
-                      value="creative"
-                      checked={regP.poomsae_type === "creative"}
-                      onChange={(e) => setRegP(r => ({ ...r, poomsae_type: e.target.value }))}
-                    />
-                    <span>ابداعی</span>
-                  </label>
-                  {regP.errors.poomsae_type && (
-                    <div className="cd-error" style={{ marginTop: 6 }}>{regP.errors.poomsae_type}</div>
-                  )}
+                  <div className="cd-radio-group">
+                    <label className="cd-radio">
+                      <input
+                        type="radio"
+                        name="poomsae_type"
+                        value="standard"
+                        checked={regP.poomsae_type === "standard"}
+                        onChange={() => setRegP((r) => ({ ...r, poomsae_type: "standard" }))}
+                      />
+                      <span>استاندارد</span>
+                    </label>
+                    <label className="cd-radio" style={{ marginInlineStart: 16 }}>
+                      <input
+                        type="radio"
+                        name="poomsae_type"
+                        value="creative"
+                        checked={regP.poomsae_type === "creative"}
+                        onChange={() => setRegP((r) => ({ ...r, poomsae_type: "creative" }))}
+                      />
+                      <span>ابداعی</span>
+                    </label>
+                  </div>
+                  {regP.errors.poomsae_type && <div className="cd-error" style={{ marginTop: 6 }}>{regP.errors.poomsae_type}</div>}
                 </div>
               </div>
 
-              {/* شماره بیمه */}
               <div className="cd-row" title="شماره درج‌شده روی کارت بیمه ورزشی.">
-                <label className="cd-label" htmlFor="ins-num-p">شماره بیمه</label>
+                <label className="cd-label" htmlFor="ins-num-po">شماره بیمه</label>
                 <div className="cd-value">
                   <input
-                    id="ins-num-p"
-                    className="cd-input"
-                    type="text"
-                    dir="ltr"
-                    inputMode="numeric"
-                    pattern="\d*"
+                    id="ins-num-po" className="cd-input" type="text" dir="ltr" inputMode="numeric" pattern="\d*"
                     placeholder="مثلاً ۱۲۳۴۵۶۷۸۹۰"
-                    title="شماره درج‌شده روی کارت بیمه ورزشی."
                     value={regP.insurance_number}
                     onChange={(e) => setRegP((r) => ({ ...r, insurance_number: normalizeDigits(e.target.value) }))}
                     required
@@ -1358,53 +1209,39 @@ export default function CompetitionDetails() {
                 </div>
               </div>
 
-              {/* تاریخ صدور بیمه‌نامه (شمسی) */}
-              <div className="cd-row" title="دو شرط: حداقل ۷۲ ساعت قبل از مسابقه و حداکثر یک‌سال قبل از مسابقه.">
-                <label className="cd-label" htmlFor="ins-date-p">تاریخ صدور بیمه‌نامه</label>
+              <div className="cd-row">
+                <label className="cd-label" htmlFor="ins-date-po">تاریخ صدور بیمه‌نامه</label>
                 <div className="cd-value">
                   <DatePicker
-                    id="ins-date-p"
-                    inputClass="cd-input"
-                    containerClassName="cd-date"
-                    calendar={persian}
-                    locale={persian_fa}
-                    format="YYYY/MM/DD"
+                    id="ins-date-po" inputClass="cd-input" containerClassName="cd-date"
+                    calendar={persian} locale={persian_fa} format="YYYY/MM/DD"
                     value={toJalaliDO(regP.insurance_issue_date)}
                     onChange={(v) => setRegP((r) => ({ ...r, insurance_issue_date: v ? normalizeDigits(v.format("YYYY/MM/DD")) : "" }))}
-                    calendarPosition="bottom-right"
-                    editable={false}
-                    maxDate={maxIssueDO}
-                    minDate={minIssueDO}
+                    calendarPosition="bottom-right" editable={false}
+                    maxDate={maxIssueDO} minDate={minIssueDO}
                   />
                   {regP.errors.insurance_issue_date && (<div className="cd-error" style={{ marginTop: 6 }}>{regP.errors.insurance_issue_date}</div>)}
                 </div>
               </div>
 
-                <div className="cd-row" title="این کد باید مربوط به مربیِ خودِ شما باشد.">
-                  <label className="cd-label" htmlFor="coach_code_p">کد تأیید مربی</label>
+              {regP.need_coach_code && (
+                <div className="cd-row" title="این کد را مربی‌تان در داشبورد خودش می‌بیند.">
+                  <label className="cd-label" htmlFor="coach_code_po">کد تأیید مربی</label>
                   <div className="cd-value">
                     <input
-                      id="coach_code_p"
-                      name="coach_code_p"
-                      dir="ltr"
-                      inputMode="numeric"
-                      pattern="\d*"
-                      className="cd-input"
-                      placeholder="مثلاً ۴۵۸۲۷۱"
+                      id="coach_code_po" name="coach_code_po" dir="ltr" inputMode="numeric" pattern="\d*"
+                      className="cd-input" placeholder="مثلاً ۴۵۸۲۷۱"
                       value={regP.coach_code}
                       onChange={(e) => setRegP((r) => ({ ...r, coach_code: e.target.value }))}
-                      aria-invalid={!!regP.errors.coach_code}
-                      required
+                      aria-invalid={!!regP.errors.coach_code} required={regP.need_coach_code}
                     />
-                    {regP.errors.coach_code && <div className="cd-error" style={{ marginTop: 6 }}>{regP.errors.coach_code}</div>}
+                    {regP.errors.coach_code && (<div className="cd-error" style={{ marginTop: 6 }}>{regP.errors.coach_code}</div>)}
                   </div>
                 </div>
-
-
+              )}
             </div>
 
-            {/* تأیید صحت اطلاعات */}
-            <div className="cd-row cd-row-multi" title="با تأیید این گزینه مسئولیت صحت اطلاعات را می‌پذیرید.">
+            <div className="cd-row cd-row-multi">
               <label className="cd-checkbox">
                 <input type="checkbox" checked={regP.confirmed} onChange={(e) => setRegP((r) => ({ ...r, confirmed: e.target.checked }))} />
                 <span>تمام اطلاعات واردشده را صحیح می‌دانم و مسئولیت آن را می‌پذیرم.</span>
@@ -1424,7 +1261,7 @@ export default function CompetitionDetails() {
         </section>
       )}
 
-      {/* لایت‌باکس (فقط تصویر) */}
+      {/* لایت‌باکس */}
       {lightbox && (
         <div className="cd-modal" onClick={() => setLightbox(null)}>
           <div className="cd-modal-inner" onClick={(e) => e.stopPropagation()}>
