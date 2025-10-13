@@ -1,0 +1,172 @@
+/* LoginModal.css — مشتق از CSS ثبت‌نام، با prefix "login-" */
+
+/* backdrop */
+.login-modal-backdrop {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* container */
+.login-modal-container {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 2rem 2.5rem;
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  animation: login-pop 0.3s ease;
+  font-family: 'IRANSansWeb', sans-serif;
+}
+
+/* pop animation */
+@keyframes login-pop {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* close button */
+.login-close-btn {
+  position: absolute;
+  top: 12px; left: 12px;
+  background: transparent;
+  border: none;
+  font-size: 26px;
+  cursor: pointer;
+  color: #aaa;
+  transition: color 0.3s;
+}
+.login-close-btn:hover { color: #ff4d4f; }
+
+/* content */
+.login-modal-content h2 {
+  margin-bottom: 0.5rem;
+  color: #2c3e50;
+  font-size: 1.4rem;
+  text-align: right;
+}
+
+.login-subtext {
+  font-size: 0.95rem;
+  color: #7f8c8d;
+  margin-bottom: 1.2rem;
+  text-align: right;
+}
+
+/* inputs */
+.login-input-field {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  margin-bottom: 1rem;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.login-input-field:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+  outline: none;
+}
+
+/* password */
+.login-password-container {
+  position: relative;
+  width: 100%;
+}
+.login-password-input {
+  width: 100%;
+  padding: 12px;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background: #fff;
+  margin-bottom: 12px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.login-password-input:focus {
+  border-color: #3498db;
+  outline: none;
+  box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+}
+
+/* eye button (positioned left because dir=rtl) */
+.login-toggle-password-btn {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  color: #555;
+  display: flex;
+  align-items: center;
+}
+.login-toggle-password-btn:hover { color: #000; }
+
+/* error */
+.login-error-msg {
+  color: #e74c3c;
+  font-size: 0.9rem;
+  margin-top: 0.3rem;
+  margin-bottom: 1rem;
+  text-align: right;
+}
+
+/* action button — EXACT same color as register (you gave #f39c12) */
+.login-action-btn {
+  background-color: #f39c12;
+  color: #fff;
+  margin-right: 0;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 10px;
+  font-weight: bold;
+  font-size: 1rem;
+  width: 100%;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.08s;
+  box-shadow: 0 8px 18px rgba(243,156,18,0.12);
+}
+.login-action-btn:hover { background-color: #d68910; }
+.login-action-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* resend / forgot */
+.login-resend-btn {
+  background-color: transparent;
+  color: #3498db;
+  padding: 10px;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 0.95rem;
+  text-decoration: underline;
+  text-align: left;
+  width: 100%;
+}
+.login-resend-btn:hover { opacity: 0.9; }
+
+/* responsive */
+@media (max-width: 768px) {
+  .login-modal-container {
+    width: 92%;
+    padding: 1.5rem 1.8rem;
+    max-width: 95vw;
+    border-radius: 16px;
+  }
+  .login-modal-content h2 { font-size: 1.2rem; }
+  .login-input-field, .login-action-btn { font-size: 0.95rem; padding: 10px 14px; }
+}

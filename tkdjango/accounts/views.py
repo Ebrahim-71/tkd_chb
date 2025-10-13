@@ -86,146 +86,47 @@ class SendCodeAPIView(APIView):
         return Response({"message": "کد تأیید ارسال شد."}, status=status.HTTP_200_OK)
 
 
-class LoginSendCodeAPIView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        serializer = PhoneSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        phone = serializer.validated_data['phone']
-        role = serializer.validated_data['role']
-
-        if role not in ['player', 'coach', 'referee', 'both', 'club']:
-            return Response({"error": "نقش نامعتبر است."}, status=status.HTTP_400_BAD_REQUEST)
-
-        exists = False
-        if role == 'coach':  # یعنی مربی | داور
-            exists = UserProfile.objects.filter(phone=phone, role__in=['coach', 'referee', 'both']).exists()
-        elif role in ['player', 'referee', 'both']:
-            exists = UserProfile.objects.filter(phone=phone, role=role).exists()
-        elif role == 'club':
-            exists = TkdClub.objects.filter(founder_phone=phone).exists()
-
-        if not exists:
-            return Response({"error": "کاربری با این شماره  یافت نشد."}, status=404)
-
-        recent = SMSVerification.objects.filter(
-            phone=phone,
-            created_at__gte=timezone.now() - timedelta(minutes=3)
-        ).first()
-
-        if recent:
-            remaining = 180 - int((timezone.now() - recent.created_at).total_seconds())
-            return Response({
-                "error": "کد قبلی هنوز معتبر است.",
-                "retry_after": remaining
-            }, status=429)
-
-        code = str(random.randint(1000, 9999))
-        SMSVerification.objects.create(phone=phone, code=code)
-        send_verification_code(phone, code)
-
-        return Response({"message": "کد ارسال شد."}, status=200)
 
 
 # ------------------------------ ۲. تایید کد ------------------------------
+
 class VerifyCodeAPIView(APIView):
+    """
+    بررسی و تأیید کد پیامکی برای ثبت‌نام کاربران جدید
+    """
     def post(self, request):
         serializer = VerifyCodeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        phone = serializer.validated_data['phone']
-        code = serializer.validated_data['code']
+        phone = serializer.validated_data["phone"]
+        code = serializer.validated_data["code"]
+
         expire_time = timezone.now() - timedelta(minutes=3)
 
         try:
             record = SMSVerification.objects.get(phone=phone, code=code)
+        except SMSVerification.DoesNotExist:
+            # در صورت وارد کردن کد اشتباه، همه‌ی رکوردهای قدیمی آن شماره پاک شوند
+            SMSVerification.objects.filter(phone=phone).delete()
+            return Response(
+                {"error": "کد وارد شده نادرست است."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-            if record.created_at < expire_time:
-                # اگر کد منقضی شده، پاکش کن
-                record.delete()
-                return Response({'error': 'کد منقضی شده است.'}, status=400)
-
-            # اگر کد معتبر بود، پاکش کن
+        # بررسی انقضای کد
+        if record.created_at < expire_time:
             record.delete()
-            return Response({'message': 'کد تأیید شد. ادامه دهید.'})
+            return Response(
+                {"error": "کد منقضی شده است. لطفاً مجدداً دریافت کنید."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        except SMSVerification.DoesNotExist:
-            # چک می‌کنیم آیا کد قدیمی از همین شماره هست
-            old_codes = SMSVerification.objects.filter(phone=phone)
-            if old_codes.exists():
-                old_codes.delete()  # پاکسازی احتیاطی
-
-            return Response({'error': 'کد وارد شده نادرست است.'}, status=400)
-
-class VerifyLoginCodeAPIView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        serializer = VerifyLoginCodeSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        phone = serializer.validated_data['phone']
-        code = serializer.validated_data['code']
-        role = serializer.validated_data['role']
-
-        # کد تأیید را پیدا کن
-        try:
-            sms = SMSVerification.objects.get(phone=phone, code=code)
-        except SMSVerification.DoesNotExist:
-            return Response({"error": "کد وارد شده نادرست است."}, status=400)
-
-        # انقضا
-        if sms.is_expired():
-            sms.delete()
-            return Response({"error": "کد منقضی شده است."}, status=400)
-
-        # پروفایل/باشگاه را پیدا کن
-        if role in ['coach', 'referee', 'both', 'player']:
-            profile = UserProfile.objects.filter(
-                phone=phone,
-                role__in=['coach', 'referee', 'both', 'player']
-            ).first()
-        elif role == 'club':
-            profile = TkdClub.objects.filter(founder_phone=phone).first()
-        else:
-            profile = None
-
-        if not profile:
-            return Response({"error": "کاربری با این اطلاعات یافت نشد."}, status=404)
-
-        # --- تغییر اصلی از اینجا ---
-        user = getattr(profile, "user", None)
-        if user is None:
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-
-            base_username = str(phone)
-            username = base_username
-            i = 1
-            while User.objects.filter(username=username).exists():
-                i += 1
-                username = f"{base_username}_{i}"
-
-            user = User.objects.create_user(username=username)
-            user.set_unusable_password()
-            user.save()
-
-            # وصل‌کردن به مدل مربوط
-            profile.user = user
-            profile.save(update_fields=["user"])
-
-        real_role = profile.role if isinstance(profile, UserProfile) else 'club'
-        # --- تا اینجا ---
-
-        # مصرف کد و ساخت توکن
-        sms.delete()
-        refresh = RefreshToken.for_user(user)
-        return Response({
-            "access": str(refresh.access_token),
-            "role": real_role
-        })
+        # کد معتبر است → پاک و تأیید
+        record.delete()
+        return Response(
+            {"message": "کد تأیید شد. ادامه دهید."},
+            status=status.HTTP_200_OK
+        )
 
 
 @api_view(['GET'])
@@ -447,7 +348,10 @@ def approve_pending_user(request, pk):
             coach_instance = None
 
     user_obj = User.objects.create_user(username=pending.phone)
-    user_obj.set_unusable_password()
+    if pending.national_code and pending.national_code.isdigit():
+        user_obj.set_password(pending.national_code)
+    else:
+        user_obj.set_unusable_password()
     user_obj.save()
 
     user = UserProfile.objects.create(
@@ -582,7 +486,10 @@ def approve_pending_club(request, pk):
         return redirect(reverse("admin:accounts_pendingclub_changelist"))
 
     user_obj = User.objects.create_user(username=pending.founder_phone)
-    user_obj.set_unusable_password()
+    if pending.founder_national_code and pending.founder_national_code.isdigit():
+        user_obj.set_password(pending.founder_national_code)
+    else:
+        user_obj.set_unusable_password()
     user_obj.save()
 
     approved = TkdClub.objects.create(
@@ -1629,3 +1536,34 @@ def mini_profile(request):
     }
     return Response(data)
 
+# ✅ ورود عمومی با نام کاربری و رمز عبور
+class UniversalLoginAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = request.data.get("username")
+        password = request.data.get("password")
+
+        if not username or not password:
+            return Response({"error": "نام کاربری و رمز عبور الزامی هستند."}, status=400)
+
+        user = authenticate(username=username, password=password)
+        if not user:
+            return Response({"error": "نام کاربری یا رمز عبور اشتباه است."}, status=401)
+
+        refresh = RefreshToken.for_user(user)
+
+        # نقش را تشخیص بده
+        role = "player"
+        if hasattr(user, "profile"):
+            role = user.profile.role
+        elif hasattr(user, "tkdclub"):
+            role = "club"
+        elif hasattr(user, "tkdboard"):
+            role = "heyat"
+
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "role": role,
+        }, status=200)

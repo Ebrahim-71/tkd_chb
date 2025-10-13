@@ -1023,8 +1023,6 @@ class PoomsaeCompetition(RegistrationManualMixin, models.Model):
     entry_fee = models.PositiveIntegerField(default=0, verbose_name="هزینه ورودی (تومان)")
     terms_text = models.TextField(blank=True, verbose_name="متن قوانین و مقررات")
 
-
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1046,10 +1044,15 @@ class PoomsaeCompetition(RegistrationManualMixin, models.Model):
     def __str__(self):
         return self.name
 
-    # alias برای استفاده راحت‌تر
+    # alias برای استفادهٔ راحت در فرانت (comp.key)
+    @property
+    def key(self) -> str:
+        return self.public_id
+
     @property
     def is_registration_open(self) -> bool:
         return self.registration_open_effective
+
     @property
     def style_display(self):
         return "پومسه"
@@ -1060,8 +1063,11 @@ class PoomsaeCompetition(RegistrationManualMixin, models.Model):
         return d
 
     def clean(self):
-        self.start_date = self._to_greg_if_jalali_date(self.start_date)
-        self.end_date   = self._to_greg_if_jalali_date(self.end_date)
+        # پوشش تمام تاریخ‌های DateField که ممکن است در ادمین جلالی وارد شوند
+        self.start_date       = self._to_greg_if_jalali_date(self.start_date)
+        self.end_date         = self._to_greg_if_jalali_date(self.end_date)
+        self.draw_date        = self._to_greg_if_jalali_date(self.draw_date)
+        self.competition_date = self._to_greg_if_jalali_date(self.competition_date)
         super().clean()
 
     def save(self, *args, **kwargs):
@@ -1102,15 +1108,19 @@ class PoomsaeDivision(models.Model):
 
 class PoomsaeCoachApproval(models.Model):
     """
-    تأیید مربی برای شرکت بازیکن در پومسه (کد ۶ رقمی یکتا در سطح همان مسابقه).
-    - یکتا: (competition, player)
-    - یکتایی کد: (competition, code) وقتی code نال نیست
+    تأیید مربی برای شرکت بازیکنان در پومسه.
+    - یکتایی مربی در هر مسابقه: (competition, coach)
+    - یکتایی کد وقتی code نال نیست: (competition, code)
+    - player می‌تواند تهی باشد؛ کد مربی هنگام ثبت‌نامِ بازیکن اعتبارسنجی می‌شود.
     """
-    competition = models.ForeignKey(PoomsaeCompetition, on_delete=models.CASCADE, related_name="coach_approvals", verbose_name="مسابقه")
+    competition = models.ForeignKey(PoomsaeCompetition, on_delete=models.CASCADE,
+                                    related_name="coach_approvals", verbose_name="مسابقه")
     player = models.ForeignKey("accounts.UserProfile", on_delete=models.CASCADE,
                                related_name="poomsae_approvals", verbose_name="بازیکن",
                                null=True, blank=True)
-    coach  = models.ForeignKey("accounts.UserProfile", on_delete=models.CASCADE, related_name="poomsae_coach_approvals", limit_choices_to={"is_coach": True}, verbose_name="مربی")
+    coach  = models.ForeignKey("accounts.UserProfile", on_delete=models.CASCADE,
+                               related_name="poomsae_coach_approvals",
+                               limit_choices_to={"is_coach": True}, verbose_name="مربی")
 
     code = models.CharField("کد تأیید مربی", max_length=8, blank=True, null=True, db_index=True)
     approved = models.BooleanField("تأیید شده", default=False)
@@ -1142,13 +1152,8 @@ class PoomsaeCoachApproval(models.Model):
 
     @transaction.atomic
     def set_fresh_code(self, save: bool = True, force: bool = False) -> str:
-        """
-        اگر قبلاً کد دارد و force=False باشد، همان کد را برمی‌گرداند.
-        اگر force=True باشد، «به‌اجبار» کد جدید و یکتا (در سطح همان مسابقه) می‌سازد.
-        """
         if self.code and not force:
             return self.code
-
         current = type(self).objects.select_for_update().get(pk=self.pk)
         if current.code and not force:
             return current.code
@@ -1166,9 +1171,8 @@ class PoomsaeCoachApproval(models.Model):
 
     def clean(self):
         import re as _re
-        if self.code:
-            if not _re.fullmatch(r"\d{4,8}", str(self.code)):
-                raise ValidationError({"code": "کد باید عددی و بین ۴ تا ۸ رقم باشد."})
+        if self.code and not _re.fullmatch(r"\d{4,8}", str(self.code)):
+            raise ValidationError({"code": "کد باید عددی و بین ۴ تا ۸ رقم باشد."})
         super().clean()
 
     def save(self, *args, **kwargs):
@@ -1180,28 +1184,156 @@ class PoomsaeCoachApproval(models.Model):
                 raise ValidationError({"code": "تغییر کد مجاز نیست. فقط مسیر تولید کد مجاز است."})
         return super().save(*args, **kwargs)
 
-class PoomsaeEntry(models.Model):
-    """
-    ثبت‌نام پومسه (هم‌ارز Enrollment در کیوروگی، اما ساده‌تر و بدون وزن).
-    """
-    player   = models.ForeignKey("accounts.UserProfile", on_delete=models.CASCADE, related_name="poomsae_entries", verbose_name="بازیکن")
-    division = models.ForeignKey(PoomsaeDivision, on_delete=models.CASCADE, related_name="entries", verbose_name="رده")
-    coach    = models.ForeignKey("accounts.UserProfile", on_delete=models.SET_NULL, null=True, blank=True, related_name="poomsae_coach_entries", limit_choices_to={"is_coach": True}, verbose_name="مربی")
+# ====================== POOMSAE – Enrollment (مثل کیوروگی) ======================
 
-    paid = models.BooleanField("پرداخت شده", default=False)
+class PoomsaeEnrollment(models.Model):
+    MEDAL_CHOICES = [
+        ("", "—"),
+        ("gold", "طلا"),
+        ("silver", "نقره"),
+        ("bronze", "برنز"),
+    ]
+
+    STATUS_CHOICES = [
+        ("pending_payment", "در انتظار پرداخت"),
+        ("paid", "پرداخت‌شده"),
+        ("confirmed", "تأیید نهایی"),
+        ("accepted", "پذیرفته‌شده"),
+        ("completed", "تکمیل‌شده"),
+        ("canceled", "لغو شده"),
+    ]
+
+    POOMSAE_TYPE_CHOICES = [
+        ("standard", "استاندارد"),
+        ("creative", "ابداعی"),
+    ]
+
+    # مسابقه/بازیکن
+    competition = models.ForeignKey(
+        "competitions.PoomsaeCompetition",
+        on_delete=models.CASCADE,
+        related_name="enrollments",
+        verbose_name="مسابقه پومسه",
+    )
+    player = models.ForeignKey(
+        UserProfile, on_delete=models.PROTECT, related_name="poomsae_enrollments", verbose_name="بازیکن"
+    )
+
+    # مربی + اسنپ‌شات
+    coach = models.ForeignKey(
+        UserProfile,
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="poomsae_coach_enrollments",
+        limit_choices_to={"is_coach": True},
+        verbose_name="مربی",
+    )
+    coach_name = models.CharField("نام مربی (اسنپ‌شات)", max_length=150, blank=True, default="")
+    coach_approval_code = models.CharField("کد تایید مربی (اسنپ‌شات)", max_length=8, blank=True, default="")
+
+    # باشگاه/هیئت: FK + اسنپ‌شات نام
+    club = models.ForeignKey(
+        TkdClub, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="poomsae_club_enrollments", verbose_name="باشگاه"
+    )
+    club_name = models.CharField("نام باشگاه (اسنپ‌شات)", max_length=150, blank=True, default="")
+    board = models.ForeignKey(
+        TkdBoard, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="poomsae_board_enrollments", verbose_name="هیئت"
+    )
+    board_name = models.CharField("نام هیئت (اسنپ‌شات)", max_length=150, blank=True, default="")
+
+    # گروه کمربندی / رده سنی
+    belt_group = models.ForeignKey(
+        "competitions.BeltGroup", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="poomsae_enrollments", verbose_name="گروه کمربندی"
+    )
+    age_category = models.ForeignKey(
+        "competitions.AgeCategory", on_delete=models.PROTECT,
+        null=True, blank=True, related_name="poomsae_enrollments", verbose_name="رده سنی"
+    )
+
+    # بجای وزن، نوع مسابقه پومسه
+    poomsae_type = models.CharField("نوع پومسه", max_length=16, choices=POOMSAE_TYPE_CHOICES)
+
+    # داده‌های فرم (بیمه)
+    insurance_number = models.CharField("شماره بیمه", max_length=20)
+    insurance_issue_date = models.DateField("تاریخ صدور بیمه")
+
+    # پرداخت
+    status = models.CharField("وضعیت", max_length=20, choices=STATUS_CHOICES, default="pending_payment")
+    is_paid = models.BooleanField("پرداخت شده؟", default=False)
+    paid_amount = models.PositiveIntegerField("مبلغ پرداختی (تومان)", default=0)
+    bank_ref_code = models.CharField("کد مرجع بانکی", max_length=64, blank=True, default="")
+    paid_at = models.DateTimeField("زمان پرداخت", null=True, blank=True)
+    medal = models.CharField("مدال", max_length=10, choices=MEDAL_CHOICES, blank=True, default="")
     created_at = models.DateTimeField("ایجاد", auto_now_add=True)
 
     class Meta:
         verbose_name = "ثبت‌نام پومسه"
         verbose_name_plural = "ثبت‌نام‌های پومسه"
-        unique_together = ("player", "division")
         indexes = [
-            Index(fields=["division", "paid"]),
-            Index(fields=["player"]),
+            models.Index(fields=["competition", "status"]),
+            models.Index(fields=["coach"]),
+            models.Index(fields=["club"]),
+            models.Index(fields=["board"]),
+            models.Index(fields=["competition", "player"]),  # ← برای جست‌وجوهای رایج
         ]
+        # امکان ثبت‌نام هم‌زمان در نوع استاندارد و ابداعی
+        unique_together = (("competition", "player", "poomsae_type"),)
+        # اگر فقط یک ثبت‌نام در هر مسابقه می‌خواهید:
+        # unique_together = (("competition", "player"),)
 
     def __str__(self):
-        return f"{self.player} – {self.division}"
+        return f"{self.player} @ {self.competition} [{self.get_poomsae_type_display()}]"
+
+    # ولیدیشن تکمیلی (اختیاری اما مفید)
+    def clean(self):
+        # تاریخ بیمه: معقول بودن (نه آیندهٔ دور، نه خیلی قدیمی)
+        if self.insurance_issue_date:
+            # نمونه: حداکثر 365 روز قبل از روز مسابقه (اگر competition_date موجود باشد)
+            comp_date = self.competition.competition_date or self.competition.start_date
+            try:
+                delta = comp_date - self.insurance_issue_date
+                if delta.days < 3 or delta.days > 365:
+                    raise ValidationError({"insurance_issue_date": "تاریخ بیمه باید حداقل ۳ روز و حداکثر ۱ سال قبل از مسابقه باشد."})
+            except Exception:
+                pass
+        super().clean()
+
+    def mark_paid(self, amount: int = 0, ref_code: str = ""):
+        was_paid = self.is_paid
+        self.is_paid = True
+        self.paid_amount = int(amount or 0)
+        if ref_code:
+            self.bank_ref_code = ref_code
+        self.paid_at = timezone.now()
+        if self.status in ("pending_payment", "canceled", ""):
+            self.status = "paid"
+        super().save(update_fields=["is_paid", "paid_amount", "bank_ref_code", "paid_at", "status"])
+
+        # امتیازدهی یک‌بار در لحظهٔ اولین پرداخت (مثل کیوروگی)
+        if not was_paid:
+            try:
+                UserProfile.objects.filter(id=self.player_id).update(
+                    ranking_competition=F("ranking_competition") + 1.0,
+                    ranking_total=F("ranking_total") + 1.0
+                )
+            except Exception:
+                pass
+
+            if self.coach_id:
+                UserProfile.objects.filter(id=self.coach_id).update(
+                    ranking_total=F("ranking_total") + 0.75
+                )
+            if self.club_id:
+                TkdClub.objects.filter(id=self.club_id).update(
+                    ranking_total=F("ranking_total") + 0.5
+                )
+            if self.board_id:
+                TkdBoard.objects.filter(id=self.board_id).update(
+                    ranking_total=F("ranking_total") + 0.5
+                )
+
 class PoomsaeImage(models.Model):
     competition = models.ForeignKey(
         PoomsaeCompetition, related_name='images',
@@ -1224,5 +1356,7 @@ class PoomsaeFile(models.Model):
         verbose_name = 'فایل مسابقه پومسه'
         verbose_name_plural = 'فایل‌های مسابقه پومسه'
 
+# --- Backward-compat alias (to keep old imports working) ---
+PoomsaeEntry = PoomsaeEnrollment
 
 

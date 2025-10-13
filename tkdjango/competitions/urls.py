@@ -23,20 +23,22 @@ from .views import (
     # --------- Poomsae ----------
     PoomsaeCompetitionDetailView,
     PoomsaeCoachApprovalStatusView, PoomsaeCoachApprovalApproveView,
-    poomsae_register_self,  # ✅ تابع موجود در views.py
+    PoomsaeRegisterSelfView,
+    # PoomsaeRegisterSelfPrefillView,  # اگر دارید، فعالش کنید
 )
 
 app_name = "competitions"
 
-
-# کلید عددی یا public_id/slug
+# کلید عددی یا public_id/slug (حساس به طول کمتر و کاراکتر _ هم مجاز)
 class CompKeyConverter:
-    regex = r"(?:\d+|[A-Za-z0-9\-]{8,36})"
+    # عددی خالص، یا slug/public_id شامل حروف/عدد/خط تیره/خط زیرین با طول 3 تا 64
+    regex = r"(?:\d+|[A-Za-z0-9_-]{3,64})"
 
-    def to_python(self, value): return value
+    def to_python(self, value):
+        return value  # حساسیت حروف را در ویو هندل کنید
 
-    def to_url(self, value): return str(value)
-
+    def to_url(self, value):
+        return str(value)
 
 register_converter(CompKeyConverter, "ckey")
 
@@ -104,16 +106,18 @@ urlpatterns = [
          PoomsaeCoachApprovalApproveView.as_view(),
          name="poomsae-coach-approval-approve"),
 
-    # ========================= پومسه: ثبت‌نام فردی =========================
-    # مسیر اصلی تعریف‌شده در ویو
-    path("competitions/poomsae/<ckey:public_id>/register/self/", poomsae_register_self,
-         name="poomsae-register-self-compat"),
-    # alias مطابق فرانت (auth/poomsae/...)
-    path("auth/poomsae/<ckey:public_id>/register/self/", poomsae_register_self,
-         name="poomsae-register-self"),
-
-    # توجه: prefill برای پومسه در ویوها پیاده‌سازی نشده؛ اگر فرانت GET می‌زند،
-    # باید یک View بسازی و اینجا map کنی (در حال حاضر عمداً حذف شده تا 404 بده).
+    # ========================= پومسه: ثبت‌نام فردی + prefill =========================
+    path(
+        "auth/poomsae/<ckey:public_id>/register/self/",
+        PoomsaeRegisterSelfView.as_view(),
+        name="poomsae-register-self",
+    ),
+    # اگر ویو prefill مخصوص پومسه دارید، این مسیر را فعال کنید:
+    # path(
+    #     "auth/poomsae/<ckey:public_id>/prefill/",
+    #     PoomsaeRegisterSelfPrefillView.as_view(),
+    #     name="poomsae-prefill",
+    # ),
 
     # ========================= جزئیات مسابقه (GENERIC) =========================
     path("<ckey:key>/", CompetitionDetailAnyView.as_view(), name="competition-detail-any"),

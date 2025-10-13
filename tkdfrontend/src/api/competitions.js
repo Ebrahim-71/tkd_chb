@@ -20,17 +20,14 @@ const DASHBOARD_KY_AUTH  = `${API_BASE}/api/competitions/auth/dashboard/kyorugi/
 const DASHBOARD_ALL_AUTH = `${API_BASE}/api/competitions/auth/dashboard/all/`;
 
 /* ---------------- Token & Headers ---------------- */
+// اولویت طبق ترجیح شما: coach → both → <role>_token → access_token → token
 function pickToken() {
   const role = (localStorage.getItem("user_role") || "").toLowerCase().trim();
+  const roleTokenKey = role ? `${role}_token` : null;
   const keys = [
-    role ? `${role}_token` : null,
-    "both_token",
     "coach_token",
-    "player_token",
-    "referee_token",
-    "club_token",
-    "heyat_token",
-    "board_token",
+    "both_token",
+    roleTokenKey,
     "access_token",
     "token",
   ].filter(Boolean);
@@ -63,47 +60,41 @@ function requireAuthHeaders() {
 }
 
 /* ---------------- Fetch helpers ---------------- */
-async function parseJSONorThrow(res) {
+async function safeFetch(url, opts = {}) {
+  const res = await fetch(url, opts);
+  let data = null;
+  try { data = await res.json(); } catch { /* may be text */ }
+  if (!res.ok) {
+    let message =
+      data?.detail ||
+      (Array.isArray(data?.non_field_errors) ? data.non_field_errors.join(" ") : null) ||
+      data?.message ||
+      data?.error ||
+      `HTTP ${res.status}`;
+    if (!message && res.statusText) message = `${res.status} ${res.statusText}`;
+    const err = new Error(message || "HTTP Error");
+    err.status = res.status;
+    err.payload = data;
+    throw err;
+  }
   if (res.status === 204 || res.status === 205) return null;
-  const ct = (res.headers.get("content-type") || "").toLowerCase();
-  if (ct.includes("application/json")) {
-    const data = await res.json();
-    if (!res.ok) {
-      let msg =
-        data?.detail ||
-        (Array.isArray(data?.non_field_errors) ? data.non_field_errors.join(" ") : null) ||
-        data?.message ||
-        data?.error ||
-        `${res.status} ${res.statusText}`;
-      const err = new Error(msg);
-      err.status = res.status;
-      err.payload = data;
-      throw err;
-    }
-    return data;
-  }
-  const text = await res.text();
-  const err = new Error(`${res.status} ${res.statusText} – Expected JSON, got non-JSON`);
-  err.status = res.status;
-  err.payload = text;
-  throw err;
+  if (data !== null) return data;
+  const text = await res.text().catch(() => "");
+  return text ? { raw: text } : null;
 }
 
-async function safeFetch(url, options = {}) {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), options.timeoutMs || 15000);
-  try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
-    return await parseJSONorThrow(res);
-  } catch (e) {
-    if (e?.status === 401) e.message = "دسترسی غیرمجاز. لطفاً وارد حساب کاربری شوید.";
-    throw e;
-  } finally {
-    clearTimeout(t);
-  }
+// حذف کلیدهای undefined/"" قبل از ارسال
+function compact(obj) {
+  const out = {};
+  Object.entries(obj || {}).forEach(([k, v]) => {
+    if (v === undefined || v === null) return;
+    if (typeof v === "string" && v.trim() === "") return;
+    out[k] = v;
+  });
+  return out;
 }
 
-// چند URL را تست می‌کند و اولین موفق را برمی‌گرداند؛ 404 ها را نادیده می‌گیرد
+// چند URL را تست می‌کند و اولین موفق را برمی‌گرداند؛ 404 ها نادیده
 async function tryFirst(urls, options = {}) {
   let lastErr;
   const tried = [];
@@ -114,7 +105,7 @@ async function tryFirst(urls, options = {}) {
     } catch (e) {
       tried.push({ url: u, status: e?.status, message: e?.message });
       lastErr = e;
-      if (e?.status && e.status !== 404) break; // غیر از 404 متوقف شو
+      if (e?.status && e.status !== 404) break; // روی خطاهای غیر 404 متوقف شو
     }
   }
   if (options.__debugUrls) console.warn("[tryFirst] all candidates failed:", tried);
@@ -162,27 +153,26 @@ export async function getCompetitionTerms(key) {
   const k = encodeURIComponent(String(key || "").trim());
   return tryFirst(
     [
-      `${ANY_PUBLIC_ROOT}/by-public/${k}/terms/`,            // جنریک صحیح
-      `${ANY_PUBLIC_ROOT}/${k}/terms/`,                      // جنریک کوتاه
-      `${KY_PUBLIC_ROOT}/${k}/terms/`,                       // کیوروگی
-      `${ANY_PUBLIC_ROOT}/competitions/kyorugi/${k}/terms/`, // سازگاری قدیمی
+      `${ANY_PUBLIC_ROOT}/by-public/${k}/terms/`,
+      `${ANY_PUBLIC_ROOT}/${k}/terms/`,
+      `${KY_PUBLIC_ROOT}/${k}/terms/`,
+      `${ANY_PUBLIC_ROOT}/competitions/kyorugi/${k}/terms/`,
     ],
     { method: "GET", headers, credentials: "omit", __debugUrls: true }
   );
 }
 
 /* ---------------- Competition detail (public_id/slug/id) ---------------- */
-// مطابق urls.py: by-public/<key>/  و  <key>/  و مسیرهای اختصاصی
 export async function getCompetitionDetail(key) {
   const headers = authHeaders();
   const k = encodeURIComponent(String(key || "").trim());
   return tryFirst(
     [
-      `${ANY_PUBLIC_ROOT}/by-public/${k}/`,    // ✅ ویوی جنریک برای هر دو مدل
-      `${ANY_PUBLIC_ROOT}/${k}/`,              // ✅ جنریک کوتاه
-      `${KY_PUBLIC_ROOT}/${k}/`,               // اختصاصی کیوروگی
-      `${POOM_PUBLIC_ROOT}/${k}/`,             // اختصاصی پومسه
-      `${ANY_PUBLIC_ROOT}/competitions/${k}/`, // سازگاری قدیمی
+      `${ANY_PUBLIC_ROOT}/by-public/${k}/`,
+      `${ANY_PUBLIC_ROOT}/${k}/`,
+      `${KY_PUBLIC_ROOT}/${k}/`,
+      `${POOM_PUBLIC_ROOT}/${k}/`,
+      `${ANY_PUBLIC_ROOT}/competitions/${k}/`,
     ],
     { method: "GET", headers, credentials: "omit", __debugUrls: true }
   );
@@ -217,7 +207,6 @@ export async function approvePoomsaeCompetition(publicId) {
 }
 
 /* ---------------- Register self (کیوروگی) ---------------- */
-// مطابق urls.py: auth/kyorugi/<key>/prefill/  و  auth/kyorugi/<key>/register/self/
 export async function getRegisterSelfPrefill(publicId) {
   const headers = requireAuthHeaders();
   return safeFetch(`${KY_AUTH_ROOT}/${encodeURIComponent(publicId)}/prefill/`, {
@@ -226,38 +215,59 @@ export async function getRegisterSelfPrefill(publicId) {
 }
 export async function registerSelf(publicId, payload) {
   const headers = requireAuthHeaders();
-  const body = JSON.stringify({
+  const body = compact({
     coach_code: (payload?.coach_code ?? "").trim(),
     declared_weight: String(payload?.declared_weight ?? "").trim(),
     insurance_number: (payload?.insurance_number ?? "").trim(),
     insurance_issue_date: (payload?.insurance_issue_date ?? "").trim(), // YYYY-MM-DD
   });
   return safeFetch(`${KY_AUTH_ROOT}/${encodeURIComponent(publicId)}/register/self/`, {
-    method: "POST", headers, credentials: "omit", body
+    method: "POST", headers, credentials: "omit", body: JSON.stringify(body)
   });
 }
 
 /* ---------------- Register self (پومسه) ---------------- */
-
-// مثل کیوروگی: auth/poomsae/<key>/prefill/ و auth/poomsae/<key>/register/self/
-export async function getPoomsaeRegisterSelfPrefill(publicId) {
-  const headers = requireAuthHeaders();
-  return safeFetch(`${POOM_AUTH_ROOT}/${encodeURIComponent(publicId)}/prefill/`, {
-    method: "GET", headers, credentials: "omit"
-  });
+// prefill مجزا برای پومسه نداریم؛ از دیتیل می‌سازیم
+export async function buildPoomsaePrefill(publicId) {
+  const detail = await getCompetitionDetail(publicId); // kind: "poomsae"
+  const locked = detail?.me_locked || detail?.my_profile || {};
+  return {
+    can_register: Boolean(
+      detail?.registration_open_effective ??
+      detail?.registration_open ??
+      detail?.can_register
+    ),
+    locked: {
+      first_name: locked.first_name || "",
+      last_name: locked.last_name || "",
+      national_code: locked.national_id || locked.nationalCode || "",
+      birth_date: locked.birth_date || locked.birthDate || "",
+      belt: locked.belt || "",
+      club: locked.club || "",
+      coach: locked.coach || "",
+    },
+    suggested: {
+      insurance_number: "",
+      insurance_issue_date: "",
+    },
+    // طبق تصمیم اخیر: کد مربی برای پومسه هم اجباری است
+    need_coach_code: true,
+  };
 }
 
 export async function registerSelfPoomsae(publicId, payload) {
   const headers = requireAuthHeaders();
-  const body = JSON.stringify({
-    coach_code: (payload?.coach_code ?? "").trim(),
-    poomsae_type: (payload?.poomsae_type ?? "").trim(),           // "standard" | "creative"
-    insurance_number: (payload?.insurance_number ?? "").trim(),
-    insurance_issue_date: (payload?.insurance_issue_date ?? "").trim(), // "YYYY/MM/DD" یا "YYYY-MM-DD"
+  const body = compact({
+    coach_code: payload?.coach_code ? String(payload.coach_code).trim() : undefined,
+    // یکی از 'standard' | 'creative'
+    poomsae_type: payload?.poomsae_type ? String(payload.poomsae_type).toLowerCase() : undefined,
+    insurance_number: payload?.insurance_number ? String(payload.insurance_number).trim() : undefined,
+    insurance_issue_date: payload?.insurance_issue_date, // YYYY-MM-DD
   });
-  return safeFetch(`${POOM_AUTH_ROOT}/${encodeURIComponent(publicId)}/register/self/`, {
-    method: "POST", headers, credentials: "omit", body
-  });
+  return safeFetch(
+    `${POOM_AUTH_ROOT}/${encodeURIComponent(publicId)}/register/self/`,
+    { method: "POST", headers, credentials: "omit", body: JSON.stringify(body) }
+  );
 }
 
 /* ---------------- Coach bulk register (شاگردان مربی) ---------------- */
@@ -340,7 +350,6 @@ export async function getRefereeOpenCompetitions() {
 }
 
 /* ---------------- Enrollment card & my enrollment ---------------- */
-// مطابق urls.py: auth/kyorugi/<key>/my-enrollment/
 export async function getEnrollmentCard(enrollmentId) {
   const headers = requireAuthHeaders();
   return safeFetch(`${API_BASE}/api/competitions/auth/enrollments/${encodeURIComponent(enrollmentId)}/card/`, {
@@ -382,7 +391,7 @@ export async function getCompetitionResults(publicId) {
     [
       `${KY_PUBLIC_ROOT}/${encodeURIComponent(publicId)}/results/`,
       `${ANY_PUBLIC_ROOT}/by-public/${encodeURIComponent(publicId)}/results/`,
-      `${ANY_PUBLIC_ROOT}/competitions/${encodeURIComponent(publicId)}/results/`, // سازگاری قدیمی
+      `${ANY_PUBLIC_ROOT}/competitions/${encodeURIComponent(publicId)}/results/`,
     ],
     { method: "GET", headers, credentials: "omit", __debugUrls: true }
   );
