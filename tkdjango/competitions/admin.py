@@ -1,125 +1,100 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-from django.utils.dateparse import parse_date, parse_datetime
+
 import datetime as _dt
+import datetime
+import json
+from collections import OrderedDict
+from django.db.models import Q
+from django.forms.widgets import NullBooleanSelect
 
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
-from django.contrib.admin.filters import RelatedFieldListFilter
-from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
-from django.db.models import Prefetch
+from django.db import IntegrityError, transaction
 from django.middleware.csrf import get_token
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import redirect, render
 from django.template.response import TemplateResponse
 from django.templatetags.static import static
 from django.urls import path, reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.html import format_html
 
-import datetime
-import json
-from collections import defaultdict
-
 import jdatetime
-import django_jalali.admin as jadmin
 import django_jalali.forms as jforms
+import django_jalali.admin as jadmin
 from django_jalali.admin.filters import JDateFieldListFilter
 
+# ============================ مدل‌ها ============================
 from .models import (
-    AgeCategory, Belt, BeltGroup, WeightCategory, KyorugiCompetition,
-    MatAssignment, CompetitionImage, CompetitionFile, CoachApproval, TermsTemplate,
-    Enrollment, Draw, Match, DrawStart, KyorugiResult,
+    AgeCategory, Belt, BeltGroup, WeightCategory,
+    KyorugiCompetition, CompetitionImage, CompetitionFile, MatAssignment,
+    CoachApproval, TermsTemplate, Enrollment, Draw, Match, DrawStart, KyorugiResult,
     Seminar, SeminarRegistration,
+    # --- پومسه ---
+    PoomsaeCompetition, PoomsaeDivision, PoomsaeCoachApproval, PoomsaeEntry,
 )
+
+# سرویس‌ها
 from .services.draw_service import create_draw_for_group
 from .services.results_service import apply_results_and_points
 from competitions.services.numbering_service import (
     number_matches_for_competition,
     clear_match_numbers_for_competition,
 )
-from django.urls import reverse
-from urllib.parse import urlencode
 
-
-
-
-
-from competitions.services.numbering_service import (
-    number_matches_for_competition, clear_match_numbers_for_competition,
-)
-
-# -------------------------------------------------------------------
-# تنظیمات و کمک‌تابع‌ها
-# -------------------------------------------------------------------
+# ============================ کمک‌تابع‌ها ============================
 
 ELIGIBLE_STATUSES = ("paid", "confirmed", "accepted", "completed")
 
-# competitions/admin.py (پایین فایل)
 
-class MatchNumberingEntry(KyorugiCompetition):
-    class Meta:
-        proxy = True
-        verbose_name = "شماره‌گذاری بازی‌ها"
-        verbose_name_plural = "شماره‌گذاری بازی‌ها"
 
-@admin.register(MatchNumberingEntry)
-class MatchNumberingEntryAdmin(admin.ModelAdmin):
-    def has_add_permission(self, request): return False
-    def has_change_permission(self, request, obj=None): return False
-    def has_delete_permission(self, request, obj=None): return False
-
-    def changelist_view(self, request, extra_context=None):
-        from django.shortcuts import redirect
-        from django.urls import reverse
-        return redirect(reverse("admin:competitions_match_numbering"))
+# ---- سه‌حالتیِ امن برای True/False/None
+class TriStateChoiceField(forms.TypedChoiceField):
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            choices=(
+                ("",  "طبق تاریخ‌ها"),  # None
+                ("1", "اجباراً باز"),   # True
+                ("0", "اجباراً بسته"),  # False
+            ),
+            coerce=lambda v: True if v == "1" else (False if v == "0" else None),
+            required=False,
+            *args, **kwargs
+        )
 
 def _to_greg(v):
-    """jdatetime.date -> datetime.date (Gregorian) یا همان ورودی در غیر این‌صورت."""
+    """jdatetime.date|datetime -> معادل میلادی؛ یا همان ورودی اگر لازم نبود."""
+    if isinstance(v, jdatetime.datetime):
+        return v.togregorian()
     if isinstance(v, jdatetime.date):
         return v.togregorian()
     return v
 
 
 def _init_jalali(form, field_names):
-    """
-    مقداردهی اولیهٔ فیلدهای jDateField با معادل جلالی.
-    روی date/datetime/str ISO هم کار می‌کند.
-    """
+    """مقداردهی اولیهٔ فیلدهای جلالی با مقادیر مدل (Date/DateTime ← jdatetime)."""
     for name in field_names:
         v = form.initial.get(name) or getattr(form.instance, name, None)
         if not v:
             continue
-        # اگر از قبل jdatetime است
-        if isinstance(v, jdatetime.date):
-            form.initial[name] = v
-            continue
-        # datetime -> date
-        if isinstance(v, datetime.datetime):
-            v = v.date()
-        # date
-        if isinstance(v, datetime.date):
-            form.initial[name] = jdatetime.date.fromgregorian(date=v)
-            continue
-        # string ISO
-        if isinstance(v, str):
-            try:
-                d = datetime.date.fromisoformat(v[:10])
-                form.initial[name] = jdatetime.date.fromgregorian(date=d)
-            except ValueError:
-                pass
+        try:
+            if isinstance(v, datetime.datetime):
+                if timezone.is_aware(v):
+                    v = timezone.localtime(v)
+                form.initial[name] = jdatetime.datetime.fromgregorian(datetime=v)
+            elif isinstance(v, datetime.date):
+                form.initial[name] = jdatetime.date.fromgregorian(date=v)
+        except Exception:
+            pass
 
 
 def _to_jalali_str(value):
-    """
-    value: datetime | date | 'YYYY-MM-DD' | 'YYYY-MM-DDTHH:MM[:SS]'
-    return: 'YYYY/MM/DD' or '-'
-    """
+    """گرگوری → رشتهٔ شمسی YYYY/MM/DD (برای نمایش)."""
     if not value:
         return "-"
-
     try:
         if isinstance(value, datetime.datetime):
             if timezone.is_aware(value):
@@ -128,7 +103,6 @@ def _to_jalali_str(value):
         elif isinstance(value, datetime.date):
             g_date = value
         elif isinstance(value, str):
-            # قبول هر دو فرمت تاریخ/دیتایم
             dt = parse_datetime(value)
             if dt:
                 if timezone.is_aware(dt):
@@ -139,17 +113,40 @@ def _to_jalali_str(value):
                 g_date = d if d else None
         else:
             g_date = None
-
         if not g_date:
             return "-"
-
         j = jdatetime.date.fromgregorian(date=g_date)
         return j.strftime("%Y/%m/%d")
     except Exception:
         return "-"
 
+
+def _to_jalali_dt_str(val):
+    """گرگوری → رشتهٔ شمسی YYYY/MM/DD HH:MM"""
+    if not val:
+        return "—"
+    try:
+        if isinstance(val, datetime.datetime):
+            if timezone.is_aware(val):
+                val = timezone.localtime(val)
+            gdt = val
+        elif isinstance(val, datetime.date):
+            gdt = datetime.datetime.combine(val, datetime.time(0, 0))
+        else:
+            dt = parse_datetime(str(val)) or parse_date(str(val))
+            if not dt:
+                return "—"
+            if isinstance(dt, datetime.date) and not isinstance(dt, datetime.datetime):
+                gdt = datetime.datetime.combine(dt, datetime.time(0, 0))
+            else:
+                gdt = dt
+        jdt = jdatetime.datetime.fromgregorian(datetime=gdt)
+        return jdt.strftime("%Y/%m/%d %H:%M")
+    except Exception:
+        return "—"
+
+
 def _full_name(u):
-    """نام کامل برای نمایش در براکت/لیست‌ها."""
     if not u:
         return None
     for a in ("full_name", "name"):
@@ -161,24 +158,68 @@ def _full_name(u):
     return (fn + " " + ln).strip() or getattr(u, "username", None)
 
 
-def _jalali(d):
-    try:
-        return jdatetime.date.fromgregorian(date=d).strftime("%Y/%m/%d") if d else "—"
-    except Exception:
-        return "—"
-
-
 def _logo_url():
-    """لوگوی هیئت برای هدر چاپ."""
     url = getattr(settings, "BOARD_LOGO_URL", None)
-    if url:
-        return url
-    return static("img/board-logo.png")
+    return url or static("img/board-logo.png")
+
+# ---------- اکشن‌های باز/بسته/خودکار کردن ثبت‌نام ----------
+@admin.action(description="باز کردن ثبت‌نام (اجباری)")
+def action_open_registration(modeladmin, request, queryset):
+    updated = queryset.update(registration_manual=True)
+    modeladmin.message_user(request, f"برای {updated} مورد: ثبت‌نام «اجباراً باز» شد.", level=messages.SUCCESS)
+
+@admin.action(description="بستن ثبت‌نام (اجباری)")
+def action_close_registration(modeladmin, request, queryset):
+    updated = queryset.update(registration_manual=False)
+    modeladmin.message_user(request, f"برای {updated} مورد: ثبت‌نام «اجباراً بسته» شد.", level=messages.SUCCESS)
+
+@admin.action(description="حالت خودکار (طبق تاریخ‌ها)")
+def action_auto_registration(modeladmin, request, queryset):
+    updated = queryset.update(registration_manual=None)
+    modeladmin.message_user(request, f"برای {updated} مورد: وضعیت ثبت‌نام به «خودکار» برگشت.", level=messages.INFO)
 
 
-# -------------------------------------------------------------------
-# فرم‌های جلالی (Kyorugi)
-# -------------------------------------------------------------------
+# ---------- فیلتر باز/بسته بودن ثبت‌نام (براساس تاریخ‌ها + override دستی) ----------
+class RegistrationOpenFilter(admin.SimpleListFilter):
+    title = "وضعیت ثبت‌نام"
+    parameter_name = "reg_open"
+
+    def lookups(self, request, model_admin):
+        return (("yes", "باز"), ("no", "بسته"))
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if not val:
+            return queryset
+
+        Model = queryset.model
+
+        # DateTimeField (مثل پومسه) → now() ؛ DateField (کیوروگی) → localdate()
+        has_dt_start = any(
+            getattr(f, "name", "") == "registration_start" and getattr(f, "get_internal_type", lambda: "")().startswith("DateTime")
+            for f in Model._meta.get_fields()
+        )
+
+        if has_dt_start:
+            now = timezone.now()
+            open_q = (
+                Q(registration_manual=True) |
+                (Q(registration_manual__isnull=True) &
+                 Q(registration_start__lte=now) &
+                 Q(registration_end__gte=now))
+            )
+        else:
+            today = timezone.localdate()
+            open_q = (
+                Q(registration_manual=True) |
+                (Q(registration_manual__isnull=True) &
+                 Q(registration_start__lte=today) &
+                 Q(registration_end__gte=today))
+            )
+
+        return queryset.filter(open_q) if val == "yes" else queryset.exclude(open_q)
+
+# ============================ Kyorugi ============================
 
 class KyorugiCompetitionAdminForm(forms.ModelForm):
     registration_start = jforms.jDateField(widget=jadmin.widgets.AdminjDateWidget)
@@ -198,32 +239,25 @@ class KyorugiCompetitionAdminForm(forms.ModelForm):
             "weigh_date", "draw_date", "competition_date",
         ])
 
+        # جایگزینی ویجت پیش‌فرض با نسخه‌ی فارسی
+        if "registration_manual" in self.fields:
+            # فیلد را با نسخهٔ سه‌حالتیِ تایپ‌دار جایگزین کن
+            current = getattr(self.instance, "registration_manual", None)
+            self.fields["registration_manual"] = TriStateChoiceField(label="فعال بودن ثبت‌نام")
+            # مقدار اولیه مطابق مقدار مدل
+            if not self.is_bound:
+                self.initial["registration_manual"] = (
+                    "" if current is None else ("1" if current is True else "0")
+                )
+
+            self.fields["registration_manual"].help_text = "خالی=طبق تاریخ‌ها، بله=اجباراً باز، خیر=اجباراً بسته"
+
     def clean_registration_start(self): return _to_greg(self.cleaned_data.get("registration_start"))
     def clean_registration_end(self):   return _to_greg(self.cleaned_data.get("registration_end"))
     def clean_weigh_date(self):         return _to_greg(self.cleaned_data.get("weigh_date"))
     def clean_draw_date(self):          return _to_greg(self.cleaned_data.get("draw_date"))
     def clean_competition_date(self):   return _to_greg(self.cleaned_data.get("competition_date"))
 
-
-class AgeCategoryAdminForm(forms.ModelForm):
-    from_date = jforms.jDateField(widget=jadmin.widgets.AdminjDateWidget)
-    to_date   = jforms.jDateField(required=False, widget=jadmin.widgets.AdminjDateWidget)
-
-    class Meta:
-        model = AgeCategory
-        fields = "__all__"
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        _init_jalali(self, ["from_date", "to_date"])
-
-    def clean_from_date(self): return _to_greg(self.cleaned_data.get("from_date"))
-    def clean_to_date(self):   return _to_greg(self.cleaned_data.get("to_date"))
-
-
-# -------------------------------------------------------------------
-# اینلاین‌ها
-# -------------------------------------------------------------------
 
 class MatAssignmentInline(admin.TabularInline):
     model = MatAssignment
@@ -262,26 +296,28 @@ class CoachApprovalInline(admin.TabularInline):
         return "-"
 
 
-# -------------------------------------------------------------------
-# ادمین مسابقه
-# -------------------------------------------------------------------
-
 @admin.register(KyorugiCompetition)
 class KyorugiCompetitionAdmin(admin.ModelAdmin):
     form = KyorugiCompetitionAdminForm
 
     list_display = (
         "title", "style_col", "age_category", "gender",
-        "get_jalali_competition_date", "registration_open", "entry_fee",
+        "get_jalali_competition_date",
+        "registration_open_col",    # ✅ ستون بولی
+        "registration_manual",      # نمایش وضعیت دستی
+        "entry_fee",
     )
     search_fields = ("title", "public_id", "city", "address")
     filter_horizontal = ("belt_groups",)
     list_filter = (
-        "gender", "age_category", "belt_level", "registration_open",
+        "gender", "age_category", "belt_level",
+        RegistrationOpenFilter,           # ✅ فیلتر وضعیت باز/بسته
+        "registration_manual",            # فیلتر روی حالت دستی
         ("competition_date", JDateFieldListFilter),
         ("registration_start", JDateFieldListFilter),
         ("registration_end", JDateFieldListFilter),
     )
+    actions = [action_open_registration, action_close_registration, action_auto_registration]  # ✅ اکشن‌ها
     inlines = [MatAssignmentInline, CompetitionImageInline, CompetitionFileInline, CoachApprovalInline]
     readonly_fields = ("public_id",)
     ordering = ("-competition_date", "-id")
@@ -290,8 +326,10 @@ class KyorugiCompetitionAdmin(admin.ModelAdmin):
             "fields": ("title", "poster", "entry_fee", "age_category", "belt_level", "belt_groups", "gender")
         }),
         ("محل برگزاری", {"fields": ("city", "address")}),
-        ("تاریخ‌ها", {"fields": ("registration_start", "registration_end", "weigh_date", "draw_date", "competition_date")}),
-        ("تنظیمات مسابقه", {"fields": ("mat_count", "registration_open")}),
+        ("تاریخ‌ها",
+         {"fields": ("registration_start", "registration_end", "weigh_date", "draw_date", "competition_date")}),
+        ("ثبت‌نام", {"fields": ("mat_count", "registration_manual"),
+                     "description": "خالی=طبق تاریخ‌ها، تیک=اجباراً باز، بدون تیک=اجباراً بسته"}),
         ("تعهدنامه مربی", {"fields": ("terms_template",), "classes": ("collapse",)}),
         ("شناسه عمومی", {"fields": ("public_id",), "classes": ("collapse",)}),
     )
@@ -306,14 +344,32 @@ class KyorugiCompetitionAdmin(admin.ModelAdmin):
     def style_col(self, obj):
         return getattr(obj, "style_display", "—")
 
+    @admin.display(boolean=True, description="ثبت‌نام باز؟")
+    def registration_open_col(self, obj):
+        # از میکسین RegistrationManualMixin می‌آید
+        return bool(getattr(obj, "registration_open_effective", False))
 
-# -------------------------------------------------------------------
-# ادمین سن/کمربند/وزن
-# -------------------------------------------------------------------
+
+# ============================ سن/کمربند/وزن ============================
 
 @admin.register(AgeCategory)
 class AgeCategoryAdmin(admin.ModelAdmin):
-    form = AgeCategoryAdminForm
+    class _Form(forms.ModelForm):
+        from_date = jforms.jDateField(widget=jadmin.widgets.AdminjDateWidget)
+        to_date   = jforms.jDateField(required=False, widget=jadmin.widgets.AdminjDateWidget)
+
+        class Meta:
+            model = AgeCategory
+            fields = "__all__"
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            _init_jalali(self, ["from_date", "to_date"])
+
+        def clean_from_date(self): return _to_greg(self.cleaned_data.get("from_date"))
+        def clean_to_date(self):   return _to_greg(self.cleaned_data.get("to_date"))
+
+    form = _Form
     list_display = ("name", "get_jalali_from_date", "get_jalali_to_date")
     search_fields = ("name",)
     ordering = ("from_date",)
@@ -321,15 +377,11 @@ class AgeCategoryAdmin(admin.ModelAdmin):
 
     @admin.display(description="از تاریخ تولد (شمسی)")
     def get_jalali_from_date(self, obj):
-        if obj.from_date:
-            return jdatetime.date.fromgregorian(date=obj.from_date).strftime("%Y/%m/%d")
-        return "-"
+        return _to_jalali_str(obj.from_date)
 
     @admin.display(description="تا تاریخ تولد (شمسی)")
     def get_jalali_to_date(self, obj):
-        if obj.to_date:
-            return jdatetime.date.fromgregorian(date=obj.to_date).strftime("%Y/%m/%d")
-        return "-"
+        return _to_jalali_str(obj.to_date)
 
 
 @admin.register(Belt)
@@ -353,9 +405,7 @@ class WeightCategoryAdmin(admin.ModelAdmin):
     ordering = ("gender", "min_weight")
 
 
-# -------------------------------------------------------------------
-# تعهدنامه/تأیید مربی
-# -------------------------------------------------------------------
+# ============================ تعهدنامه/تأیید مربی (Kyorugi) ============================
 
 @admin.register(TermsTemplate)
 class TermsTemplateAdmin(admin.ModelAdmin):
@@ -363,27 +413,7 @@ class TermsTemplateAdmin(admin.ModelAdmin):
     search_fields = ("title",)
 
 
-@admin.register(CoachApproval)
-class CoachApprovalAdmin(admin.ModelAdmin):
-    list_display = ("competition", "coach", "code", "terms_accepted", "is_active", "get_jalali_approved_at")
-    list_filter = ("competition", "terms_accepted", "is_active")
-    search_fields = (
-        "competition__title", "code",
-        "coach__first_name", "coach__last_name", "coach__phone", "coach__national_code",
-    )
-    raw_id_fields = ("competition", "coach")
-    readonly_fields = ("approved_at",)
-
-    @admin.display(description="تاریخ تأیید (شمسی)")
-    def get_jalali_approved_at(self, obj):
-        if obj.approved_at:
-            return jdatetime.datetime.fromgregorian(datetime=obj.approved_at).strftime("%Y/%m/%d %H:%M")
-        return "-"
-
-
-# -------------------------------------------------------------------
-# گزارش شرکت‌کنندگان (Proxy)
-# -------------------------------------------------------------------
+# ============================ گزارش شرکت‌کنندگان (Kyorugi) ============================
 
 class KyorugiCompetitionParticipantsReport(KyorugiCompetition):
     class Meta:
@@ -401,7 +431,6 @@ class ParticipantsReportAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None): return False
 
     def changelist_view(self, request, extra_context=None):
-        from collections import OrderedDict
         form = ParticipantsReportForm(request.GET or None)
 
         selected_competition = None
@@ -456,9 +485,7 @@ class ParticipantsReportForm(forms.Form):
     )
 
 
-# -------------------------------------------------------------------
-# صفحه‌ی «شروع قرعه‌کشی» (Proxy: DrawStart)
-# -------------------------------------------------------------------
+# ============================ شروع قرعه‌کشی (Kyorugi) ============================
 
 class DrawStartForm(forms.Form):
     competition = forms.ModelChoiceField(
@@ -471,11 +498,9 @@ class DrawStartForm(forms.Form):
         label="رده وزنی", queryset=WeightCategory.objects.none(), required=False
     )
 
-    # نماهای خودکار (فقط نمایش)
     auto_count = forms.IntegerField(label="شرکت‌کننده‌ها", required=False, disabled=True)
     auto_size  = forms.IntegerField(label="اندازهٔ پیشنهادی جدول", required=False, disabled=True)
 
-    # تنظیمات دستی
     manual = forms.BooleanField(label="تنظیمات دستی", required=False)
     size_override = forms.IntegerField(
         label="اندازهٔ جدول (توان ۲)", required=False,
@@ -621,114 +646,7 @@ class DrawStartAdmin(admin.ModelAdmin):
         return TemplateResponse(request, "admin/competitions/draw_start.html", ctx)
 
 
-def get_admin_urls(get_urls_fn):
-    def my_urls():
-        urls = get_urls_fn()
-        extra = [
-            path(
-                "competitions/announce-results/",
-                admin.site.admin_view(announce_results_view),
-                name="announce-results",
-            ),
-        ]
-        return extra + urls
-    return my_urls
-
-admin.site.get_urls = get_admin_urls(admin.site.get_urls)
-
-
-@staff_member_required
-def announce_results_view(request):
-    comp_id = request.GET.get("competition") or request.POST.get("competition")
-    competitions = KyorugiCompetition.objects.order_by("-id").only("id", "title", "gender")
-
-    ctx = {
-        "competitions": competitions,
-        "selected_competition_id": int(comp_id) if comp_id and str(comp_id).isdigit() else None,
-        "csrf_token": get_token(request),
-    }
-
-    if not (comp_id and str(comp_id).isdigit()):
-        return render(request, "admin/competitions/announce_results.html", ctx)
-
-    comp = KyorugiCompetition.objects.get(id=int(comp_id))
-    allowed_ids = comp.allowed_weight_ids() or []
-    weights = WeightCategory.objects.filter(id__in=allowed_ids, gender=comp.gender).order_by("min_weight")
-
-    by_weight = {w.id: list(
-        Enrollment.objects.filter(competition=comp, weight_category=w)
-        .select_related("player")
-        .order_by("player__first_name", "player__last_name")
-    ) for w in weights}
-
-    existing = {r.weight_category_id: r for r in KyorugiResult.objects.filter(competition=comp)}
-
-    if request.method == "POST" and request.POST.get("confirm") == "yes":
-        for w in weights:
-            def _get_enr(field):
-                val = request.POST.get(f"w_{w.id}_{field}")
-                return Enrollment.objects.filter(id=val).first() if val and val.isdigit() else None
-
-            gold    = _get_enr("gold")
-            silver  = _get_enr("silver")
-            bronze1 = _get_enr("bronze1")
-            bronze2 = _get_enr("bronze2")
-
-            if not any([gold, silver, bronze1, bronze2]):
-                continue
-
-            res = existing.get(w.id) or KyorugiResult(competition=comp, weight_category=w, created_by=request.user)
-            res.gold_enrollment    = gold
-            res.silver_enrollment  = silver
-            res.bronze1_enrollment = bronze1
-            res.bronze2_enrollment = bronze2
-            res.save()
-            existing[w.id] = res
-
-            apply_results_and_points(res)
-
-        return redirect(f"{request.path}?competition={comp.id}&saved=1")
-
-    rows = []
-    for w in weights:
-        enrs = by_weight[w.id]
-        res  = existing.get(w.id)
-        rows.append({
-            "weight": w,
-            "enrollments": [{"id": str(e.id), "label": f"{e.player.first_name} {e.player.last_name} — کد:{e.player_id}"} for e in enrs],
-            "prefill": {
-                "gold":    str(getattr(getattr(res, "gold_enrollment",   None), "id", "") or ""),
-                "silver":  str(getattr(getattr(res, "silver_enrollment", None), "id", "") or ""),
-                "bronze1": str(getattr(getattr(res, "bronze1_enrollment",None), "id", "") or ""),
-                "bronze2": str(getattr(getattr(res, "bronze2_enrollment",None), "id", "") or ""),
-            }
-        })
-
-    ctx.update({"competition": comp, "weights": rows, "saved": request.GET.get("saved") == "1"})
-    return render(request, "admin/competitions/announce_results.html", ctx)
-
-
-class AnnounceResultsProxy(KyorugiCompetition):
-    class Meta:
-        proxy = True
-        verbose_name = "اعلام نتایج"
-        verbose_name_plural = "اعلام نتایج"
-
-
-@admin.register(AnnounceResultsProxy)
-class AnnounceResultsProxyAdmin(admin.ModelAdmin):
-    def has_add_permission(self, request): return False
-    def has_change_permission(self, request, obj=None): return False
-    def has_delete_permission(self, request): return False
-
-    def changelist_view(self, request, extra_context=None):
-        return redirect(reverse("admin:announce-results"))
-
-
-
-
-
-# ---------- فرم صفحه شماره‌گذاری ----------
+# ---------- شماره‌گذاری بازی‌ها ----------
 class MatchNumberingForm(forms.Form):
     competition = forms.ModelChoiceField(
         label="مسابقه",
@@ -748,7 +666,6 @@ class MatchNumberingForm(forms.Form):
         super().__init__(*args, **kwargs)
 
         comp = None
-        # تلاش از data -> initial
         comp_id = self.data.get("competition") or self.initial.get("competition")
         if comp_id:
             try:
@@ -756,16 +673,15 @@ class MatchNumberingForm(forms.Form):
             except KyorugiCompetition.DoesNotExist:
                 comp = None
 
-        # وزن‌های مجاز از روی تخصیص زمین + جنسیت مسابقه
-        wc_qs = WeightCategory.objects.none()
+        wc_qs = WeightCategory.objects.none
         if comp:
             allowed_ids = list(comp.mat_assignments.values_list("weights__id", flat=True))
             wc_qs = WeightCategory.objects.filter(id__in=allowed_ids, gender=comp.gender).order_by("min_weight")
+        else:
+            wc_qs = WeightCategory.objects.none()
         self.fields["weights"].queryset = wc_qs
 
 
-# ---------- View ادمین ----------
-# ---------- View ادمین ----------
 def numbering_view(request):
     """/admin/competitions/numbering/"""
     form = MatchNumberingForm(request.POST or request.GET or None)
@@ -782,12 +698,10 @@ def numbering_view(request):
     reset_old = form.cleaned_data.get("reset_old") or False
     do_apply  = form.cleaned_data.get("do_apply")  or False
 
-    # اگر فقط پاک‌سازی خواستی و اعمال نزدی
     if reset_old and not do_apply:
         clear_match_numbers_for_competition(comp.id, weight_ids)
         messages.warning(request, "شماره‌های قبلی پاک شد.")
 
-    # اعمال شماره‌گذاری
     if do_apply:
         try:
             number_matches_for_competition(comp.id, weight_ids, clear_prev=reset_old)
@@ -795,7 +709,6 @@ def numbering_view(request):
         except Exception as e:
             messages.error(request, f"خطا در شماره‌گذاری: {e}")
 
-    # نقشهٔ وزن→زمین برای نمایش بالای صفحه
     mats_map = []
     for ma in comp.mat_assignments.all().prefetch_related("weights"):
         ws = [w.name for w in ma.weights.filter(id__in=weight_ids).order_by("min_weight")]
@@ -803,7 +716,6 @@ def numbering_view(request):
             mats_map.append((ma.mat_number, ws))
     ctx["mats_map"] = mats_map
 
-    # ساخت دادهٔ براکت‌ها
     draws = (
         Draw.objects
         .filter(competition=comp, weight_category_id__in=weight_ids)
@@ -813,7 +725,6 @@ def numbering_view(request):
 
     brackets = []
     for dr in draws:
-        # همه‌ی مسابقه‌ها
         ms = (
             Match.objects
             .filter(draw=dr)
@@ -835,10 +746,9 @@ def numbering_view(request):
                 "player_b": (getattr(m.player_b, "full_name", None)
                              or f"{getattr(m.player_b,'first_name','')} {getattr(m.player_b,'last_name','')}".strip()
                              or ""),
-                "match_number": m.match_number,  # کلید درست
+                "match_number": m.match_number,
             })
 
-        # زمین مرتبط با این وزن (همیشه مقداردهی کن حتی اگر None باشد)
         mat_no = None
         for ma in comp.mat_assignments.all().prefetch_related("weights"):
             if ma.weights.filter(id=dr.weight_category_id).exists():
@@ -852,7 +762,6 @@ def numbering_view(request):
             "mat_no": mat_no,
             "date_j": _to_jalali_str(comp.competition_date),
             "size": getattr(dr, "size", 0) or 0,
-            # حتما JSON رشته‌ای بده تا در تمپلیت سالم پارس شود
             "matches_json": json.dumps(matches_json, ensure_ascii=False),
         })
 
@@ -861,8 +770,6 @@ def numbering_view(request):
     return TemplateResponse(request, "admin/competitions/match_numbering.html", ctx)
 
 
-
-# ---------- ثبت URL در ادمین ----------
 def _inject_numbering_url(get_urls_fn):
     def wrapper():
         urls = get_urls_fn()
@@ -875,20 +782,29 @@ def _inject_numbering_url(get_urls_fn):
         ]
         return extra + urls
     return wrapper
-
 admin.site.get_urls = _inject_numbering_url(admin.site.get_urls)
 
 
-#-------------------------------------------------------------سمینار----------------------------------------------------------------------------
-# admin.py
+class MatchNumberingEntry(KyorugiCompetition):
+    class Meta:
+        proxy = True
+        verbose_name = "شماره‌گذاری بازی‌ها"
+        verbose_name_plural = "شماره‌گذاری بازی‌ها"
 
-# ---------------- Helpers ----------------
-def _jdate_to_greg(v):
-    """jdatetime.date -> datetime.date (Gregorian)."""
-    return v.togregorian() if isinstance(v, jdatetime.date) else v
+
+@admin.register(MatchNumberingEntry)
+class MatchNumberingEntryAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request): return False
+    def has_change_permission(self, request, obj=None): return False
+    def has_delete_permission(self, request): return False
+
+    def changelist_view(self, request, extra_context=None):
+        return redirect(reverse("admin:competitions_match_numbering"))
+
+
+# ============================ سمینار ============================
 
 def _greg_to_jalali_str(val):
-    """date|datetime -> 'YYYY/MM/DD' (jalali) or ''."""
     if not val:
         return ""
     try:
@@ -902,7 +818,6 @@ def _greg_to_jalali_str(val):
         return ""
 
 
-# ---------------- Seminar Form ----------------
 class SeminarAdminForm(forms.ModelForm):
     registration_start = jforms.jDateField(label="شروع ثبت‌نام", widget=jadmin.widgets.AdminjDateWidget)
     registration_end   = jforms.jDateField(label="پایان ثبت‌نام", widget=jadmin.widgets.AdminjDateWidget)
@@ -942,9 +857,9 @@ class SeminarAdminForm(forms.ModelForm):
                     pass
             self.initial["allowed_roles"] = inst.allowed_roles or []
 
-    def clean_registration_start(self): return _jdate_to_greg(self.cleaned_data.get("registration_start"))
-    def clean_registration_end(self):   return _jdate_to_greg(self.cleaned_data.get("registration_end"))
-    def clean_event_date(self):         return _jdate_to_greg(self.cleaned_data.get("event_date"))
+    def clean_registration_start(self): return _to_greg(self.cleaned_data.get("registration_start"))
+    def clean_registration_end(self):   return _to_greg(self.cleaned_data.get("registration_end"))
+    def clean_event_date(self):         return _to_greg(self.cleaned_data.get("event_date"))
 
     def save(self, commit=True):
         inst: Seminar = super().save(commit=False)
@@ -954,16 +869,10 @@ class SeminarAdminForm(forms.ModelForm):
         return inst
 
 
-# ---------------- Seminar Admin ----------------
-
 class SeminarAdmin(admin.ModelAdmin):
-    """
-    مدیریت سمینارها + نمای سفارشی لیست شرکت‌کنندگان
-    """
+    """مدیریت سمینارها + نمای سفارشی لیست شرکت‌کنندگان"""
     form = SeminarAdminForm
-    change_form_template = "admin/competitions/seminar/change_form.html"  # دکمه/لینک «شرکت‌کنندگان» در فرم
 
-    # لیست سمینارها
     list_display = (
         "title",
         "registration_start_shamsi",
@@ -971,7 +880,7 @@ class SeminarAdmin(admin.ModelAdmin):
         "event_date_shamsi",
         "fee",
         "allowed_roles_disp",
-        "registrations_count_link",  # ← لینک به صفحهٔ شرکت‌کنندگان همان سمینار
+        "registrations_count_link",
     )
     list_display_links = ("title",)
     list_per_page = 25
@@ -989,7 +898,6 @@ class SeminarAdmin(admin.ModelAdmin):
         ("سیستمی", {"fields": ("created_at",), "classes": ("collapse",)}),
     )
 
-    # ستون‌های تاریخ به شمسی
     @admin.display(description="تاریخ برگزاری (شمسی)", ordering="event_date")
     def event_date_shamsi(self, obj: Seminar):
         return _greg_to_jalali_str(obj.event_date)
@@ -1002,7 +910,6 @@ class SeminarAdmin(admin.ModelAdmin):
     def registration_end_shamsi(self, obj: Seminar):
         return _greg_to_jalali_str(obj.registration_end)
 
-    # نمایش نقش‌ها به‌صورت خوانا
     def allowed_roles_disp(self, obj: Seminar):
         return obj.allowed_roles_display()
     allowed_roles_disp.short_description = "نقش‌های مجاز"
@@ -1014,7 +921,6 @@ class SeminarAdmin(admin.ModelAdmin):
         count = obj.registrations.count()
         return format_html('<a class="button" href="{}">{}</a>', url, count)
 
-    # --------- URL سفارشی صفحهٔ شرکت‌کنندگان ---------
     def get_urls(self):
         urls = super().get_urls()
         custom = [
@@ -1026,7 +932,6 @@ class SeminarAdmin(admin.ModelAdmin):
         ]
         return custom + urls
 
-    # نمای لیست شرکت‌کنندگان سمینار (تمپلیت: admin/competitions/seminar/participants_changelist.html)
     def participants_view(self, request):
         seminars = Seminar.objects.order_by("-event_date", "-id")
         sel = request.GET.get("seminar")
@@ -1038,44 +943,36 @@ class SeminarAdmin(admin.ModelAdmin):
             except Exception:
                 selected = None
 
-            if selected:
-                qs = (
-                    SeminarRegistration.objects
-                    .filter(seminar=selected)
-                    .select_related("user", "user__profile")
-                    .order_by("id")
+        if selected:
+            qs = (
+                SeminarRegistration.objects
+                .filter(seminar=selected)
+                .select_related("user", "user__profile")
+                .order_by("id")
+            )
+            mapping = dict(Seminar.ROLE_CHOICES)
+
+            for i, r in enumerate(qs, 1):
+                prof = getattr(r.user, "profile", None)
+                full_name = (
+                    ((getattr(prof, "first_name", "") + " " + getattr(prof, "last_name", "")).strip())
+                    or (getattr(r.user, "get_full_name", lambda: "")() or str(r.user))
                 )
-                # نقش‌های فارسی
-                mapping = dict(Seminar.ROLE_CHOICES)  # {'player':'بازیکن','coach':'مربی','referee':'داور'}
+                nid   = (getattr(prof, "national_code", "") or "").strip()
+                belt  = (getattr(prof, "belt_grade", "") or "").strip()
+                mobile = (r.phone or getattr(prof, "phone", "") or "").strip() or "—"
+                roles_fa = "، ".join(mapping.get(x, x) for x in (r.roles or [])) or "—"
 
-                for i, r in enumerate(qs, 1):
-                    prof = getattr(r.user, "profile", None)
-
-                    # نام کامل
-                    full_name = (
-                        ((getattr(prof, "first_name", "") + " " + getattr(prof, "last_name", "")).strip())
-                        or (getattr(r.user, "get_full_name", lambda: "")() or str(r.user))
-                    )
-                    # کدملی و کمربند
-                    nid   = (getattr(prof, "national_code", "") or "").strip()
-                    belt  = (getattr(prof, "belt_grade", "") or "").strip()
-
-                    # موبایل: اول phone خود ثبت‌نام، بعد phone پروفایل
-                    mobile = (r.phone or getattr(prof, "phone", "") or "").strip() or "—"
-
-                    # نقش‌ها فارسی
-                    roles_fa = "، ".join(mapping.get(x, x) for x in (r.roles or [])) or "—"
-
-                    rows.append({
-                        "idx": i,
-                        "full_name": full_name or "—",
-                        "nid": nid or "—",
-                        "belt": belt or "—",
-                        "roles_fa": roles_fa,
-                        "mobile": mobile,
-                        "paid": "بله" if r.is_paid else "خیر",
-                        "amount": r.paid_amount or 0,
-                    })
+                rows.append({
+                    "idx": i,
+                    "full_name": full_name or "—",
+                    "nid": nid or "—",
+                    "belt": belt or "—",
+                    "roles_fa": roles_fa,
+                    "mobile": mobile,
+                    "paid": "بله" if r.is_paid else "خیر",
+                    "amount": r.paid_amount or 0,
+                })
 
         ctx = {
             **self.admin_site.each_context(request),
@@ -1087,7 +984,6 @@ class SeminarAdmin(admin.ModelAdmin):
         return render(request, "admin/competitions/seminar/participants_changelist.html", ctx)
 
 
-# ---------------- Proxy: لیست شرکت‌کنندگان ----------------
 class SeminarAttendee(SeminarRegistration):
     class Meta:
         proxy = True
@@ -1095,7 +991,6 @@ class SeminarAttendee(SeminarRegistration):
         verbose_name_plural = "لیست شرکت‌کنندگان سمینارها"
 
 
-# ------------- Action: CSV Export -------------
 @admin.action(description="خروجی CSV")
 def export_csv(modeladmin, request, queryset):
     import csv
@@ -1125,23 +1020,17 @@ def export_csv(modeladmin, request, queryset):
     return resp
 
 
-# ---------------- Admin: صفحهٔ مستقل شرکت‌کنندگان ----------------
 @admin.register(SeminarAttendee)
 class SeminarAttendeeAdmin(admin.ModelAdmin):
-
     change_list_template = "admin/competitions/seminar/participants_changelist.html"
     actions = [export_csv]
 
-    # این صفحه فقط نمایش/اکسپورت است
     def has_add_permission(self, request): return False
     def has_change_permission(self, request, obj=None): return False
-    def has_delete_permission(self, request, obj=None): return False
+    def has_delete_permission(self, request): return False
 
     def changelist_view(self, request, extra_context=None):
-        # لیست سمینارها برای دراپ‌داون
         seminars = Seminar.objects.all().order_by("-event_date", "-created_at")
-
-        # سمینار انتخاب‌شده از querystring
         selected = request.GET.get("seminar") or ""
         regs = []
         selected_obj = None
@@ -1166,16 +1055,409 @@ class SeminarAttendeeAdmin(admin.ModelAdmin):
         return TemplateResponse(request, self.change_list_template, ctx)
 
 
-# ---------------- Register / Unregister ----------------
-try:
-    admin.site.unregister(Seminar)
-except admin.sites.NotRegistered:
-    pass
-admin.site.register(Seminar, SeminarAdmin)
+# ============================ پومسه ============================
 
-# مدل اصلی را از منو حذف می‌کنیم تا فقط صفحهٔ مستقل نمایش داده شود
+# فیلدهای موجود در مدل، برای سازگاری
 try:
-    admin.site.unregister(SeminarRegistration)
+    POOM_FIELDS = {f.name for f in PoomsaeCompetition._meta.get_fields()}
+except Exception:
+    POOM_FIELDS = set()
+
+_HAS_AGE_CATEGORY   = "age_category"   in POOM_FIELDS
+_HAS_AGE_CATEGORIES = "age_categories" in POOM_FIELDS
+
+# اینلاین‌های ضمیمه (اگر مدل وجود داشته باشد)
+PoomsaeImageInline = None
+PoomsaeFileInline  = None
+try:
+    from .models import PoomsaeImage
+
+    class PoomsaeImageInline(admin.TabularInline):
+        model = PoomsaeImage
+        extra = 1
+        verbose_name = "تصویر"
+        verbose_name_plural = "تصاویر پیوست"
+except Exception:
+    pass
+
+try:
+    from .models import PoomsaeFile
+
+    class PoomsaeFileInline(admin.TabularInline):
+        model = PoomsaeFile
+        extra = 1
+        verbose_name = "فایل PDF"
+        verbose_name_plural = "فایل‌های پیوست"
+except Exception:
+    pass
+
+
+class PoomsaeCompetitionAdminForm(forms.ModelForm):
+    if "draw_date" in POOM_FIELDS:
+        draw_date = jforms.jDateField(label="تاریخ قرعه‌کشی", widget=jadmin.widgets.AdminjDateWidget, required=False)
+    if "competition_date" in POOM_FIELDS:
+        competition_date = jforms.jDateField(label="تاریخ برگزاری", widget=jadmin.widgets.AdminjDateWidget, required=False)
+    if "registration_start" in POOM_FIELDS:
+        registration_start = jforms.jDateField(label="شروع ثبت‌نام", widget=jadmin.widgets.AdminjDateWidget)
+    if "registration_end" in POOM_FIELDS:
+        registration_end   = jforms.jDateField(label="پایان ثبت‌نام", widget=jadmin.widgets.AdminjDateWidget)
+
+    # کپی‌کردن متن قالب به terms_text
+    terms_template = forms.ModelChoiceField(
+        queryset=TermsTemplate.objects.all(),
+        required=False,
+        label="قالب تعهدنامه",
+        help_text="در صورت انتخاب، متن قالب به فیلد قوانین (terms_text) کپی می‌شود."
+    )
+
+    class Meta:
+        model = PoomsaeCompetition
+        exclude = tuple(x for x in ("start_date", "end_date") if x in POOM_FIELDS) + \
+                  (("age_category",) if _HAS_AGE_CATEGORIES else ())
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _init_jalali(self, [f for f in ("draw_date", "competition_date") if f in self.fields])
+
+        if "age_categories" in self.fields:
+            self.fields["age_categories"].label = "گروه‌های سنی"
+        if "belt_level" in self.fields:
+            self.fields["belt_level"].label = "رده کمربندی"
+        if "belt_groups" in self.fields:
+            self.fields["belt_groups"].label = "گروه‌های کمربندی"
+
+        inst: PoomsaeCompetition | None = getattr(self, "instance", None)
+        if inst and inst.pk:
+            if "registration_start" in self.fields and inst.registration_start:
+                dt = timezone.localtime(inst.registration_start) if timezone.is_aware(inst.registration_start) else inst.registration_start
+                self.initial["registration_start"] = jdatetime.date.fromgregorian(date=dt.date())
+            if "registration_end" in self.fields and inst.registration_end:
+                dt = timezone.localtime(inst.registration_end) if timezone.is_aware(inst.registration_end) else inst.registration_end
+                self.initial["registration_end"] = jdatetime.date.fromgregorian(date=dt.date())
+
+        if "registration_manual" in self.fields:
+            current = getattr(self.instance, "registration_manual", None)
+            self.fields["registration_manual"] = TriStateChoiceField(label="فعال بودن ثبت‌نام")
+            if not self.is_bound:
+                self.initial["registration_manual"] = (
+                    "" if current is None else ("1" if current is True else "0")
+                )
+            self.fields["registration_manual"].help_text = "خالی=طبق تاریخ‌ها، بله=اجباراً باز، خیر=اجباراً بسته"
+
+    def clean_draw_date(self):        return _to_greg(self.cleaned_data.get("draw_date"))
+    def clean_competition_date(self): return _to_greg(self.cleaned_data.get("competition_date"))
+
+    def clean_registration_start(self):
+        d = _to_greg(self.cleaned_data.get("registration_start"))
+        if not d: return None
+        dt = datetime.datetime.combine(d, datetime.time(0, 0, 0))
+        return timezone.make_aware(dt, timezone.get_current_timezone())
+
+    def clean_registration_end(self):
+        d = _to_greg(self.cleaned_data.get("registration_end"))
+        if not d: return None
+        dt = datetime.datetime.combine(d, datetime.time(23, 59, 59))
+        return timezone.make_aware(dt, timezone.get_current_timezone())
+
+    def clean(self):
+        cleaned = super().clean()
+        rs = cleaned.get("registration_start")
+        re = cleaned.get("registration_end")
+        cd = cleaned.get("competition_date")
+
+        if rs and re and rs > re:
+            self.add_error("registration_start", "شروع ثبت‌نام نباید بعد از پایان ثبت‌نام باشد.")
+        if cd and re and re.date() > cd:
+            self.add_error("registration_end", "پایان ثبت‌نام باید قبل یا در همان روز برگزاری باشد.")
+        return cleaned
+
+    def save(self, commit=True):
+        inst: PoomsaeCompetition = super().save(commit=False)
+
+        re = self.cleaned_data.get("registration_end")
+        cd = self.cleaned_data.get("competition_date")
+
+        if cd:
+            inst.start_date = cd
+            inst.end_date   = cd
+        elif re:
+            d = timezone.localtime(re).date() if timezone.is_aware(re) else re.date()
+            inst.start_date = d
+            inst.end_date   = d
+
+        tmpl = self.cleaned_data.get("terms_template")
+        if tmpl:
+            inst.terms_text = tmpl.content or ""
+
+        if commit:
+            inst.save()
+            self.save_m2m()
+        return inst
+
+
+class PoomsaeCoachApprovalInline(admin.TabularInline):
+    model = PoomsaeCoachApproval
+    extra = 0
+    fields = ("player", "coach", "code", "approved", "is_active", "created_at", "updated_at")
+    readonly_fields = ("code", "created_at", "updated_at")
+    autocomplete_fields = ("player", "coach")
+
+
+@admin.register(PoomsaeCompetition)
+class PoomsaeCompetitionAdmin(admin.ModelAdmin):
+    form = PoomsaeCompetitionAdminForm
+
+    _fh = []
+    if "belt_groups" in POOM_FIELDS: _fh.append("belt_groups")
+    if _HAS_AGE_CATEGORIES:          _fh.append("age_categories")
+    if _fh: filter_horizontal = tuple(_fh)
+
+    _inlines = []
+    if PoomsaeImageInline: _inlines.append(PoomsaeImageInline)
+    if PoomsaeFileInline:  _inlines.append(PoomsaeFileInline)
+    _inlines.append(PoomsaeCoachApprovalInline)
+    inlines = _inlines
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if "belt_groups" in POOM_FIELDS:
+            qs = qs.prefetch_related("belt_groups")
+        return qs
+
+    list_display = (
+        "name",
+        "belt_groups_col",
+        "gender",
+        "competition_date_shamsi",
+        "registration_open_col",   # ✅ boolean icon
+        "registration_manual",     # وضعیت دستی
+        "entry_fee",
+    )
+    list_display_links = ("name",)
+
+    search_fields = tuple(
+        x for x in ("name", "public_id", "description", "city", "address")
+        if (x in POOM_FIELDS) or x in ("name", "description")
+    )
+    list_filter = tuple(f for f in (
+        ("registration_start", JDateFieldListFilter) if "registration_start" in POOM_FIELDS else None,
+        ("registration_end",   JDateFieldListFilter) if "registration_end"   in POOM_FIELDS else None,
+        ("draw_date",          JDateFieldListFilter) if "draw_date"          in POOM_FIELDS else None,
+        ("competition_date",   JDateFieldListFilter) if "competition_date"   in POOM_FIELDS else None,
+        RegistrationOpenFilter,     # ✅ فیلتر وضعیت باز/بسته
+        "registration_manual",      # ✅ فیلتر حالت دستی
+        ("gender" if "gender" in POOM_FIELDS else None),
+    ) if f)
+
+    actions = [action_open_registration, action_close_registration, action_auto_registration]  # ✅ اکشن‌ها
+    readonly_fields = tuple(f for f in ("public_id", "created_at", "updated_at") if f in POOM_FIELDS)
+    ordering = ("-competition_date", "-id")
+
+    def get_fieldsets(self, request, obj=None):
+        form_instance = self.form()
+        present = set(form_instance.fields.keys()) | set(self.readonly_fields)
+
+        def keep(*names): return tuple(n for n in names if n and n in present)
+
+        info = keep(
+            "name", "poster", "description", "entry_fee",
+            ("age_categories" if _HAS_AGE_CATEGORIES else ("age_category" if _HAS_AGE_CATEGORY else None)),
+            "belt_level", "belt_groups", "gender",
+        )
+        place  = keep("city", "address")
+        # ✅ به‌جای registration_open از registration_manual استفاده می‌کنیم
+        dates  = keep("registration_manual", "registration_start", "registration_end", "draw_date", "competition_date")
+        terms  = keep("terms_template")
+        system = keep("public_id", "created_at", "updated_at")
+
+        fs = [("اطلاعات کلی", {"fields": info})]
+        if place:  fs.append(("محل برگزاری", {"fields": place}))
+        if dates:  fs.append(("ثبت‌نام و تاریخ‌ها (شمسی)", {"fields": dates}))
+        if terms:  fs.append(("تعهدنامه مربی", {"fields": terms}))
+        if system: fs.append(("سیستمی", {"fields": system, "classes": ("collapse",)}))
+        return tuple(fs)
+
+    @admin.display(description="گروه‌های کمربندی")
+    def belt_groups_col(self, obj):
+        if not hasattr(obj, "belt_groups"):
+            return "—"
+        labels = list(obj.belt_groups.values_list("label", flat=True))
+        if not labels:
+            return "—"
+        shown = "، ".join(labels[:3])
+        extra = len(labels) - 3
+        return f"{shown} …(+{extra})" if extra > 0 else shown
+
+    @admin.display(description="برگزاری (شمسی)", ordering="competition_date")
+    def competition_date_shamsi(self, obj):
+        return _to_jalali_str(getattr(obj, "competition_date", None))
+
+    @admin.display(description="شروع ثبت‌نام (شمسی)")
+    def registration_start_shamsi(self, obj):
+        dt = getattr(obj, "registration_start", None)
+        if dt and timezone.is_aware(dt): dt = timezone.localtime(dt)
+        return _to_jalali_str(dt.date() if dt else None)
+
+    @admin.display(description="پایان ثبت‌نام (شمسی)")
+    def registration_end_shamsi(self, obj):
+        dt = getattr(obj, "registration_end", None)
+        if dt and timezone.is_aware(dt): dt = timezone.localtime(dt)
+        return _to_jalali_str(dt.date() if dt else None)
+
+    @admin.display(boolean=True, description="ثبت‌نام باز؟")
+    def registration_open_col(self, obj):
+        return obj.registration_open_effective
+
+
+# اگر قبلاً ثبت بود و نمی‌خواهیم دیده شود
+try:
+    admin.site.unregister(PoomsaeEntry)
 except admin.sites.NotRegistered:
     pass
-# پروکسی با @admin.register بالا ثبت شده است
+
+
+# ======================= تأیید مربیان (یکپارچه) =======================
+# پاک کردن ثبت‌های تکراری تا فقط یک منو داشته باشیم
+try:
+    admin.site.unregister(CoachApproval)
+except admin.sites.NotRegistered:
+    pass
+try:
+    admin.site.unregister(PoomsaeCoachApproval)
+except admin.sites.NotRegistered:
+    pass
+
+
+class CoachApprovalsEntry(KyorugiCompetition):
+    class Meta():
+        proxy = True
+        verbose_name = "تأیید مربیان"
+        verbose_name_plural = "تأیید مربیان"
+
+
+@admin.register(CoachApprovalsEntry)
+class CoachApprovalsAdmin(admin.ModelAdmin):
+    change_list_template = "admin/competitions/approvals_unified.html"
+
+    def has_add_permission(self, request): return False
+    def has_change_permission(self, request, obj=None): return False
+    def has_delete_permission(self, request, obj=None): return False
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "detail/<str:kind>/<int:comp_id>/",
+                self.admin_site.admin_view(self.detail_view),
+                name="competitions_approvals_detail",
+            ),
+        ]
+        return custom + urls
+
+    # لیست مسابقات با تعداد تأیید
+    def changelist_view(self, request, extra_context=None):
+        k_qs = (CoachApproval.objects
+                .filter(terms_accepted=True, is_active=True)
+                .select_related("competition")
+                .order_by("-approved_at"))
+
+        p_qs = (PoomsaeCoachApproval.objects
+                .filter(approved=True, is_active=True)
+                .select_related("competition")
+                .order_by("-updated_at", "-created_at"))
+
+        rows = []
+        bundle = {}
+        last_dt = {}
+
+        for a in k_qs:
+            key = ("ky", a.competition_id)
+            b = bundle.setdefault(key, {
+                "title": getattr(a.competition, "title", f"#{a.competition_id}"),
+                "style": "کیوروگی", "count": 0
+            })
+            b["count"] += 1
+            last_dt[key] = max(last_dt.get(key, a.approved_at), a.approved_at)
+
+        for a in p_qs:
+            key = ("pm", a.competition_id)
+            b = bundle.setdefault(key, {
+                "title": getattr(a.competition, "name", f"#{a.competition_id}"),
+                "style": "پومسه", "count": 0
+            })
+            b["count"] += 1
+            dt = a.updated_at or a.created_at
+            last_dt[key] = max(last_dt.get(key, dt), dt)
+
+        for (kind, cid), info in bundle.items():
+            rows.append({
+                "title": info["title"],
+                "style": info["style"],
+                "count": info["count"],
+                "last": last_dt.get((kind, cid)),
+                "detail_url": reverse("admin:competitions_approvals_detail", args=[kind, cid]),
+            })
+
+        rows.sort(key=lambda r: (r["last"] or datetime.datetime.min), reverse=True)
+        for r in rows:
+            r["last_j"] = _to_jalali_dt_str(r["last"])
+
+        ctx = dict(self.admin_site.each_context(request))
+        ctx.update({"title": "تأیید مربیان", "mode": "list", "rows": rows})
+        if extra_context: ctx.update(extra_context)
+        return TemplateResponse(request, "admin/competitions/approvals_unified.html", ctx)
+
+    # جزئیات هر مسابقه + حذف
+    def detail_view(self, request, kind: str, comp_id: int):
+        if request.method == "POST":
+            del_id = request.POST.get("del_id")
+            if del_id and del_id.isdigit():
+                if kind == "ky":
+                    CoachApproval.objects.filter(pk=int(del_id)).delete()
+                else:
+                    PoomsaeCoachApproval.objects.filter(pk=int(del_id)).delete()
+                self.message_user(request, "حذف شد.", level=messages.SUCCESS)
+                return redirect(request.path)
+
+        rows = []
+        if kind == "ky":
+            comp = KyorugiCompetition.objects.filter(pk=comp_id).first()
+            comp_title = getattr(comp, "title", f"#{comp_id}")
+            qs = (CoachApproval.objects
+                  .filter(competition_id=comp_id, terms_accepted=True, is_active=True)
+                  .select_related("coach")
+                  .order_by("-approved_at", "-id"))
+            for a in qs:
+                rows.append({
+                    "id": a.id,
+                    "coach": _full_name(a.coach) or "—",
+                    "code": a.code or "—",
+                    "date_j": _to_jalali_dt_str(a.approved_at),
+                })
+            style = "کیوروگی"
+        else:
+            comp = PoomsaeCompetition.objects.filter(pk=comp_id).first()
+            comp_title = getattr(comp, "name", f"#{comp_id}")
+            qs = (PoomsaeCoachApproval.objects
+                  .filter(competition_id=comp_id, approved=True, is_active=True)
+                  .select_related("coach")
+                  .order_by("-updated_at", "-id"))
+            for a in qs:
+                rows.append({
+                    "id": a.id,
+                    "coach": _full_name(a.coach) or "—",
+                    "code": a.code or "—",
+                    "date_j": _to_jalali_dt_str(a.updated_at or a.created_at),
+                })
+            style = "پومسه"
+
+        ctx = dict(self.admin_site.each_context(request))
+        ctx.update({
+            "title": f"تأیید مربیان – {comp_title}",
+            "mode": "detail",
+            "style": style,
+            "comp_title": comp_title,
+            "rows": rows,
+            "back_url": reverse("admin:competitions_coachapprovalsentry_changelist"),
+        })
+        return TemplateResponse(request, "admin/competitions/approvals_unified.html", ctx)

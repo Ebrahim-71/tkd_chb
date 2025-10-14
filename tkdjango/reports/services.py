@@ -1053,3 +1053,223 @@ def board_students(board_id=None, belt_id=None, coach_id=None, club_id=None, nat
             "national_code": national_code,
         },
     }
+#-*-*-*-**-*-*-*-*-*-**-*--*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+
+
+
+def _role_label(val: str) -> str:
+    s = (str(val or "")).strip().lower()
+    if s in {"coach","coach_referee","both","مربی"}: return "مربی"
+    if s in {"referee","coach_referee","both","داور"}: return "داور"
+    return s or "—"
+
+
+def _created_or_approved_field(model):
+    """به ترتیب approved_at، created_at، date_joined، created، joined_at را برمی‌گرداند اگر وجود داشته باشد."""
+    for name in ("approved_at", "created_at", "date_joined", "created", "joined_at"):
+        try:
+            model._meta.get_field(name)
+            return name
+        except Exception:
+            continue
+    return None
+
+
+def _board_field_name(model):
+    """نام فیلد FK/M2M احتمالی به هیئت روی UserProfile یا Club را حدس می‌زند."""
+    for nm in ("board", "tkd_board", "federation_board", "province_board", "hyat", "heyat"):
+        if _field_exists(model, nm):
+            return nm
+    for nm in ("boards", "tkd_boards", "related_boards"):
+        try:
+            f = model._meta.get_field(nm)
+            if getattr(f, "many_to_many", False):
+                return nm
+        except Exception:
+            continue
+    return None
+
+# --- جدید: نقش ترکیبی ---
+def _has_role_val(val: str, bucket: str) -> bool:
+    s = (str(val or "")).strip().lower()
+    return any(s == str(v).strip().lower() for v in ROLE_VALUES[bucket])
+
+def _role_combo(up, UserProfile):
+    # بر اساس فیلد role یا بولی‌ها
+    coach = ref = False
+    if _field_exists(UserProfile, ROLE_FIELD_NAME):
+        rv = getattr(up, ROLE_FIELD_NAME, "")
+        coach = _has_role_val(rv, "coach")
+        ref   = _has_role_val(rv, "referee")
+        # مقادیر مرکب متداول
+        if str(rv).lower() in {"coach_referee","both","مربی/داور","coach-referee"}:
+            coach = ref = True
+    else:
+        coach = bool(getattr(up, "is_coach", False))
+        ref   = bool(getattr(up, "is_referee", False))
+    if coach and ref: return "مربی/داور"
+    if coach: return "مربی"
+    if ref:   return "داور"
+    return "—"
+
+# --- جدید: لیست همه‌ی باشگاه‌ها (FK + M2Mهای رایج) ---
+def _clubs_list_for_profile(up):
+    names = set()
+    # FK رایج
+    if getattr(up, "club", None):
+        c = up.club
+        names.add(getattr(c, "name", str(c)))
+    # چند به چندهای رایج
+    for m in ("coaching_clubs","clubs","related_clubs","managed_clubs"):
+        try:
+            rel = getattr(up, m, None)
+            if rel and hasattr(rel, "all"):
+                for c in rel.all():
+                    names.add(getattr(c, "name", str(c)))
+        except Exception:
+            continue
+    return "، ".join([n for n in names if n]) or ""
+
+# --- جدید: شمارش بازیکنانِ این مربی (اگر مربی است) ---
+def _players_count_for_person(up_id: int) -> int:
+    try:
+        qs = _students_qs_by_user_coach(up_id)
+        return qs.count()
+    except Exception:
+        return 0
+def board_coaches_referees(board_id=None, role=None, club_id=None, national_code=None):
+
+    from accounts.models import UserProfile
+
+    # 1) مبنا: UserProfile
+    base_qs = UserProfile.objects.all()
+
+    # فیلتر براساس باشگاه/هیئت
+    if club_id:
+        # مستقیم club_id روی پروفایل
+        if _field_exists(UserProfile, "club"):
+            base_qs = base_qs.filter(club_id=club_id)
+        else:
+            # fallback اگر رابطه غیرمستقیم باشد
+            base_qs = base_qs.filter(club__id=club_id) if _field_exists(UserProfile, "club") else base_qs.none()
+    elif board_id:
+        # الف) اگر خود پروفایل فیلد board دارد
+        bfield = _board_field_name(UserProfile)
+        if bfield:
+            if "__" in bfield or getattr(UserProfile._meta.get_field(bfield), "many_to_many", False):
+                base_qs = base_qs.filter(**{f"{bfield}__id": board_id})
+            else:
+                base_qs = base_qs.filter(**{f"{bfield}_id": board_id})
+        else:
+            # ب) از روی باشگاه‌های هیئت
+            cqs = _clubs_qs_for_board(board_id)
+            if cqs is not None:
+                club_ids = list(cqs.values_list("id", flat=True))
+                if club_ids:
+                    if _field_exists(UserProfile, "club"):
+                        base_qs = base_qs.filter(club_id__in=club_ids)
+                    else:
+                        try:
+                            base_qs = base_qs.filter(club__id__in=club_ids)
+                        except Exception:
+                            base_qs = UserProfile.objects.none()
+                else:
+                    base_qs = UserProfile.objects.none()
+            else:
+                base_qs = UserProfile.objects.none()
+    else:
+        # هیچ فیلتری روی هیئت/باشگاه داده نشده
+        base_qs = UserProfile.objects.none()
+
+    # 2) فیلتر نقش (coach/referee)
+    # اگر فیلد نقش داری:
+    if _field_exists(UserProfile, ROLE_FIELD_NAME):
+        rq = Q()
+        if not role:
+            for v in set(ROLE_VALUES["coach"])|set(ROLE_VALUES["referee"]):
+                rq |= Q(**{f"{ROLE_FIELD_NAME}__iexact": v})
+        else:
+            for v in ROLE_VALUES[role]:
+                rq |= Q(**{f"{ROLE_FIELD_NAME}__iexact": v})
+        base_qs = base_qs.filter(rq)
+    else:
+        # fallback: فیلدهای boolean
+        if role == "coach":
+            if _field_exists(UserProfile, "is_coach"):
+                base_qs = base_qs.filter(is_coach=True)
+        elif role == "referee":
+            if _field_exists(UserProfile, "is_referee"):
+                base_qs = base_qs.filter(is_referee=True)
+        else:
+            # هرکدام که در دسترس‌اند
+            q = Q()
+            if _field_exists(UserProfile, "is_coach"): q |= Q(is_coach=True)
+            if _field_exists(UserProfile, "is_referee"): q |= Q(is_referee=True)
+            base_qs = base_qs.filter(q) if q else base_qs.none()
+
+    # 3) فیلتر کد ملی (اختیاری)
+    if national_code:
+        for cand in ("national_code","nid","national_id"):
+            if _field_exists(UserProfile, cand):
+                base_qs = base_qs.filter(**{f"{cand}__iexact": national_code})
+                break
+
+    # 4) آماده‌سازی فیلدهای نام، تماس، باشگاه/هیئت
+    created_field = _created_or_approved_field(UserProfile)
+    base_qs = base_qs.select_related("club").order_by("last_name", "first_name", "id")
+
+    rows = []
+    for p in base_qs:
+        fname = getattr(p, "first_name", "") or ""
+        lname = getattr(p, "last_name", "") or ""
+        full_name = (fname + " " + lname).strip() or getattr(p, "name", "") or str(p)
+
+        role_label = _role_combo(p, UserProfile)  # 👈 ترکیبی
+        nid = next((getattr(p, cand) for cand in ("national_code", "nid", "national_id") if getattr(p, cand, None)), "")
+        phone = ""
+        for cand in ("phone", "mobile", "phone_number", "cellphone"):
+            if getattr(p, cand, None): phone = getattr(p, cand); break
+
+        club_names = _clubs_list_for_profile(p)  # 👈 همه باشگاه‌ها
+
+        joined = getattr(p, created_field, None) if created_field else None
+        joined_jalali = ""
+        if joined and _HAS_JDATETIME:
+            try:
+                d = joined.date() if isinstance(joined, _dt.datetime) else joined
+                j = jdatetime.date.fromgregorian(date=d)
+                joined_jalali = f"{j.year:04d}/{j.month:02d}/{j.day:02d}"
+            except Exception:
+                pass
+
+        # تعداد بازیکنان شخص (اگر مربی نباشد احتمالاً 0 می‌ماند)
+        players_count = _players_count_for_person(p.id)
+
+        g = s = b = 0
+        try:
+            g, s, b = _medals_for_player(p.id)
+        except Exception:
+            pass
+        r_comp, r_total = _rankings_for_player(p.id)
+
+        rows.append({
+            "full_name": full_name,
+            "role_label": role_label,
+            "national_code": nid or "",
+            "phone": phone or "",
+            "club_name": club_names,  # 👈 لیستی
+            "players_count": players_count,  # 👈 جایگزین ستون هیئت
+            "joined_jalali": joined_jalali or "",
+            "medal_gold": g, "medal_silver": s, "medal_bronze": b,
+            "rank_total": r_total or 0,
+        })
+
+    return {
+        "rows": rows,
+        "filters_applied": {
+            "board_id": board_id,
+            "club_id": club_id,
+            "role": role or "",
+            "national_code": national_code,
+        }
+    }

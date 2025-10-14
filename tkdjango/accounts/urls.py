@@ -3,12 +3,13 @@ from .views import (
     SendCodeAPIView,VerifyCodeAPIView,form_data_view,form_data_player_view,
     RegisterCoachAPIView,approve_pending_user,check_national_code,
     RegisterPlayerAPIView,coaches_by_club_gender, RegisterPendingClubAPIView,
-    approve_pending_club, LoginSendCodeAPIView,VerifyLoginCodeAPIView,
+    approve_pending_club,  ForgotPasswordSendCodeAPIView,
+    ForgotPasswordVerifyAPIView,
     DashboardCombinedView,user_profile_with_form_data_view, UpdateProfilePendingAPIView,
     approve_edited_profile,CoachStudentsAPIView,CoachClubsAPIView,UpdateCoachClubsAPIView,
     AllClubsAPIView,ClubStudentsView,ClubCoachesView,ClubAllCoachesView,UpdateClubCoachesView
 ,PendingCoachRequestsView,RespondToCoachRequestView,HeyatLoginAPIView,HeyatStudentsAPIView, heyat_form_data,
-HeyatCoachesAPIView,HeyatRefereesAPIView,heyat_clubs_list,KyorugiCompetitionListView,
+HeyatCoachesAPIView,HeyatRefereesAPIView,heyat_clubs_list,KyorugiCompetitionListView,UniversalLoginAPIView
 )
 
 urlpatterns = [
@@ -23,8 +24,6 @@ urlpatterns = [
     path('register-club/', RegisterPendingClubAPIView.as_view(), name='register-club'),
     path('check-national-code/', check_national_code, name='check_national_code'),
     path('admin/approve-club/<int:pk>/', approve_pending_club, name='approve_pending_club'),
-    path('login/send-code/', LoginSendCodeAPIView.as_view(), name='send_login_code'),
-    path('login/verify-code/', VerifyLoginCodeAPIView.as_view(), name='verify_login_code'),
 
     path('user-profile-with-options/', user_profile_with_form_data_view),
     path('profile/edit/', UpdateProfilePendingAPIView.as_view(), name='edit_profile'),
@@ -47,5 +46,8 @@ urlpatterns = [
     path("heyat/clubs/", heyat_clubs_list, name="heyat-clubs"),
     path("dashboard/kyorugi/", KyorugiCompetitionListView.as_view(), name="kyorugi-list"),
     path("dashboard/<role>/", DashboardCombinedView.as_view(), name="dashboard-combined"),
-
+    # ✅ ورود عمومی با نام کاربری و رمز عبور
+    path('login/', UniversalLoginAPIView.as_view(), name='universal-login'),
+    path("password/forgot/send/", ForgotPasswordSendCodeAPIView.as_view()),
+    path("password/forgot/verify/", ForgotPasswordVerifyAPIView.as_view()),
 ]

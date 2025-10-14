@@ -1,60 +1,125 @@
 # competitions/urls.py
 from django.urls import path, register_converter
-from .views import (
-    KyorugiCompetitionDetailView,RegisterSelfView,RegisterSelfPrefillView,
-    CoachApprovalStatusView,ApproveCompetitionView,PlayerCompetitionsList,
-    RefereeCompetitionsList,DashboardKyorugiListView,EnrollmentCardView,
-    MyEnrollmentView,KyorugiBracketView,EnrollmentCardsBulkView,
-    CoachStudentsEligibleListView,CoachRegisterStudentsView,KyorugiResultsView,
-    SeminarListView,SeminarDetailView,SeminarRegisterView,sidebar_seminars,#SeminarPayCallbackView
 
+from .views import (
+    # --------- Generic / Any ----------
+    CompetitionDetailAnyView,
+
+    # --------- Kyorugi ----------
+    KyorugiCompetitionDetailView, KyorugiBracketView, KyorugiResultsView,
+    CompetitionTermsView,
+    RegisterSelfPrefillView, RegisterSelfView,
+    CoachApprovalStatusView, ApproveCompetitionView,
+    MyEnrollmentView, EnrollmentCardView, EnrollmentCardsBulkView,
+    DashboardKyorugiListView, PlayerCompetitionsList, RefereeCompetitionsList,
+    CoachStudentsEligibleListView, CoachRegisterStudentsView,
+
+    # --------- Dashboard (ALL) ----------
+    DashboardAllCompetitionsView,
+
+    # --------- Seminars ----------
+    SeminarListView, SeminarDetailView, SeminarRegisterView, sidebar_seminars,
+
+    # --------- Poomsae ----------
+    PoomsaeCompetitionDetailView,
+    PoomsaeCoachApprovalStatusView, PoomsaeCoachApprovalApproveView,
+    PoomsaeRegisterSelfView,
+    # PoomsaeRegisterSelfPrefillView,  # اگر دارید، فعالش کنید
 )
 
 app_name = "competitions"
 
-class PublicKeyConverter:
-    regex = r"[a-z0-9]{10,16}"   # با چک داخل ویو هماهنگ
-    def to_python(self, value): return value
-    def to_url(self, value): return value
+# کلید عددی یا public_id/slug (حساس به طول کمتر و کاراکتر _ هم مجاز)
+class CompKeyConverter:
+    # عددی خالص، یا slug/public_id شامل حروف/عدد/خط تیره/خط زیرین با طول 3 تا 64
+    regex = r"(?:\d+|[A-Za-z0-9_-]{3,64})"
 
-register_converter(PublicKeyConverter, "pkey")
+    def to_python(self, value):
+        return value  # حساسیت حروف را در ویو هندل کنید
+
+    def to_url(self, value):
+        return str(value)
+
+register_converter(CompKeyConverter, "ckey")
 
 urlpatterns = [
-    # ==== عمومی ====
-    path("kyorugi/<pkey:key>/", KyorugiCompetitionDetailView.as_view(), name="detail"),
-    path("kyorugi/<pkey:key>/bracket/", KyorugiBracketView.as_view(), name="kyorugi-bracket"),
-    path("kyorugi/<pkey:key>/results/", KyorugiResultsView.as_view(), name="kyorugi-results"),              # ← اضافه شد (مسیر استاندارد)
-    path("competitions/<pkey:key>/results/", KyorugiResultsView.as_view(), name="kyorugi-results-compat"),  # ← سازگاری با فرانت قدیمی
+    # ========================= عمومی Kyorugi =========================
+    path("kyorugi/<ckey:key>/", KyorugiCompetitionDetailView.as_view(), name="kyorugi-detail"),
+    path("kyorugi/<ckey:key>/terms/", CompetitionTermsView.as_view(), name="kyorugi-terms"),
+    path("kyorugi/<ckey:key>/bracket/", KyorugiBracketView.as_view(), name="kyorugi-bracket"),
+    path("kyorugi/<ckey:key>/results/", KyorugiResultsView.as_view(), name="kyorugi-results"),
+    # سازگاری قدیمی نتایج
+    path("competitions/<ckey:key>/results/", KyorugiResultsView.as_view(), name="kyorugi-results-compat"),
 
-    # ==== احراز هویت ====
-    path("auth/kyorugi/<pkey:key>/prefill/", RegisterSelfPrefillView.as_view(), name="prefill"),
-    path("auth/kyorugi/<pkey:key>/register/self/", RegisterSelfView.as_view(), name="register-self"),
-    path("auth/kyorugi/<pkey:key>/coach-approval/status/", CoachApprovalStatusView.as_view(), name="coach-approval-status"),
-    path("auth/kyorugi/<pkey:key>/coach-approval/approve/", ApproveCompetitionView.as_view(), name="coach-approval-approve"),
-    path("auth/kyorugi/<pkey:key>/my-enrollment/", MyEnrollmentView.as_view(), name="my-enrollment"),
+    # ========================= by-public (GENERIC برای هر دو مدل) =========================
+    path("by-public/<ckey:key>/", CompetitionDetailAnyView.as_view(), name="detail-by-public"),
+    path("by-public/<ckey:key>/terms/", CompetitionTermsView.as_view(), name="terms-by-public"),
+    path("by-public/<ckey:key>/bracket/", KyorugiBracketView.as_view(), name="bracket-by-public"),
+    path("by-public/<ckey:key>/results/", KyorugiResultsView.as_view(), name="results-by-public"),
+
+    # ========================= احراز هویت Kyorugi =========================
+    path("auth/kyorugi/<ckey:key>/prefill/", RegisterSelfPrefillView.as_view(), name="prefill"),
+    path("auth/kyorugi/<ckey:key>/register/self/", RegisterSelfView.as_view(), name="register-self"),
+    path("auth/kyorugi/<ckey:key>/coach-approval/status/", CoachApprovalStatusView.as_view(),
+         name="coach-approval-status"),
+    path("auth/kyorugi/<ckey:key>/coach-approval/approve/", ApproveCompetitionView.as_view(),
+         name="coach-approval-approve"),
+    path("auth/kyorugi/<ckey:key>/my-enrollment/", MyEnrollmentView.as_view(), name="my-enrollment"),
     path("auth/enrollments/<int:enrollment_id>/card/", EnrollmentCardView.as_view(), name="enrollment-card"),
-    path("auth/dashboard/kyorugi/", DashboardKyorugiListView.as_view(), name="dashboard-list"),
-    path("kyorugi/player/competitions/",  PlayerCompetitionsList.as_view(),  name="player-competitions"),
+    path("auth/enrollments/cards/bulk/", EnrollmentCardsBulkView.as_view(), name="enrollment-cards-bulk"),
+    path("auth/kyorugi/<ckey:key>/coach/students/eligible/", CoachStudentsEligibleListView.as_view(),
+         name="coach-eligible-students"),
+    path("auth/kyorugi/<ckey:key>/coach/register/students/", CoachRegisterStudentsView.as_view(),
+         name="coach-register-students"),
+    path("auth/kyorugi/<ckey:key>/register/students/", CoachRegisterStudentsView.as_view(),
+         name="register-students-bulk-alias"),
+
+    # ========================= Dashboard =========================
+    path("dashboard/all/", DashboardAllCompetitionsView.as_view(), name="dashboard-all"),
+    path("dashboard/kyorugi/", DashboardKyorugiListView.as_view(), name="dashboard-kyorugi"),
+    # alias با پیشوند auth/ برای سازگاری با فرانت
+    path("auth/dashboard/all/", DashboardAllCompetitionsView.as_view(), name="dashboard-all-auth-alias"),
+    path("auth/dashboard/kyorugi/", DashboardKyorugiListView.as_view(), name="dashboard-kyorugi-auth-alias"),
+
+    # ========================= Kyorugi – لیست‌های نقش‌محور =========================
+    path("kyorugi/player/competitions/", PlayerCompetitionsList.as_view(), name="player-competitions"),
     path("kyorugi/referee/competitions/", RefereeCompetitionsList.as_view(), name="referee-competitions"),
 
-    # مربی
-    path("auth/kyorugi/<pkey:key>/coach/students/eligible/", CoachStudentsEligibleListView.as_view(), name="coach-eligible-students"),
-    path("auth/kyorugi/<pkey:key>/coach/register/students/", CoachRegisterStudentsView.as_view(), name="coach-register-students"),
-    path("auth/kyorugi/<pkey:key>/register/students/", CoachRegisterStudentsView.as_view(), name="register-students-bulk-alias"),
-
-    # کارت‌های گروهی
-    path("auth/enrollments/cards/bulk/", EnrollmentCardsBulkView.as_view(), name="enrollment-cards-bulk"),
-
-    # public
+    # ========================= سمینار =========================
     path("seminars/", SeminarListView.as_view(), name="seminar-list"),
-    path("seminars/<pkey:key>/", SeminarDetailView.as_view(), name="seminar-detail"),
-
-    # auth (ثبت‌نام)
-    path("auth/seminars/<pkey:key>/register/", SeminarRegisterView.as_view(), name="seminar-register"),
-
-    # path("auth/seminars/<pkey:key>/pay/callback/", SeminarPayCallbackView.as_view(), name="seminar-pay-callback"),
-
+    path("seminars/<ckey:key>/", SeminarDetailView.as_view(), name="seminar-detail"),
+    path("auth/seminars/<ckey:key>/register/", SeminarRegisterView.as_view(), name="seminar-register"),
     path("seminars/sidebar/", sidebar_seminars, name="seminars-sidebar"),
 
+    # ========================= ترم‌ها (عمومی) =========================
+    path("<ckey:key>/terms/", CompetitionTermsView.as_view(), name="terms-generic"),
+    path("competitions/kyorugi/<ckey:key>/terms/", CompetitionTermsView.as_view(), name="kyorugi-terms-compat"),
 
+    # ========================= پومسه: جزئیات و تأیید مربی =========================
+    path("poomsae/<ckey:key>/", PoomsaeCompetitionDetailView.as_view(), name="poomsae-detail"),
+    path("competitions/poomsae/<ckey:key>/", PoomsaeCompetitionDetailView.as_view(), name="poomsae-detail-compat"),
+
+    path("auth/poomsae/<ckey:public_id>/coach-approval/status/",
+         PoomsaeCoachApprovalStatusView.as_view(),
+         name="poomsae-coach-approval-status"),
+    path("auth/poomsae/<ckey:public_id>/coach-approval/approve/",
+         PoomsaeCoachApprovalApproveView.as_view(),
+         name="poomsae-coach-approval-approve"),
+
+    # ========================= پومسه: ثبت‌نام فردی + prefill =========================
+    path(
+        "auth/poomsae/<ckey:public_id>/register/self/",
+        PoomsaeRegisterSelfView.as_view(),
+        name="poomsae-register-self",
+    ),
+    # اگر ویو prefill مخصوص پومسه دارید، این مسیر را فعال کنید:
+    # path(
+    #     "auth/poomsae/<ckey:public_id>/prefill/",
+    #     PoomsaeRegisterSelfPrefillView.as_view(),
+    #     name="poomsae-prefill",
+    # ),
+
+    # ========================= جزئیات مسابقه (GENERIC) =========================
+    path("<ckey:key>/", CompetitionDetailAnyView.as_view(), name="competition-detail-any"),
+    path("competitions/<ckey:key>/", CompetitionDetailAnyView.as_view(), name="competition-detail-any-compat"),
 ]

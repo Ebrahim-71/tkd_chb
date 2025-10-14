@@ -8,19 +8,15 @@ from django.http import HttpResponse
 from django.shortcuts import render, redirect
 
 from .forms import DateRangeForm, CoachStudentsForm, ClubStudentsForm, BoardStudentsForm
-
+from .forms import BoardCoachesRefereesForm   # ← جدید
 from . import services
 
-
-# tkdjango/reports/views.py
 
 def _admin_ctx(request):
     return admin.site.each_context(request)
 
 def _daterange_from_form(request):
-    """همیشه s,e برگرداند؛ حتی اگر فرم نامعتبر باشد یا bound نباشد."""
     form = DateRangeForm(request.GET or None)
-    # تلاش برای اعتبارسنجی تا cleaned_data ساخته شود
     try:
         form.is_valid()
     except Exception:
@@ -37,7 +33,6 @@ def center(request):
     ctx = _admin_ctx(request)
     ctx.update({"title": "مرکز گزارش‌گیری"})
     return render(request, "admin/reports/center.html", ctx)
-
 
 
 @staff_member_required
@@ -87,7 +82,7 @@ def users_report(request):
         else:
             club_students = {"rows": []}
 
-    # --- شاگردان هیئت‌ها (جدید) ---
+    # --- شاگردان هیئت‌ها ---
     board_form = BoardStudentsForm(request.GET or None, prefix="bd")
     board_students = None
     board_display = None
@@ -111,6 +106,31 @@ def users_report(request):
         else:
             board_students = {"rows": []}
 
+    # --- مربی و داور هیئت‌ها  ← جدید ---
+    cr_form = BoardCoachesRefereesForm(request.GET or None, prefix="cr")
+    board_coaches_referees = None
+    role_display = None
+    board_display_for_cr = None
+    if request.GET.get("show_board_coaches_referees") == "1":
+        if cr_form.is_valid():
+            cd = cr_form.cleaned_data
+            board = cd.get("board")
+            role  = cd.get("role") or ""
+            club  = cd.get("club")
+            ncode = cd.get("national_code") or None
+
+            board_display_for_cr = str(board) if board else None
+            role_display = "فقط مربی" if role=="coach" else ("فقط داور" if role=="referee" else None)
+
+            board_coaches_referees = services.board_coaches_referees(
+                board_id = board.id if board else None,
+                role     = role or None,
+                club_id  = getattr(club, "id", None) if club else None,
+                national_code = ncode,
+            )
+        else:
+            board_coaches_referees = {"rows": []}
+
     ctx = {
         "form": form,
         "data": data,
@@ -126,8 +146,16 @@ def users_report(request):
         "board_form": board_form,
         "board_students": board_students,
         "board_display": board_display,
+
+        # 👇 جدید:
+        "cr_form": cr_form,
+        "board_coaches_referees": board_coaches_referees,
+        "role_display": role_display,
+        # اگر در تمپلیت یک متغیر واحد board_display استفاده می‌کنی، می‌توانی این را هم بگذاری:
+        "board_display_for_cr": board_display_for_cr,
     }
     return render(request, "admin/reports/users.html", ctx)
+
 
 @staff_member_required
 def competitions_report(request):

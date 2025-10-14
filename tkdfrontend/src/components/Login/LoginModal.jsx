@@ -1,205 +1,293 @@
-import React, { useState, useEffect, useRef } from 'react';
-import '../Register/RegisterModal.css';
-import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import React, { useEffect, useRef, useState } from "react";
+import "./LoginModal.css";
+import { Eye, EyeOff } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-const LoginModal = ({ role, onClose }) => {
+// ---------- تنظیمات API ----------
+const API_BASE =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE) ||
+  process.env.REACT_APP_API_BASE ||
+  "http://localhost:8000";
+
+const ACCOUNTS_PREFIX =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_ACCOUNTS_PREFIX) ||
+  process.env.REACT_APP_ACCOUNTS_PREFIX ||
+  "/api/auth/";
+
+// ساخت آدرس نهایی
+const joinUrl = (...parts) =>
+  parts
+    .map((p, i) =>
+      i === 0
+        ? String(p || "").replace(/\/+$/, "")
+        : String(p || "").replace(/^\/+|\/+$/g, "")
+    )
+    .filter(Boolean)
+    .join("/");
+
+const PATHS = {
+  login: "login/",
+};
+
+// ---------- نقش‌ها ----------
+const ROLE_GROUPS = {
+  player: ["player"],
+  coachref: ["coach", "referee", "both"],
+  club: ["club"],
+  heyat: ["heyat"],
+};
+
+// ---------- توابع کمکی ----------
+const normalizeDigits = (s = "") => {
+  const fa = "۰۱۲۳۴۵۶۷۸۹";
+  const ar = "٠١٢٣٤٥٦٧٨٩";
+  return String(s)
+    .trim()
+    .replace(/[۰-۹]/g, (d) => String(fa.indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String(ar.indexOf(d)))
+    .replace(/[\s-]/g, "");
+};
+
+const isValidUsername = (v = "") => {
+  const val = normalizeDigits(v);
+  if (/^\+?\d+$/.test(val)) {
+    const digits = val.replace(/^\+/, "");
+    return digits.length >= 10 && digits.length <= 15;
+  }
+  return val.length >= 3;
+};
+
+const normalizeRole = (r = "") => {
+  const key = String(r || "").toLowerCase();
+  if (["player"].includes(key)) return "player";
+  if (["coach", "referee", "both"].includes(key)) return key;
+  if (["club"].includes(key)) return "club";
+  if (["heyat", "hey'at"].includes(key)) return "heyat";
+  return "player";
+};
+
+// ---------- کامپوننت اصلی ----------
+const LoginModal = ({
+  role = "player",
+  title,
+  subtitle,
+  onClose,
+  onForgotPassword,
+}) => {
   const navigate = useNavigate();
-  const inputRefs = useRef([]);
-  const [step, setStep] = useState(1);
-  const [phone, setPhone] = useState('');
-  const [code, setCode] = useState(['', '', '', '']);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const allowed = ROLE_GROUPS[role] || ["player"];
+
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [timer, setTimer] = useState(0);
-  const [cooldown, setCooldown] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
+  const abortRef = useRef(null);
+  const cardRef = useRef(null);
+  const userInputRef = useRef(null);
+
+  // قفل اسکرول پشت مودال و فوکوس
   useEffect(() => {
-    if (cooldown && timer > 0) {
-      const interval = setInterval(() => setTimer((t) => t - 1), 1000);
-      return () => clearInterval(interval);
-    }
-    if (timer === 0 && cooldown) setCooldown(false);
-  }, [cooldown, timer]);
-
-  const getRoleLabel = () => {
-    const labels = {
-      player: 'بازیکن',
-      coach: 'مربی',
-      referee: 'داور',
-      both: 'مربی و داور',
-      club: 'باشگاه',
-      heyat: 'هیأت',
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    setTimeout(() => userInputRef.current?.focus(), 0);
+    return () => {
+      document.body.style.overflow = prev;
+      if (abortRef.current) abortRef.current.abort();
     };
-    return labels[role] || 'کاربر';
+  }, []);
+
+  // کلیدهای Esc و Enter
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape" && !loading) onClose?.();
+      if (e.key === "Enter" && !loading) {
+        const form = document.getElementById("login-form");
+        if (form) form.requestSubmit();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [loading, onClose]);
+
+  const handleBackdropClick = (e) => {
+    if (loading) return;
+    if (cardRef.current && !cardRef.current.contains(e.target)) onClose?.();
   };
 
-  const handleCodeChange = (val, idx) => {
-    if (!/^\d?$/.test(val)) return;
-    const newCode = [...code];
-    newCode[idx] = val;
-    setCode(newCode);
-    if (val && idx < 3) inputRefs.current[idx + 1]?.focus();
-    if (newCode.every((d) => d.length === 1)) verifyCode(newCode.join(''));
+  // ---------- ورود ----------
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (loading) return;
+
+    setError("");
+    const u = normalizeDigits(username || "");
+    const p = String(password || "").trim();
+
+    if (import.meta?.env?.MODE === "development") {
+   console.log("DEBUG_INPUT_VALUES", { username: u, role });
+ }
+
+    if (!u || !p) return setError("نام کاربری و رمز عبور الزامی است.");
+    if (!isValidUsername(u)) return setError("فرمت نام کاربری صحیح نیست.");
+    if (p.length < 6) return setError("حداقل طول رمز عبور ۶ کاراکتر است.");
+
+    setLoading(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const url = joinUrl(API_BASE, ACCOUNTS_PREFIX, PATHS.login) + "/";
+      console.log("[LOGIN] POST", url);
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Role-Group": role,
+        },
+        credentials: "include",
+        signal: controller.signal,
+        body: JSON.stringify({
+          identifier: u,
+          password: p,
+          roleGroup: role,
+        }),
+      });
+
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (_) {}
+
+      if (!res.ok) {
+        console.error("LOGIN_ERROR", res.status, data);
+        const msg =
+          data?.error ||
+          data?.detail ||
+          data?.message ||
+          (res.status === 401
+            ? "نام کاربری یا رمز عبور اشتباه است."
+            : res.status === 403
+            ? "این فرم مخصوص نقش دیگری است."
+            : res.status === 404
+            ? "مسیر لاگین یافت نشد. پریفیکس اشتباه است."
+            : "مشکلی در ورود پیش آمد.");
+        throw new Error(msg);
+      }
+
+      const roleFromAPI = normalizeRole(data.role || data.user?.role || "player");
+      const token = data.access || data.token || data.jwt || data.accessToken;
+
+      const okCoachRef =
+        role === "coachref" && ["coach", "referee", "both"].includes(roleFromAPI);
+      if (!allowed.includes(roleFromAPI) && !okCoachRef) {
+        throw new Error("این فرم مخصوص نقش دیگری است. لطفاً از فرم صحیح ورود استفاده کنید.");
+      }
+
+      if (token) localStorage.setItem(`${roleFromAPI}_token`, token);
+      localStorage.setItem("user_role", roleFromAPI);
+
+      onClose?.();
+      const nextPath =
+        roleFromAPI === "player"
+          ? "/dashboard/player"
+          : roleFromAPI === "club"
+          ? "/dashboard/club"
+          : roleFromAPI === "heyat"
+          ? "/dashboard/heyat"
+          : "/dashboard/coachref";
+      navigate(nextPath);
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        setError(err.message || "مشکلی پیش آمد.");
+      }
+    } finally {
+      setLoading(false);
+      abortRef.current = null;
+    }
   };
 
-  const sendCode = () => {
-    setError('');
-    if (!/^09\d{9}$/.test(phone)) return setError('شماره موبایل معتبر نیست.');
-    if (cooldown) return setError('لطفاً کمی صبر کنید.');
-
-    fetch('http://localhost:8000/api/auth/login/send-code/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, role }),
-    })
-      .then((res) => res.json().then((data) => ({ ok: res.ok, status: res.status, data })))
-      .then(({ ok, status, data }) => {
-        if (ok || (status === 429 && data.retry_after)) {
-          setStep(2);
-          setTimer(data.retry_after || 180);
-          setCooldown(true);
-          if (data.error) setError(data.error);
-        } else {
-          setError(data.error || 'خطا در ارسال کد.');
-        }
-      })
-      .catch(() => setError('خطا در اتصال به سرور.'));
-  };
-
-  const verifyCode = (codeStr) => {
-    setError('');
-    fetch('http://localhost:8000/api/auth/login/verify-code/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, code: codeStr, role }),
-    })
-      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
-      .then(({ ok, data }) => {
-        if (ok && data.access && data.role) {
-          localStorage.setItem(`${data.role}_token`, data.access);
-          localStorage.setItem('user_role', data.role);
-          onClose();
-          navigate(`/dashboard/${data.role}`);
-        } else {
-          setError(data.error || 'کد نادرست است.');
-          setCode(['', '', '', '']);
-          inputRefs.current[0]?.focus();
-        }
-      })
-      .catch(() => setError('خطا در تأیید کد.'));
-  };
-
-  const handleHeyatLogin = () => {
-    setError('');
-    if (!username || !password) return setError('نام کاربری و رمز عبور الزامی است.');
-    console.log(JSON.stringify({ username, password }));
-
-    fetch('http://localhost:8000/api/auth/login/board/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    })
-      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
-      .then(({ ok, data }) => {
-        if (ok && data.access) {
-          const r = data.role === 'board' ? 'heyat' : data.role;
-          localStorage.setItem(`${r}_token`, data.access);
-          localStorage.setItem('user_role', r);
-          onClose();
-          navigate(`/dashboard/${r}`);
-        } else {
-          setError(data.error || 'نام کاربری یا رمز اشتباه است.');
-        }
-      })
-      .catch(() => setError('خطا در ورود.'));
+  // ---------- فراموشی رمز ----------
+  const handleForgotClick = (e) => {
+    e.preventDefault();
+    if (loading) return;
+    onClose?.();
+    onForgotPassword?.();
   };
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-container animate-pop">
-        <button className="close-btn" onClick={onClose}>
+    <div className="login-modal-backdrop" onMouseDown={handleBackdropClick}>
+      <div
+        className="login-modal-container"
+        dir="rtl"
+        ref={cardRef}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <button
+          className="login-close-btn"
+          onClick={onClose}
+          disabled={loading}
+          aria-label="بستن"
+        >
           &times;
         </button>
 
-        {role === 'heyat' ? (
-          <div className="modal-content">
-            <h2>ورود هیأت</h2>
-            <p className="subtext">نام کاربری و رمز عبور خود را وارد کنید</p>
+        <div className="login-modal-content">
+          <h2>{title || "ورود به پنل کاربری"}</h2>
+          <p className="login-subtext">
+            {subtitle || "لطفاً نام کاربری و رمز عبور را وارد کنید."}
+          </p>
+
+          <form id="login-form" onSubmit={handleLogin} className="login-form" noValidate>
             <input
-              className="input-field"
+              ref={userInputRef}
+              className="login-input-field"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="نام کاربری"
+              placeholder="نام کاربری (شماره موبایل)"
+              dir="ltr"
+              autoComplete="username"
             />
-            <div className="password-container">
+
+            <div className="login-password-container">
               <input
-                type={showPassword ? 'text' : 'password'}
+                className="login-password-input"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="رمز عبور"
-                className="password-input"
+                dir="ltr"
+                autoComplete="current-password"
               />
               <button
                 type="button"
-                className="toggle-password-btn"
-                onClick={() => setShowPassword(!showPassword)}
+                className="login-toggle-password-btn"
+                onClick={() => setShowPassword((s) => !s)}
+                disabled={loading}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-            {error && <p className="error-msg">{error}</p>}
-            <button className="action-btn" onClick={handleHeyatLogin}>
-              ورود
+
+            {error && <p className="login-error-msg">{error}</p>}
+
+            <button type="submit" className="login-action-btn" disabled={loading}>
+              {loading ? "در حال ورود..." : "ورود"}
             </button>
-          </div>
-        ) : step === 1 ? (
-          <div className="modal-content">
-            <h2>ورود {getRoleLabel()}</h2>
-            <p className="subtext">شماره موبایل خود را وارد کنید</p>
-            <input
-              className="input-field"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="مثلاً 09123456789"
-              dir="rtl"
-            />
-            {error && <p className="error-msg">{error}</p>}
-            <button className="action-btn" onClick={sendCode}>
-              ارسال کد ورود
-            </button>
-          </div>
-        ) : (
-          <div className="modal-content">
-            <h2>کد ورود</h2>
-            <p className="subtext">کد ۴ رقمی پیامک‌شده را وارد کنید</p>
-            <div className="code-inputs" dir="ltr">
-              {code.map((val, i) => (
-                <input
-                  key={i}
-                  type="text"
-                  maxLength="1"
-                  ref={(el) => (inputRefs.current[i] = el)}
-                  value={val}
-                  onChange={(e) => handleCodeChange(e.target.value, i)}
-                  className="code-box"
-                />
-              ))}
-            </div>
-            {error && <p className="error-msg">{error}</p>}
-            {timer > 0 ? (
-              <p className="timer">ارسال مجدد در {timer} ثانیه</p>
-            ) : (
-              <button className="resend-btn" onClick={sendCode}>
-                ارسال مجدد
-              </button>
-            )}
-          </div>
-        )}
+          </form>
+
+          <button
+            type="button"
+            className="login-resend-btn"
+            onClick={handleForgotClick}
+            disabled={loading}
+          >
+            فراموشی رمز عبور
+          </button>
+        </div>
       </div>
     </div>
   );
