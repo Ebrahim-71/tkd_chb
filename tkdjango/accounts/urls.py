@@ -3,7 +3,8 @@ from .views import (
     SendCodeAPIView,VerifyCodeAPIView,form_data_view,form_data_player_view,
     RegisterCoachAPIView,approve_pending_user,check_national_code,
     RegisterPlayerAPIView,coaches_by_club_gender, RegisterPendingClubAPIView,
-    approve_pending_club,
+    approve_pending_club,  ForgotPasswordSendCodeAPIView,
+    ForgotPasswordVerifyAPIView,
     DashboardCombinedView,user_profile_with_form_data_view, UpdateProfilePendingAPIView,
     approve_edited_profile,CoachStudentsAPIView,CoachClubsAPIView,UpdateCoachClubsAPIView,
     AllClubsAPIView,ClubStudentsView,ClubCoachesView,ClubAllCoachesView,UpdateClubCoachesView
@@ -47,5 +48,6 @@ urlpatterns = [
     path("dashboard/<role>/", DashboardCombinedView.as_view(), name="dashboard-combined"),
     # ✅ ورود عمومی با نام کاربری و رمز عبور
     path('login/', UniversalLoginAPIView.as_view(), name='universal-login'),
-
+    path("password/forgot/send/", ForgotPasswordSendCodeAPIView.as_view()),
+    path("password/forgot/verify/", ForgotPasswordVerifyAPIView.as_view()),
 ]
