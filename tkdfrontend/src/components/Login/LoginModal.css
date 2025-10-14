@@ -1,4 +1,4 @@
-/* LoginModal.css — مشتق از CSS ثبت‌نام، با prefix "login-" */
+/* LoginModal.css — نسخه نهایی و تمیز */
 
 /* backdrop */
 .login-modal-backdrop {
@@ -61,47 +61,43 @@
 }
 
 /* inputs */
-.login-input-field {
+.login-input-field,
+.login-password-input {
   width: 100%;
-  padding: 0.75rem;
+  height: 44px;
+  padding: 10px 14px;
   font-size: 1rem;
   border-radius: 10px;
   border: 1px solid #ccc;
+  background: #fff;
   margin-bottom: 1rem;
   transition: border-color 0.3s, box-shadow 0.3s;
+  box-sizing: border-box;
 }
-.login-input-field:focus {
+
+.login-input-field:focus,
+.login-password-input:focus {
   border-color: #3498db;
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.18);
   outline: none;
 }
 
-/* password */
+/* password container */
 .login-password-container {
   position: relative;
   width: 100%;
 }
+
+/* فضای اضافی برای آیکن سمت چپ (dir=rtl) */
 .login-password-input {
-  width: 100%;
-  padding: 12px;
-  font-size: 1rem;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  background: #fff;
-  margin-bottom: 12px;
-  transition: border-color 0.3s, box-shadow 0.3s;
-}
-.login-password-input:focus {
-  border-color: #3498db;
-  outline: none;
-  box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+  padding-left: 42px;
 }
 
-/* eye button (positioned left because dir=rtl) */
+/* eye button (سمت چپ) */
 .login-toggle-password-btn {
   position: absolute;
-  left: 10px;
-  top: 50%;
+  left: 14px;
+  top: 37%;
   transform: translateY(-50%);
   border: none;
   background: transparent;
@@ -110,8 +106,16 @@
   color: #555;
   display: flex;
   align-items: center;
+  line-height: 1;
 }
 .login-toggle-password-btn:hover { color: #000; }
+
+/* placeholder راست‌چین برای زبان فارسی */
+.login-input-field::placeholder,
+.login-password-input::placeholder {
+  text-align: right;
+  opacity: 0.75;
+}
 
 /* error */
 .login-error-msg {
@@ -122,7 +126,7 @@
   text-align: right;
 }
 
-/* action button — EXACT same color as register (you gave #f39c12) */
+/* action button */
 .login-action-btn {
   background-color: #f39c12;
   color: #fff;
@@ -144,7 +148,7 @@
   transform: none;
 }
 
-/* resend / forgot */
+/* resend / forgot password */
 .login-resend-btn {
   background-color: transparent;
   color: #3498db;
@@ -167,6 +171,14 @@
     max-width: 95vw;
     border-radius: 16px;
   }
+
   .login-modal-content h2 { font-size: 1.2rem; }
-  .login-input-field, .login-action-btn { font-size: 0.95rem; padding: 10px 14px; }
+
+  .login-input-field,
+  .login-password-input,
+  .login-action-btn {
+    font-size: 0.95rem;
+    height: 42px;
+    padding: 10px 14px;
+  }
 }
