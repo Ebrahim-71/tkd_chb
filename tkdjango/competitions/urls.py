@@ -15,7 +15,7 @@ from .views import (
     CoachStudentsEligibleListView, CoachRegisterStudentsView,
 
     # --------- Dashboard (ALL) ----------
-    DashboardAllCompetitionsView,
+    DashboardAllCompetitionsView,public_bracket_view  ,
 
     # --------- Seminars ----------
     SeminarListView, SeminarDetailView, SeminarRegisterView, sidebar_seminars,
@@ -23,7 +23,7 @@ from .views import (
     # --------- Poomsae ----------
     PoomsaeCompetitionDetailView,
     PoomsaeCoachApprovalStatusView, PoomsaeCoachApprovalApproveView,
-    PoomsaeRegisterSelfView,
+    PoomsaeRegisterSelfView,MyPoomsaeEnrollmentsView
     # PoomsaeRegisterSelfPrefillView,  # اگر دارید، فعالش کنید
 )
 
@@ -84,6 +84,7 @@ urlpatterns = [
     # ========================= Kyorugi – لیست‌های نقش‌محور =========================
     path("kyorugi/player/competitions/", PlayerCompetitionsList.as_view(), name="player-competitions"),
     path("kyorugi/referee/competitions/", RefereeCompetitionsList.as_view(), name="referee-competitions"),
+    path("public/kyorugi/<str:public_id>/bracket/", public_bracket_view, name="public-kyorugi-bracket"),
 
     # ========================= سمینار =========================
     path("seminars/", SeminarListView.as_view(), name="seminar-list"),
@@ -112,13 +113,7 @@ urlpatterns = [
         PoomsaeRegisterSelfView.as_view(),
         name="poomsae-register-self",
     ),
-    # اگر ویو prefill مخصوص پومسه دارید، این مسیر را فعال کنید:
-    # path(
-    #     "auth/poomsae/<ckey:public_id>/prefill/",
-    #     PoomsaeRegisterSelfPrefillView.as_view(),
-    #     name="poomsae-prefill",
-    # ),
-
+    path("poomsae/<str:key>/my-enrollments/", MyPoomsaeEnrollmentsView.as_view(), name="poomsae-my-enrollments"),
     # ========================= جزئیات مسابقه (GENERIC) =========================
     path("<ckey:key>/", CompetitionDetailAnyView.as_view(), name="competition-detail-any"),
     path("competitions/<ckey:key>/", CompetitionDetailAnyView.as_view(), name="competition-detail-any-compat"),

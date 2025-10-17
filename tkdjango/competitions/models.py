@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError
 from datetime import timedelta
 import string, secrets, jdatetime, random
 from django.db.models import Index, CheckConstraint, Q, F
+from datetime import datetime, date
+from django.contrib.auth import get_user_model
 
 from django.utils import timezone
 from django.db import models as djm
@@ -18,6 +20,7 @@ from accounts.models import UserProfile, TkdClub, TkdBoard
 from django.conf import settings
 
 
+User = get_user_model()
 
 
 
@@ -37,21 +40,23 @@ class RegistrationManualMixin(models.Model):
 
     @property
     def registration_open_effective(self) -> bool:
-        # override دستی
         if self.registration_manual is True:
             return True
         if self.registration_manual is False:
             return False
 
-        # حالت خودکار براساس نوع فیلدها
         start = getattr(self, "registration_start", None)
-        end   = getattr(self, "registration_end", None)
+        end = getattr(self, "registration_end", None)
 
-        # اگر DateTimeField است از now، اگر DateField است از localdate
-        from datetime import datetime, date
+        # اگر DateTime است: now بگیر و هر DateTime نا‌آگاه را آگاه کن
         if isinstance(start, datetime) or isinstance(end, datetime):
             current = timezone.now()
+            if isinstance(start, datetime) and timezone.is_naive(start):
+                start = timezone.make_aware(start)
+            if isinstance(end, datetime) and timezone.is_naive(end):
+                end = timezone.make_aware(end)
         else:
+            # اگر DateField است: با date مقایسه کن
             current = timezone.localdate()
 
         if start and current < start:
@@ -59,7 +64,6 @@ class RegistrationManualMixin(models.Model):
         if end and current > end:
             return False
         return True
-
 
 # =========================
 def _gen_public_id(n: int = 10) -> str:
@@ -163,6 +167,11 @@ class KyorugiCompetition(RegistrationManualMixin, models.Model):
     weigh_date         = models.DateField(verbose_name='تاریخ وزن‌کشی')
     draw_date          = models.DateField(verbose_name='تاریخ قرعه‌کشی')
     competition_date   = models.DateField(verbose_name='تاریخ برگزاری')
+    bracket_published_at = models.DateTimeField(null=True, blank=True)
+    bracket_published_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="published_kyorugi_brackets"
+    )
 
     mat_count = models.PositiveIntegerField('تعداد زمین', default=1)
 
@@ -219,6 +228,9 @@ class KyorugiCompetition(RegistrationManualMixin, models.Model):
     def style_display(self):
         return "کیوروگی"
 
+    @property
+    def is_bracket_published(self):
+        return bool(self.bracket_published_at)
     def clean(self):
         # اگر کاربر در ادمین تاریخ شمسی وارد کرد (سال < 1700)، به میلادی تبدیل کن
         for f in ["registration_start", "registration_end", "weigh_date", "draw_date", "competition_date"]:
@@ -1057,17 +1069,42 @@ class PoomsaeCompetition(RegistrationManualMixin, models.Model):
     def style_display(self):
         return "پومسه"
 
-    def _to_greg_if_jalali_date(self, d):
-        if d and hasattr(d, "year") and d.year < 1700:
-            return jdatetime.date(d.year, d.month, d.day).togregorian()
+    def resolve_belt_group_for(self, player: UserProfile) -> Optional['BeltGroup']:
+        """
+        یک BeltGroup از گروه‌های مجاز همین مسابقه برمی‌گرداند که کمربند بازیکن در آن باشد.
+        """
+        player_belt = getattr(player, "belt", None) or getattr(player, "current_belt", None)
+        if not player_belt:
+            return None
+        # فقط از گروه‌های تعریف‌شدهٔ خود این مسابقه
+        return (self.belt_groups
+                .filter(belts=player_belt)  # BeltGroup‌هایی که این کمربند را دارند
+                .order_by("id")  # قطعی و قابل پیش‌بینی
+                .first())
+
+    def _to_greg_if_jalali(self, d):
+        if not d:
+            return d
+        # اگر date یا datetime با سال < 1700 است، به میلادی برگردان
+        try:
+            if isinstance(d, datetime):
+                if d.year < 1700:
+                    jdt = jdatetime.datetime(d.year, d.month, d.day, d.hour, d.minute, d.second)
+                    return jdt.togregorian()
+            elif isinstance(d, date):
+                if d.year < 1700:
+                    return jdatetime.date(d.year, d.month, d.day).togregorian()
+        except Exception:
+            pass
         return d
 
     def clean(self):
-        # پوشش تمام تاریخ‌های DateField که ممکن است در ادمین جلالی وارد شوند
-        self.start_date       = self._to_greg_if_jalali_date(self.start_date)
-        self.end_date         = self._to_greg_if_jalali_date(self.end_date)
-        self.draw_date        = self._to_greg_if_jalali_date(self.draw_date)
-        self.competition_date = self._to_greg_if_jalali_date(self.competition_date)
+        self.start_date = self._to_greg_if_jalali(self.start_date)
+        self.end_date = self._to_greg_if_jalali(self.end_date)
+        self.draw_date = self._to_greg_if_jalali(self.draw_date)
+        self.competition_date = self._to_greg_if_jalali(self.competition_date)
+        self.registration_start = self._to_greg_if_jalali(self.registration_start)
+        self.registration_end = self._to_greg_if_jalali(self.registration_end)
         super().clean()
 
     def save(self, *args, **kwargs):
@@ -1193,7 +1230,6 @@ class PoomsaeEnrollment(models.Model):
         ("silver", "نقره"),
         ("bronze", "برنز"),
     ]
-
     STATUS_CHOICES = [
         ("pending_payment", "در انتظار پرداخت"),
         ("paid", "پرداخت‌شده"),
@@ -1202,7 +1238,6 @@ class PoomsaeEnrollment(models.Model):
         ("completed", "تکمیل‌شده"),
         ("canceled", "لغو شده"),
     ]
-
     POOMSAE_TYPE_CHOICES = [
         ("standard", "استاندارد"),
         ("creative", "ابداعی"),
@@ -1230,7 +1265,7 @@ class PoomsaeEnrollment(models.Model):
     coach_name = models.CharField("نام مربی (اسنپ‌شات)", max_length=150, blank=True, default="")
     coach_approval_code = models.CharField("کد تایید مربی (اسنپ‌شات)", max_length=8, blank=True, default="")
 
-    # باشگاه/هیئت: FK + اسنپ‌شات نام
+    # باشگاه/هیئت + اسنپ‌شات
     club = models.ForeignKey(
         TkdClub, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="poomsae_club_enrollments", verbose_name="باشگاه"
@@ -1252,7 +1287,7 @@ class PoomsaeEnrollment(models.Model):
         null=True, blank=True, related_name="poomsae_enrollments", verbose_name="رده سنی"
     )
 
-    # بجای وزن، نوع مسابقه پومسه
+    # نوع پومسه
     poomsae_type = models.CharField("نوع پومسه", max_length=16, choices=POOMSAE_TYPE_CHOICES)
 
     # داده‌های فرم (بیمه)
@@ -1276,21 +1311,30 @@ class PoomsaeEnrollment(models.Model):
             models.Index(fields=["coach"]),
             models.Index(fields=["club"]),
             models.Index(fields=["board"]),
-            models.Index(fields=["competition", "player"]),  # ← برای جست‌وجوهای رایج
+            models.Index(fields=["competition", "player"]),
         ]
-        # امکان ثبت‌نام هم‌زمان در نوع استاندارد و ابداعی
         unique_together = (("competition", "player", "poomsae_type"),)
-        # اگر فقط یک ثبت‌نام در هر مسابقه می‌خواهید:
-        # unique_together = (("competition", "player"),)
 
     def __str__(self):
         return f"{self.player} @ {self.competition} [{self.get_poomsae_type_display()}]"
 
-    # ولیدیشن تکمیلی (اختیاری اما مفید)
+    # --------- داخلی: تعیین خودکار گروه کمربندی از روی کمربند بازیکن و گروه‌های مسابقه ---------
+    def _auto_set_belt_group(self):
+        if not (self.competition_id and self.player_id):
+            return
+
+        # اگر کاربر گروهی فرستاده که اصلاً جزو گروه‌های مسابقه نیست، پاکش کن
+        if self.belt_group_id and not self.competition.belt_groups.filter(id=self.belt_group_id).exists():
+            self.belt_group = None
+
+        correct = self.competition.resolve_belt_group_for(self.player)
+        if correct and (self.belt_group_id != correct.id):
+            self.belt_group = correct
+
+    # --------- اعتبارسنجی ---------
     def clean(self):
-        # تاریخ بیمه: معقول بودن (نه آیندهٔ دور، نه خیلی قدیمی)
+        # تاریخ بیمه (منطق خودتان)
         if self.insurance_issue_date:
-            # نمونه: حداکثر 365 روز قبل از روز مسابقه (اگر competition_date موجود باشد)
             comp_date = self.competition.competition_date or self.competition.start_date
             try:
                 delta = comp_date - self.insurance_issue_date
@@ -1298,8 +1342,31 @@ class PoomsaeEnrollment(models.Model):
                     raise ValidationError({"insurance_issue_date": "تاریخ بیمه باید حداقل ۳ روز و حداکثر ۱ سال قبل از مسابقه باشد."})
             except Exception:
                 pass
+
+        # تعیین/اصلاح گروه کمربندی
+        self._auto_set_belt_group()
+
+        # اگر مسابقه گروه کمربندی دارد ولی نتوانستیم تعیین کنیم → خطا
+        if self.competition_id and self.competition.belt_groups.exists() and not self.belt_group_id:
+            raise ValidationError({"belt_group": "گروه کمربندی متناسب با کمربند بازیکن در این مسابقه یافت نشد."})
+
+        # اگر گروه ست شده ولی کمربند بازیکن داخل آن گروه نیست → خطا
+        if self.belt_group_id and self.player_id:
+            player_belt = getattr(self.player, "belt", None) \
+                          or getattr(self.player, "current_belt", None) \
+                          or getattr(self.player, "belt_level", None)
+            if player_belt and not BeltGroup.objects.filter(id=self.belt_group_id, belts=player_belt).exists():
+                raise ValidationError({"belt_group": "کمربند بازیکن با گروه کمربندی انتخاب‌شده سازگار نیست."})
+
         super().clean()
 
+    # --------- محکم‌کاری در ذخیره ---------
+    def save(self, *args, **kwargs):
+        # قبل از ذخیره دوباره محاسبه شود تا حتی با save() مستقیم هم درست بماند
+        self._auto_set_belt_group()
+        return super().save(*args, **kwargs)
+
+    # --------- پرداخت (بدون تغییر منطق شما) ---------
     def mark_paid(self, amount: int = 0, ref_code: str = ""):
         was_paid = self.is_paid
         self.is_paid = True
@@ -1311,7 +1378,6 @@ class PoomsaeEnrollment(models.Model):
             self.status = "paid"
         super().save(update_fields=["is_paid", "paid_amount", "bank_ref_code", "paid_at", "status"])
 
-        # امتیازدهی یک‌بار در لحظهٔ اولین پرداخت (مثل کیوروگی)
         if not was_paid:
             try:
                 UserProfile.objects.filter(id=self.player_id).update(
@@ -1320,7 +1386,6 @@ class PoomsaeEnrollment(models.Model):
                 )
             except Exception:
                 pass
-
             if self.coach_id:
                 UserProfile.objects.filter(id=self.coach_id).update(
                     ranking_total=F("ranking_total") + 0.75

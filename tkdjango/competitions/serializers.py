@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
 from rest_framework import serializers
 from django.utils import timezone
 from datetime import date as _date, datetime as _datetime, timedelta
@@ -8,8 +9,11 @@ import re
 from django.db.models import Q
 from django.db import transaction
 from django.conf import settings
+from django.db.models import Exists, OuterRef
+from typing import Optional
 
 from django.shortcuts import get_object_or_404
+
 
 from accounts.models import UserProfile, TkdClub, TkdBoard
 from math import inf
@@ -32,9 +36,65 @@ except Exception:
 # وضعیت‌هایی که «کارت» آماده نمایش است
 CARD_READY_STATUSES = {"paid", "confirmed", "approved", "accepted", "completed"}
 
+# ✅ کارت آماده نمایش؟
+def _can_show_card(status: str, is_paid: bool = False) -> bool:
+    s = (status or "").lower()
+    return bool(is_paid or (s in CARD_READY_STATUSES))
 # -------------------------------------------------
 # Helpers: تاریخ
 # -------------------------------------------------
+
+
+def _full_name(u):
+    if not u:
+        return None
+    # تلاش برای full_name یا name
+    for a in ("full_name", "name"):
+        v = getattr(u, a, None)
+        if v:
+            return v
+    fn = (getattr(u, "first_name", "") or "").strip()
+    ln = (getattr(u, "last_name", "") or "").strip()
+    return (fn + " " + ln).strip() or getattr(u, "username", None)
+
+class MatchPublicSerializer(serializers.ModelSerializer):
+    player_a = serializers.SerializerMethodField()
+    player_b = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Match
+        fields = (
+            "id",
+            "round_no",
+            "slot_a",
+            "slot_b",
+            "is_bye",
+            "match_number",   # شماره بازی که در شماره‌گذاری ست می‌شود
+            "player_a",
+            "player_b",
+        )
+
+    def get_player_a(self, obj): return _full_name(getattr(obj, "player_a", None)) or ""
+    def get_player_b(self, obj): return _full_name(getattr(obj, "player_b", None)) or ""
+
+class DrawWithMatchesSerializer(serializers.ModelSerializer):
+    belt_group = serializers.CharField(source="belt_group.label", allow_null=True)
+    weight_category = serializers.CharField(source="weight_category.name", allow_null=True)
+    matches = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Draw
+        fields = ("id", "size", "belt_group", "weight_category", "matches")
+
+    def get_matches(self, obj: Draw):
+        # اگر related_name روی مدل Match ندارید، از match_set استفاده می‌شود
+        qs = (getattr(obj, "matches", None) or obj.match_set)\
+                .select_related("player_a", "player_b")\
+                .order_by("round_no", "slot_a", "id")
+        return MatchPublicSerializer(qs, many=True).data
+
+
+
 def _as_local_date(v):
     if not v:
         return None
@@ -55,21 +115,50 @@ def _g2j(d):
 def _j2str(jd):
     return f"{jd.year:04d}/{jd.month:02d}/{jd.day:02d}" if jd else None
 
+# helpers (بالای فایل)
+
+
 def _to_jalali_date_str(d):
-    return _j2str(_g2j(d))
+    """Gregorian date/datetime -> 'YYYY/MM/DD' jalali (safe)."""
+    if not d:
+        return None
+    # اگر datetime است، قبل از تبدیل صرفاً تاریخ را بگیر
+    if isinstance(d, _datetime):
+        # اگر آگاه به تایم‌زون است، به لوکال تبدیل کن بعد date() بگیر
+        d = timezone.localtime(d).date() if timezone.is_aware(d) else d.date()
+    try:
+        jd = jdatetime.date.fromgregorian(date=d)
+        return f"{jd.year:04d}/{jd.month:02d}/{jd.day:02d}"
+    except Exception:
+        return None
 
 def _to_jalali_date_str_safe(d):
+    # الان با _to_jalali_date_str یکی شد؛ نگهش داریم برای سازگاری
+    return _to_jalali_date_str(d)
+
+def _to_greg_from_str_jalali(s: str):
+    """
+    ورودی: 'YYYY/MM/DD' یا 'YYYY-MM-DD' (جلالی یا میلادی).
+    خروجی: datetime.date گریگوریان. سال >=1700 میلادی فرض می‌شود.
+    """
+    if not s:
+        return None
+    # حذف ZWNJ/RTL/… و یکدست‌سازی ارقام و جداکننده
+    t = str(s)
+    t = re.sub(r"[\u200e\u200f\u200c\u202a-\u202e]", "", t)
+    t = _to_en_digits(t).strip().replace("-", "/")
     try:
-        return _to_jalali_date_str(d)
-    except NameError:
-        if not d:
-            return None
-        try:
-            g = d.date() if hasattr(d, "date") else d
-            jd = jdatetime.date.fromgregorian(date=g)
-            return jd.strftime("%Y/%m/%d")
-        except Exception:
-            return None
+        y, m, d = [int(x) for x in t.split("/")[:3]]
+    except Exception:
+        return None
+    try:
+        if y >= 1700:
+            return _date(y, m, d)
+        # جلالی → گریگوریان (date، نه datetime)
+        return jdatetime.date(y, m, d).togregorian()
+    except Exception:
+        return None
+
 
 def _parse_jalali_str(s):
     if not s:
@@ -91,21 +180,18 @@ def _parse_jalali_str(s):
     except Exception:
         return None
 
-def _to_greg_from_str_jalali(s: str):
-    """'YYYY/MM/DD' یا 'YYYY-MM-DD'; سال >=1700 را میلادی فرض کن، وگرنه شمسی→میلادی."""
-    if not s:
-        return None
-    t = _to_en_digits(str(s)).strip().replace("-", "/")
-    try:
-        jy, jm, jd = [int(x) for x in t.split("/")[:3]]
-    except Exception:
-        return None
-    try:
-        if jy >= 1700:
-            return _date(jy, jm, jd)
-        return jdatetime.date(jy, jm, jd).togregorian()
-    except Exception:
-        return None
+def _eligible_real_matches_qs(comp):
+    """
+    بازی‌های «واقعی» یعنی:
+      - BYE نیستند (is_bye=False)
+      - هر دو طرف مشخص است (player_* یا slot_* برای A و B)
+    """
+    base = Match.objects.filter(draw__competition=comp)
+    eligible = base.filter(is_bye=False).filter(
+        (Q(player_a__isnull=False) | Q(slot_a__isnull=False)) &
+        (Q(player_b__isnull=False) | Q(slot_b__isnull=False))
+    )
+    return base, eligible
 
 # -------------------------------------------------
 # Helpers: جنسیت، ارقام، کمربند، باشگاه
@@ -187,7 +273,7 @@ def _find_belt_group_obj(comp, player_belt_code: str):
                 return g
     return None
 
-def _find_belt_group_label(comp, player_belt_code: str) -> str | None:
+def _find_belt_group_label(comp, player_belt_code: str)-> Optional[str]:
     for g in comp.belt_groups.all().prefetch_related("belts"):
         codes = set()
         for b in g.belts.all():
@@ -707,26 +793,17 @@ class KyorugiCompetitionDetailSerializer(serializers.ModelSerializer):
 
     # ---------- Bracket ----------
     def get_bracket_ready(self, obj):
-        if not obj.draws.exists():
-            return False
-        return not Match.objects.filter(
-            draw__competition=obj,
-            is_bye=False,
-            match_number__isnull=True
-        ).exists()
+        return obj.draws.exists()
 
     def get_bracket_stats(self, obj):
-        total = Match.objects.filter(draw__competition=obj).count()
-        real_total = Match.objects.filter(draw__competition=obj, is_bye=False).count()
-        real_numbered = Match.objects.filter(
-            draw__competition=obj, is_bye=False, match_number__isnull=False
-        ).count()
+        base, eligible = _eligible_real_matches_qs(obj)
         return {
             "draws": obj.draws.count(),
-            "matches_total": total,
-            "real_total": real_total,
-            "real_numbered": real_numbered,
+            "matches_total": base.count(),  # کل مچ‌ها (اطلاعاتی)
+            "real_total": eligible.count(),  # فقط واقعی‌ها
+            "real_numbered": eligible.filter(match_number__isnull=False).count(),  # شماره‌دارهای واقعی
         }
+
 
 # -------------------------------------------------
 # Register-self – KYORUGI (بدون Division)
@@ -781,13 +858,14 @@ class CompetitionRegistrationSerializer(serializers.Serializer):
             raise serializers.ValidationError({"__all__": "مسابقه یافت نشد."})
 
         # بازهٔ ثبت‌نام (Date)
+
         today = timezone.localdate()
-        if comp.registration_start and today < comp.registration_start:
+        rs = _as_local_date(getattr(comp, "registration_start", None))
+        re_ = _as_local_date(getattr(comp, "registration_end", None))
+        if rs and today < rs:
             raise serializers.ValidationError({"__all__": "ثبت‌نام هنوز شروع نشده است."})
-        if comp.registration_end and today > comp.registration_end:
+        if re_ and today > re_:
             raise serializers.ValidationError({"__all__": "مهلت ثبت‌نام به پایان رسیده است."})
-        if not getattr(comp, "registration_open_effective", False):
-            raise serializers.ValidationError({"__all__": "ثبت‌نام این مسابقه فعال نیست."})
 
         # کاربر/پروفایل بازیکن
         user = getattr(req, "user", None)
@@ -1114,6 +1192,22 @@ class EnrollmentCardSerializer(serializers.ModelSerializer):
     def get_insurance_issue_date_jalali(self, obj):
         return _to_jalali_date_str(obj.insurance_issue_date)
 
+
+class MyEnrollmentStatusSerializer(serializers.Serializer):
+    enrollment_id = serializers.IntegerField()
+    status = serializers.CharField()
+    can_show_card = serializers.SerializerMethodField()
+
+    def get_can_show_card(self, obj: Enrollment):
+        return _can_show_card(getattr(obj, "status", ""), getattr(obj, "is_paid", False))
+
+    def to_representation(self, obj: Enrollment):
+        return {
+            "enrollment_id": obj.id,
+            "status": obj.status,
+            "can_show_card": self.get_can_show_card(obj),
+        }
+
 # -------------------------------------------------
 # Bracket API
 # -------------------------------------------------
@@ -1144,37 +1238,26 @@ class DrawWithMatchesSerializer(serializers.ModelSerializer):
         return "آقایان" if obj.gender=="male" else ("بانوان" if obj.gender=="female" else obj.gender)
 
 def _bracket_ready_for(comp):
-    if not comp.draws.exists():
-        return False
-    return not Match.objects.filter(
-        draw__competition=comp, is_bye=False, match_number__isnull=True
-    ).exists()
+    return bool(getattr(comp, "is_bracket_published", True)) and comp.draws.exists()
+
 
 def _bracket_stats_for(comp):
-    total = Match.objects.filter(draw__competition=comp).count()
-    real_total = Match.objects.filter(draw__competition=comp, is_bye=False).count()
-    real_numbered = Match.objects.filter(
-        draw__competition=comp, is_bye=False, match_number__isnull=False
-    ).count()
+    base, eligible = _eligible_real_matches_qs(comp)
     return {
         "draws": comp.draws.count(),
-        "matches_total": total,
-        "real_total": real_total,
-        "real_numbered": real_numbered,
+        "matches_total": base.count(),
+        "real_total": eligible.count(),
+        "real_numbered": eligible.filter(match_number__isnull=False).count(),
     }
 
 class KyorugiBracketSerializer(serializers.Serializer):
     def to_representation(self, comp):
         from .models import Match, Draw
-        draws_qs = (
-            Draw.objects.filter(competition=comp)
-            .select_related("age_category", "belt_group", "weight_category")
-            .prefetch_related(
-                "matches",
-                "matches__player_a", "matches__player_b", "matches__winner"
-            )
-            .order_by("id")
-        )
+
+        draws_qs = (Draw.objects.filter(competition=comp).select_related("age_category", "belt_group", "weight_category")
+                   .prefetch_related("matches", "matches__player_a", "matches__player_b", "matches__winner")
+                     .order_by("weight_category__min_weight", "id"))
+
         draws = DrawWithMatchesSerializer(draws_qs, many=True, context=self.context).data
 
         by_mat = []
@@ -1935,7 +2018,7 @@ class PoomsaeRegistrationSerializer(serializers.Serializer):
     def _player_belt_code(self, prof: UserProfile):
         return _player_belt_code_from_profile(prof)
 
-    def _resolve_age_category_for_player(self, comp, player) -> AgeCategory | None:
+    def _resolve_age_category_for_player(self, comp, player)-> Optional[AgeCategory]:
         """از M2M age_categories یا FK age_category بهترین رده سنی مطابق DOB بازیکن را بده."""
         dob_j = _parse_jalali_str(getattr(player, "birth_date", None))
         if not dob_j:
@@ -1972,17 +2055,20 @@ class PoomsaeRegistrationSerializer(serializers.Serializer):
                 raise serializers.ValidationError({"__all__": "مهلت ثبت‌نام به پایان رسیده است."})
 
             # اگر فیلد/پرُپرتی boolean روی مدل داری از همان استفاده کن؛
-            # وگرنه از هلسپر registration_open_effective(comp) استفاده کن.
+
             reg_open_eff = getattr(comp, "registration_open_effective", None)
             if callable(reg_open_eff):
                 is_open = bool(reg_open_eff())
             elif isinstance(reg_open_eff, bool):
                 is_open = reg_open_eff
             else:
-                from competitions.views import registration_open_effective
-                is_open = bool(registration_open_effective(comp))
+                # محاسبه‌ی سادهٔ لوکال (DateTime)
+                now_dt = timezone.now()
+                rs = getattr(comp, "registration_start", None)
+                re_ = getattr(comp, "registration_end", None)
+                is_open = bool(rs and re_ and (rs <= now_dt <= re_))
 
-            if not is_open:
+            if not force_open and not is_open:
                 raise serializers.ValidationError({"__all__": "ثبت‌نام این مسابقه فعال نیست."})
 
         # کاربر/پروفایل بازیکن
@@ -2108,8 +2194,8 @@ class PoomsaeRegistrationSerializer(serializers.Serializer):
         }
 
 
-
 class PoomsaeEnrollmentCardSerializer(serializers.ModelSerializer):
+    kind = serializers.SerializerMethodField()
     competition_title = serializers.CharField(source="competition.name", read_only=True)
     competition_date_jalali = serializers.SerializerMethodField()
 
@@ -2117,22 +2203,54 @@ class PoomsaeEnrollmentCardSerializer(serializers.ModelSerializer):
     last_name  = serializers.CharField(source="player.last_name", read_only=True)
     birth_date = serializers.SerializerMethodField()
     photo      = serializers.SerializerMethodField()
+    poomsae_types = serializers.SerializerMethodField()
 
-    poomsae_type_display = serializers.CharField(source="get_poomsae_type_display", read_only=True)
+    poomsae_type_display = serializers.SerializerMethodField()
     belt_group = serializers.SerializerMethodField()
+    belt = serializers.SerializerMethodField()               # ⬅️ جدید — نام کمربند بازیکن
+    age_category_name = serializers.SerializerMethodField()
 
     insurance_issue_date_jalali = serializers.SerializerMethodField()
 
     class Meta:
         model = PoomsaeEnrollment
         fields = [
+            "kind",
             "competition_title", "competition_date_jalali",
             "first_name", "last_name", "birth_date", "photo",
-            "poomsae_type", "poomsae_type_display",
-            "belt_group",
+            "poomsae_type", "poomsae_type_display", "poomsae_types",
+            "belt_group", "belt", "age_category_name",           # ⬅️ belt اضافه شد
             "insurance_number", "insurance_issue_date_jalali",
             "coach_name", "club_name",
         ]
+
+    def get_kind(self, obj):
+        return "poomsae"
+
+    def get_poomsae_types(self, obj):
+        return list(
+            PoomsaeEnrollment.objects
+            .filter(competition=obj.competition, player=obj.player)
+            .exclude(status="canceled")
+            .values_list("poomsae_type", flat=True)
+            .distinct()
+        )
+
+    def get_poomsae_type_display(self, obj):
+        qs = (PoomsaeEnrollment.objects
+              .filter(competition=obj.competition, player=obj.player)
+              .exclude(status="canceled"))
+        types = list(qs.values_list("poomsae_type", flat=True).distinct())
+        order = {"standard": 0, "creative": 1}
+        types.sort(key=lambda x: order.get(x, 99))
+        mapping = dict(PoomsaeEnrollment.POOMSAE_TYPE_CHOICES)
+        labels = [mapping.get(t, t) for t in types if t]
+        if labels:
+            return "، ".join(labels)
+        try:
+            return obj.get_poomsae_type_display()
+        except Exception:
+            return mapping.get(getattr(obj, "poomsae_type", None), None)
 
     def get_competition_date_jalali(self, obj):
         d = getattr(obj.competition, "competition_date", None) or getattr(obj.competition, "start_date", None)
@@ -2167,3 +2285,52 @@ class PoomsaeEnrollmentCardSerializer(serializers.ModelSerializer):
 
     def get_belt_group(self, obj):
         return getattr(getattr(obj, "belt_group", None), "label", None)
+
+    def get_belt(self, obj):
+        """نمایش نام کمربند خودِ بازیکن (نه گروه)."""
+        p = obj.player
+        # اولویت با grade، بعد نام‌های متنی؛ در نهایت رابطه Belt
+        for name in ("belt_grade", "belt_name", "belt_label", "belt_title"):
+            v = getattr(p, name, None)
+            if v:
+                return str(v)
+
+        b = getattr(p, "belt", None)
+        if not b:
+            return None
+        for attr in ("name", "label", "title"):
+            v = getattr(b, attr, None)
+            if v:
+                return str(v)
+        return b if isinstance(b, str) else None
+    def get_age_category_name(self, obj):
+        # اگر روی Enrollment ست شده بود
+        ac = getattr(obj, "age_category", None)
+        if ac and getattr(ac, "name", None):
+            return ac.name
+
+        # تلاش برای حدس زدن از DOB بازیکن و رده‌های خود مسابقه
+        bd = getattr(obj.player, "birth_date", None)
+        g = None
+        if isinstance(bd, (_date, _datetime)):
+            g = bd.date() if isinstance(bd, _datetime) else bd
+        else:
+            g = _to_greg_from_str_jalali(bd)
+        if not g:
+            return None
+
+        comp = obj.competition
+        try:
+            if getattr(comp, "age_categories", None) and comp.age_categories.exists():
+                m = AgeCategory.objects.filter(
+                    id__in=comp.age_categories.values_list("id", flat=True),
+                    from_date__lte=g, to_date__gte=g
+                ).first()
+                if m:
+                    return m.name
+        except Exception:
+            pass
+
+        # fallback عمومی
+        m = AgeCategory.objects.filter(from_date__lte=g, to_date__gte=g).first()
+        return getattr(m, "name", None)

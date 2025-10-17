@@ -60,14 +60,45 @@ function requireAuthHeaders() {
 }
 
 /* ---------------- Fetch helpers ---------------- */
+const DEBUG_API = true; // ← اگر نخواستی لاگ‌ها بیاد، بگذار false
 async function safeFetch(url, opts = {}) {
+  if (DEBUG_API) {
+    console.groupCollapsed("🌐 safeFetch");
+    console.log("URL:", url);
+    console.log("Method:", opts?.method || "GET");
+    console.log("Headers:", opts?.headers);
+    try {
+      const b = opts?.body && (typeof opts.body === "string" ? JSON.parse(opts.body) : opts.body);
+      if (b && typeof b === "object") {
+        console.log("Body:", b);
+        const typed = {};
+        Object.entries(b).forEach(([k, v]) => (typed[k] = `${v}  ← type: ${typeof v}`));
+        console.table(typed);
+      } else if (opts?.body) {
+        console.log("Body (raw):", opts.body);
+      }
+    } catch { console.log("Body (raw):", opts?.body); }
+    console.groupEnd();
+  }
+
   const res = await fetch(url, opts);
   let data = null;
   try { data = await res.json(); } catch { /* may be text */ }
+  if (DEBUG_API) {
+    console.groupCollapsed("📩 safeFetch Response");
+    console.log("Status:", res.status, res.statusText);
+    console.log("Data:", data);
+    console.groupEnd();
+  }
   if (!res.ok) {
     let message =
       data?.detail ||
       (Array.isArray(data?.non_field_errors) ? data.non_field_errors.join(" ") : null) ||
+      (Array.isArray(data?.__all__) ? data.__all__.join(" ") : null) ||
+      // اگر ساختار شبیه { errors: {field: ["..."]} } بود:
+      (data?.errors && typeof data.errors === "object"
+        ? Object.values(data.errors).flat().join(" ")
+        : null) ||
       data?.message ||
       data?.error ||
       `HTTP ${res.status}`;
@@ -75,6 +106,10 @@ async function safeFetch(url, opts = {}) {
     const err = new Error(message || "HTTP Error");
     err.status = res.status;
     err.payload = data;
+    if (DEBUG_API) {
+      console.warn("❗ safeFetch ERROR:", { url, status: res.status, message, payload: data });
+      try { console.table(data); } catch {}
+    }
     throw err;
   }
   if (res.status === 204 || res.status === 205) return null;
@@ -156,7 +191,6 @@ export async function getCompetitionTerms(key) {
       `${ANY_PUBLIC_ROOT}/by-public/${k}/terms/`,
       `${ANY_PUBLIC_ROOT}/${k}/terms/`,
       `${KY_PUBLIC_ROOT}/${k}/terms/`,
-      `${ANY_PUBLIC_ROOT}/competitions/kyorugi/${k}/terms/`,
     ],
     { method: "GET", headers, credentials: "omit", __debugUrls: true }
   );
@@ -172,7 +206,6 @@ export async function getCompetitionDetail(key) {
       `${ANY_PUBLIC_ROOT}/${k}/`,
       `${KY_PUBLIC_ROOT}/${k}/`,
       `${POOM_PUBLIC_ROOT}/${k}/`,
-      `${ANY_PUBLIC_ROOT}/competitions/${k}/`,
     ],
     { method: "GET", headers, credentials: "omit", __debugUrls: true }
   );
@@ -349,24 +382,80 @@ export async function getRefereeOpenCompetitions() {
   });
 }
 
-/* ---------------- Enrollment card & my enrollment ---------------- */
+/* ---------------- Enrollment detail, card & my enrollment ---------------- */
+
+
+export async function getEnrollmentDetail(enrollmentId) {
+  const headers = requireAuthHeaders(); // ← توکن الزامی
+  const id = String(enrollmentId).trim();
+  const base = `${API_BASE}/api/competitions/auth/enrollments/${id}`; // ← /api اضافه شد
+
+  // فقط /card/ معتبره؛ اگه خواستی کامپتیبلیتی بذار، 404 رو هندل کن
+  try {
+    return await safeFetch(`${base}/card/`, { method: "GET", headers, credentials: "omit" });
+  } catch (e) {
+    if (e?.status === 404) {
+      // سرور قدیمی (درصورت داشتن)
+      return await safeFetch(`${base}/`, { method: "GET", headers, credentials: "omit" });
+    }
+    throw e;
+  }
+}
+
+
+
+export function getEnrollmentCardUrl(enrollmentOrUrl) {
+  if (typeof enrollmentOrUrl === "string") {
+    return enrollmentOrUrl.startsWith("http")
+      ? enrollmentOrUrl
+      : `${API_BASE}${enrollmentOrUrl}`;
+  }
+  const e = enrollmentOrUrl || {};
+  const id = e.id || e.enrollment_id || e.pk;
+  return id ? `${API_BASE}/api/competitions/auth/enrollments/${encodeURIComponent(id)}/card/` : null;
+}
+
+
 export async function getEnrollmentCard(enrollmentId) {
   const headers = requireAuthHeaders();
-  return safeFetch(`${API_BASE}/api/competitions/auth/enrollments/${encodeURIComponent(enrollmentId)}/card/`, {
-    method: "GET", headers, credentials: "omit"
-  });
+  return safeFetch(
+    `${API_BASE}/api/competitions/auth/enrollments/${encodeURIComponent(enrollmentId)}/card/`,
+    { method: "GET", headers, credentials: "omit" }
+  );
 }
+
+
+
+// وضعیت ثبت‌نام خود کاربر در یک مسابقه (کیوروگی)
 export async function getMyEnrollment(publicId) {
   const headers = requireAuthHeaders();
   return safeFetch(`${KY_AUTH_ROOT}/${encodeURIComponent(publicId)}/my-enrollment/`, {
     method: "GET", headers, credentials: "omit"
   });
 }
-// پومسه my-enrollment نداریم
-export async function getMyEnrollmentPoomsae() {
-  const e = new Error("برای پومسه اندپوینت my-enrollment تعریف نشده است.");
-  e.status = 404; e.payload = { detail: e.message }; throw e;
+
+// وضعیت ثبت‌نام‌های پومسهٔ کاربر (اگر بک‌اند دارید؛ در غیر این صورت کل تابع را حذف کنید)
+// پومسه: وضعیت ثبت‌نام‌های من (استاندارد/ابداعی) + can_show_card
+export async function getMyPoomsaeEnrollments(key) {
+  const k = encodeURIComponent(String(key || "").trim());
+  const headers = authHeaders(); // ← به‌جای ساخت دستی
+
+  const candidates = [
+    `${API_BASE}/api/competitions/auth/poomsae/${k}/my-enrollments/`,
+    `${API_BASE}/api/competitions/poomsae/${k}/my-enrollments/`,
+  ];
+
+  for (const url of candidates) {
+    const res = await fetch(url, { headers, credentials: "omit" });
+    if (res.ok) return await res.json();
+    if (res.status !== 404) {
+      const msg = await res.text().catch(() => "");
+      throw new Error(msg || `HTTP ${res.status}`);
+    }
+  }
+  throw new Error("اندپوینت my-enrollments برای پومسه پیدا نشد.");
 }
+
 
 /* ---------------- Bracket & Results (کیوروگی/جنریک) ---------------- */
 export async function getBracket(publicId) {
@@ -391,7 +480,7 @@ export async function getCompetitionResults(publicId) {
     [
       `${KY_PUBLIC_ROOT}/${encodeURIComponent(publicId)}/results/`,
       `${ANY_PUBLIC_ROOT}/by-public/${encodeURIComponent(publicId)}/results/`,
-      `${ANY_PUBLIC_ROOT}/competitions/${encodeURIComponent(publicId)}/results/`,
+      `${ANY_PUBLIC_ROOT}/${encodeURIComponent(publicId)}/results/`,
     ],
     { method: "GET", headers, credentials: "omit", __debugUrls: true }
   );

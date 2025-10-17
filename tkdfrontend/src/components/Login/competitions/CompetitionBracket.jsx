@@ -39,8 +39,10 @@ function BracketCard({ draw, logoUrl = BOARD_LOGO }) {
   const matNo = useMemo(() => {
     const map = new Map();
     (draw.matches || []).forEach((m) => {
-      if (!m?.mat_no) return;
-      map.set(m.mat_no, (map.get(m.mat_no) || 0) + 1);
+      const mat =
+        m?.mat_no ?? m?.mat ?? m?.tatami_no ?? m?.tatami ?? m?.ring ?? m?.area ?? m?.court ?? null;
+      if (!mat) return;
+      map.set(mat, (map.get(mat) || 0) + 1);
     });
     let best = null, cnt = -1;
     for (const [k, v] of map.entries()) if (v > cnt) { best = k; cnt = v; }
@@ -90,9 +92,18 @@ function BracketCard({ draw, logoUrl = BOARD_LOGO }) {
       else el.classList.remove("bye");
     };
 
-    const getMatchNumber = (m) =>
-      m.match_number ?? m.number ?? m.number_on_mat ?? m.seq_no ?? m.seq ?? m.order_on_mat ?? m.order ?? "";
-
+   const getMatchNumber = (m) => {
+    // پشتیبانی از بیشترین نام‌های رایج سمت بک‌اند
+    const candidates = [
+      "match_number","number","match_no","no","bout_no",
+      "number_on_mat","order_on_mat","seq_on_mat",
+      "seq_no","seq","order","index","bracket_no"
+    ];
+    for (const k of candidates) {
+      if (m?.[k] !== undefined && m?.[k] !== null && m?.[k] !== "") return m[k];
+    }
+    return "";
+  };
     const firstRoundInfo = (mapRound) => {
       for (let r = 1; r <= 5; r++) {
         const vr = mapRound(r);
@@ -183,11 +194,21 @@ function BracketCard({ draw, logoUrl = BOARD_LOGO }) {
     if (matches.length) {
       const byRound = new Map();
       for (const m of matches) {
-        const r = Number(m.round_no || 1);
+        const r = Number(m.round_no ?? m.round ?? m.stage ?? 1);
         if (!byRound.has(r)) byRound.set(r, []);
         byRound.get(r).push(m);
       }
-      for (const [r, arr] of byRound) arr.sort((a, b) => (a.slot_a || 0) - (b.slot_a || 0));
+      for (const [r, arr] of byRound) {
+      // اولویت با slot_a، بعد order_in_round، بعد index عمومی:
+      arr.sort((a, b) => {
+        const ka = a.slot_a ?? a.order_in_round ?? a.index ?? 0;
+        const kb = b.slot_a ?? b.order_in_round ?? b.index ?? 0;
+        return (ka || 0) - (kb || 0);
+      });
+      // Fallback: اگر هیچ numberای نیامده بود، یک شماره‌ی ترتیبی موقت بگذار تا کاربر علامت‌ها را ببیند
+      let local = 1;
+      arr.forEach(m => { if (!getMatchNumber(m)) m.__fallback_no__ = local++; });
+    }
 
       for (const [r, arr] of byRound) {
         const vr = mapRound(r);
@@ -198,8 +219,8 @@ function BracketCard({ draw, logoUrl = BOARD_LOGO }) {
           const b = wrap.querySelector(`input.player-input[data-r="${vr}"][data-i="${idx}"][data-pos="b"]`);
           const n = wrap.querySelector(`input.bubble[data-r="${vr}"][data-i="${idx}"][data-num]`);
 
-          const pa = m.player_a_name || "";
-          const pb = m.player_b_name || "";
+          const pa = m.player_a_name ?? m.a_name ?? m.player_a ?? "";
+          const pb = m.player_b_name ?? m.b_name ?? m.player_b ?? "";
           const hasA = pa.trim() !== "";
           const hasB = pb.trim() !== "";
 
@@ -209,7 +230,12 @@ function BracketCard({ draw, logoUrl = BOARD_LOGO }) {
           if (n) {
             const restPair = isFirstRound && ((a?.value?.trim() === "استراحت") ^ (b?.value?.trim() === "استراحت"));
             if (restPair) { n.classList.add("bye-mark"); n.value = ""; n.title = "استراحت"; }
-            else { n.classList.remove("bye-mark"); n.value = String(getMatchNumber(m) || ""); n.title = n.value; }
+              else {
+              n.classList.remove("bye-mark");
+              const no = getMatchNumber(m) || m.__fallback_no__ || "";
+              n.value = String(no);
+              n.title = n.value;
+            }
           }
         });
       }
