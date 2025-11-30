@@ -1,37 +1,48 @@
-# Python / Django
+# ---- Python / Django ----
 __pycache__/
+*.py[cod]
+*.log
+*.pot
 *.pyc
-*.pyo
-*.pyd
-*.sqlite3
-.env
-.env.*
+
+# virtual envs
 venv/
-staticfiles/
+.env
+.venv/
+tkdjango/.venv/
+tkdworld/
+
+# DB (اگر sqlite استفاده می‌کنی)
+db.sqlite3
+
+# static/media (اگر خروجی build هستن)
+static/
 media/
+tkdjango/staticfiles/
+tkdjango/media/
+
+# Django cache / tmp / logs
+tkdjango/logs/
+tkdjango/tmp/
+tkdjango/stderr.log
+
+# Backup files
+*.bak.*
+*.bak
+*.old
+*.zip
 
 # Node / React
-node_modules/
-build/
-dist/
-*.map
+tkdfrontend/node_modules/
+tkdfrontend/build/
+tkdfrontend/.next/
 
-# Binaries & Archives
-*.zip
-*.rar
-*.7z
-*.tar
-*.gz
-*.mp4
-*.avi
-*.psd
-*.ai
-*.exe
-
-# OS/IDE
-.DS_Store
-Thumbs.db
+# Editor junk
 .vscode/
 .idea/
-tkdworld/
-tkdworld/
+.DS_Store
+
+# چیزهای اضافی عجیب
+tkdjango/True
+tkdjango/div
+"tkdjango/\357\270\217"
