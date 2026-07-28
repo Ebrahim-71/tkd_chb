@@ -3,6 +3,8 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "./dashboard.css";
 
+const API_BASE = "https://api.chbtkd.ir";
+
 const StatsCard = () => {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState("");
@@ -20,9 +22,10 @@ const StatsCard = () => {
       return;
     }
 
-    axios.get(`http://localhost:8000/api/auth/dashboard/${role}/`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    axios
+      .get(`${API_BASE}/api/auth/dashboard/${role}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
       .then((res) => setStats(res.data))
       .catch((err) => {
         if (err.response?.status === 401) {
@@ -117,7 +120,11 @@ const StatsCard = () => {
 
   return (
     <div className="stats-section">
-      <div className="scroll-btn fixed left" onClick={() => scroll(-200)} style={{ opacity: canScrollLeft ? 1 : 0.4 }}>
+      <div
+        className="scroll-btn fixed left"
+        onClick={() => scroll(-200)}
+        style={{ opacity: canScrollLeft ? 1 : 0.4 }}
+      >
         ❯
       </div>
       <div className="stats-carousel" ref={scrollRef}>
@@ -129,16 +136,13 @@ const StatsCard = () => {
           </div>
         ))}
       </div>
-      <div className="scroll-btn fixed right" onClick={() => scroll(200)} style={{ opacity: canScrollRight ? 1 : 0.4 }}>
+      <div
+        className="scroll-btn fixed right"
+        onClick={() => scroll(200)}
+        style={{ opacity: canScrollRight ? 1 : 0.4 }}
+      >
         ❮
       </div>
-     
-        {/*<div className="details-btn-wrapper">
-          <button disabled className="details-btn" onClick={() => navigate("/player/stats")} >
-            جزئیات بیشتر
-          </button>
-        </div>*/}
-      
     </div>
   );
 };

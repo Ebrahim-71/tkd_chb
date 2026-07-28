@@ -82,7 +82,7 @@ const RegisterClubPage = () => {
 
     const csrfToken = getCookie('csrftoken');
 
-    fetch('http://localhost:8000/api/auth/register-club/', {
+    fetch('https://api.chbtkd.ir/api/auth/register-club/', {
       method: 'POST',
       body: form,
       headers: {

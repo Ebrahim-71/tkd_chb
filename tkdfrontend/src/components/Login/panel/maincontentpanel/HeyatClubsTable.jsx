@@ -17,7 +17,7 @@ const HeyatClubsTable = () => {
     }
 
     try {
-      const res = await axios.get("http://localhost:8000/api/auth/heyat/clubs/", {
+      const res = await axios.get("https://api.chbtkd.ir/api/auth/heyat/clubs/", {
         headers: { Authorization: `Bearer ${token}` },
         params: search ? { search } : {},
       });

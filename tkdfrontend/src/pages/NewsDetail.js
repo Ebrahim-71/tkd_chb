@@ -44,7 +44,7 @@ const NewsDetail = () => {
       {/* تصویر شاخص */}
       {news.image && (
         <img
-          src={`http://localhost:8000/${news.image}`}
+          src={`https://api.chbtkd.ir/${news.image}`}
           alt={news.title}
           className="thumbnail"
         />

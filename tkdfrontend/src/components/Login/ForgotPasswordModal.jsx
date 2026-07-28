@@ -2,13 +2,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./LoginModal.css";
 
-const API_BASE =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE) ||
-  process.env.REACT_APP_API_BASE ||
-  "http://localhost:8000";
+// آدرس پایه‌ی API فقط با متغیرهای محیطی CRA
+const API_BASE = (
+  process.env.REACT_APP_API_BASE_URL ||   // اگر تو .env تعریف کرده باشی
+  process.env.REACT_APP_API_BASE ||       // برای سازگاری با اسم قدیمی‌تر
+  "https://api.chbtkd.ir"                 // پیش‌فرض در توسعه
+).replace(/\/+$/, "");                    // حذف اسلش‌های اضافی آخر
 
 // endpoints درست
-// درست
 const SEND_URL   = `${API_BASE}/api/auth/password/forgot/send/`;
 const VERIFY_URL = `${API_BASE}/api/auth/password/forgot/verify/`;
 

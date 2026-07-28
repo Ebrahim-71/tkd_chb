@@ -35,7 +35,7 @@ const HeyatCreateNews = () => {
     try {
       setSubmitting(true);
       await axios.post(
-        "http://localhost:8000/api/news/board/submit/",
+        "https://api.chbtkd.ir/api/news/board/submit/",
         form,
         {
           headers: {

@@ -29,6 +29,39 @@
   padding: 10px;
   margin-top: 6px;
 }
+.cd-discount-box {
+  border: 1px dashed var(--cd-border);
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cd-discount-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.cd-discount-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cd-discount-row .cd-input {
+  flex: 1;
+}
+
+.cd-discount-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.9rem;
+}
 
 @media (max-width: 920px){
   .crs-th, .crs-row { grid-template-columns: 60px 1.4fr 1fr 1fr 1fr; }

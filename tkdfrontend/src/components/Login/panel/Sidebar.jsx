@@ -1,8 +1,11 @@
+// src/components/dashboard/Sidebar.jsx
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import placeholderImage from "../../../assets/img/avatar-placeholder.png";
 import "./dashboard.css";
+
+const API_BASE = "https://api.chbtkd.ir";
 
 const getRoleInPersian = (role) => {
   switch (role) {
@@ -92,7 +95,7 @@ const Sidebar = ({ onLogout, onSectionSelect, selectedSection, className = "" })
     }
 
     axios
-      .get(`http://localhost:8000/api/auth/dashboard/${savedRole}/`, {
+      .get(`${API_BASE}/api/auth/dashboard/${savedRole}/`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {
@@ -100,7 +103,7 @@ const Sidebar = ({ onLogout, onSectionSelect, selectedSection, className = "" })
 
         if (["coach", "both"].includes(res.data.role)) {
           axios
-            .get("http://localhost:8000/api/auth/coach/requests/", {
+            .get(`${API_BASE}/api/auth/coach/requests/`, {
               headers: { Authorization: `Bearer ${token}` },
             })
             .then((res2) => {
@@ -141,7 +144,10 @@ const Sidebar = ({ onLogout, onSectionSelect, selectedSection, className = "" })
       : menuItemsByRole[role] || [];
 
   const handleSectionClick = (key) => {
-    navigate(`/dashboard/${encodeURIComponent(role)}?section=${encodeURIComponent(key)}`, { replace: false });
+    navigate(
+      `/dashboard/${encodeURIComponent(role)}?section=${encodeURIComponent(key)}`,
+      { replace: false }
+    );
     onSectionSelect && onSectionSelect(key);
   };
 
@@ -182,7 +188,9 @@ const Sidebar = ({ onLogout, onSectionSelect, selectedSection, className = "" })
             onClick={() => handleSectionClick(item.key)}
           >
             {item.label}
-            {item.key === "club-requests" && hasNewClubRequests && <span className="badge-dot" />}
+            {item.key === "club-requests" && hasNewClubRequests && (
+              <span className="badge-dot" />
+            )}
           </li>
         ))}
       </ul>

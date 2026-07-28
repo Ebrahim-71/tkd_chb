@@ -8,7 +8,7 @@ function pickToken() {
 
 export async function getMyProfile() {
   const token = pickToken();
-  const r = await fetch("http://localhost:8000/api/auth/user-profile-with-form-data/", {
+  const r = await fetch("https://api.chbtkd.ir/api/auth/user-profile-with-form-data/", {
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     credentials: "omit",
   });

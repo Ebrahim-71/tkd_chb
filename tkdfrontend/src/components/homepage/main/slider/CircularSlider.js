@@ -10,7 +10,7 @@ const CircularSlider = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/circulars/slider/')
+    fetch('https://api.chbtkd.ir/api/circulars/slider/')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setCirculars(data);

@@ -1,20 +1,14 @@
+// src/components/auth/LoginModal.jsx
 import React, { useEffect, useRef, useState } from "react";
 import "./LoginModal.css";
 import { Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 // ---------- تنظیمات API ----------
-const API_BASE =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE) ||
-  process.env.REACT_APP_API_BASE ||
-  "http://localhost:8000";
+const API_BASE = "https://api.chbtkd.ir";   // آدرس API روی سرور
+const ACCOUNTS_PREFIX = "/api/auth/";       // prefix برای auth (طبق بک‌اند)
 
-const ACCOUNTS_PREFIX =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_ACCOUNTS_PREFIX) ||
-  process.env.REACT_APP_ACCOUNTS_PREFIX ||
-  "/api/auth/";
-
-// ساخت آدرس نهایی
+// ساخت آدرس نهایی (جلوگیری از // اضافه وسط آدرس)
 const joinUrl = (...parts) =>
   parts
     .map((p, i) =>
@@ -26,7 +20,7 @@ const joinUrl = (...parts) =>
     .join("/");
 
 const PATHS = {
-  login: "login/",
+  login: "login", // بدون / آخر
 };
 
 // ---------- نقش‌ها ----------
@@ -125,10 +119,6 @@ const LoginModal = ({
     const u = normalizeDigits(username || "");
     const p = String(password || "").trim();
 
-    if (import.meta?.env?.MODE === "development") {
-   console.log("DEBUG_INPUT_VALUES", { username: u, role });
- }
-
     if (!u || !p) return setError("نام کاربری و رمز عبور الزامی است.");
     if (!isValidUsername(u)) return setError("فرمت نام کاربری صحیح نیست.");
     if (p.length < 6) return setError("حداقل طول رمز عبور ۶ کاراکتر است.");
@@ -138,6 +128,7 @@ const LoginModal = ({
     abortRef.current = controller;
 
     try {
+      // https://api.chbtkd.ir/api/auth/login/
       const url = joinUrl(API_BASE, ACCOUNTS_PREFIX, PATHS.login) + "/";
       console.log("[LOGIN] POST", url);
 
@@ -172,18 +163,24 @@ const LoginModal = ({
             : res.status === 403
             ? "این فرم مخصوص نقش دیگری است."
             : res.status === 404
-            ? "مسیر لاگین یافت نشد. پریفیکس اشتباه است."
+            ? "مسیر لاگین یافت نشد."
             : "مشکلی در ورود پیش آمد.");
         throw new Error(msg);
       }
 
-      const roleFromAPI = normalizeRole(data.role || data.user?.role || "player");
-      const token = data.access || data.token || data.jwt || data.accessToken;
+      const roleFromAPI = normalizeRole(
+        data.role || data.user?.role || "player"
+      );
+      const token =
+        data.access || data.token || data.jwt || data.accessToken;
 
       const okCoachRef =
-        role === "coachref" && ["coach", "referee", "both"].includes(roleFromAPI);
+        role === "coachref" &&
+        ["coach", "referee", "both"].includes(roleFromAPI);
       if (!allowed.includes(roleFromAPI) && !okCoachRef) {
-        throw new Error("این فرم مخصوص نقش دیگری است. لطفاً از فرم صحیح ورود استفاده کنید.");
+        throw new Error(
+          "این فرم مخصوص نقش دیگری است. لطفاً از فرم صحیح ورود استفاده کنید."
+        );
       }
 
       if (token) localStorage.setItem(`${roleFromAPI}_token`, token);
@@ -240,7 +237,12 @@ const LoginModal = ({
             {subtitle || "لطفاً نام کاربری و رمز عبور را وارد کنید."}
           </p>
 
-          <form id="login-form" onSubmit={handleLogin} className="login-form" noValidate>
+          <form
+            id="login-form"
+            onSubmit={handleLogin}
+            className="login-form"
+            noValidate
+          >
             <input
               ref={userInputRef}
               className="login-input-field"
@@ -274,7 +276,11 @@ const LoginModal = ({
 
             {error && <p className="login-error-msg">{error}</p>}
 
-            <button type="submit" className="login-action-btn" disabled={loading}>
+            <button
+              type="submit"
+              className="login-action-btn"
+              disabled={loading}
+            >
               {loading ? "در حال ورود..." : "ورود"}
             </button>
           </form>

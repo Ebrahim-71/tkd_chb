@@ -16,10 +16,10 @@ const ChangeCoachClubs = () => {
         const token = localStorage.getItem(`${role}_token`);
 
         const [all, mine] = await Promise.all([
-          axios.get("http://localhost:8000/api/auth/all-clubs/", {
+          axios.get("https://api.chbtkd.ir/api/auth/all-clubs/", {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          axios.get("http://localhost:8000/api/auth/coach/clubs/", {
+          axios.get("https://api.chbtkd.ir/api/auth/coach/clubs/", {
             headers: { Authorization: `Bearer ${token}` }
           })
         ]);
@@ -59,7 +59,7 @@ const ChangeCoachClubs = () => {
       const role = localStorage.getItem("user_role");
       const token = localStorage.getItem(`${role}_token`);
 
-      await axios.patch("http://localhost:8000/api/auth/coach/update-clubs/", {
+      await axios.patch("https://api.chbtkd.ir/api/auth/coach/update-clubs/", {
         coaching_clubs: selectedClubs
       }, {
         headers: { Authorization: `Bearer ${token}` }

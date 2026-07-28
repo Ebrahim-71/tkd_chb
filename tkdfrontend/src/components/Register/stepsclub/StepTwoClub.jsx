@@ -9,7 +9,7 @@ const StepTwoClub = ({ data, onDataChange, onNext, onBack }) => {
   const [showErrorModal, setShowErrorModal] = useState(false);
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/auth/form-data/')
+    fetch('https://api.chbtkd.ir/api/auth/form-data/')
       .then((res) => res.json())
       .then((resData) => {
         setBoards(resData.heyats || []);

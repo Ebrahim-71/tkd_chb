@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import SeminarCard from "./SeminarCard";
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+const API_BASE = process.env.REACT_APP_API_BASE_URL || "https://api.chbtkd.ir";
 
 const SeminarsSection = ({ role }) => {
   const safeRole = (role || localStorage.getItem("user_role") || "player").toLowerCase();

@@ -53,7 +53,7 @@ export default function PersonalInfoForm() {
       return;
     }
 
-    axios.get(`http://localhost:8000/api/auth/user-profile-with-options/`, { headers })
+    axios.get(`https://api.chbtkd.ir/api/auth/user-profile-with-options/`, { headers })
       .then((res) => {
         res.data.profile.selectedClubs = res.data.profile.coaching_clubs || [];
         setData(res.data.profile);
@@ -102,7 +102,7 @@ export default function PersonalInfoForm() {
 
     if (field === 'club') {
       setData(prev => ({ ...prev, coach: '' }));
-      axios.get(`http://localhost:8000/api/auth/coaches/`, {
+      axios.get(`https://api.chbtkd.ir/api/auth/coaches/`, {
         params: { club: parseInt(value), gender: data.gender }
       })
       .then(res => {
@@ -372,7 +372,7 @@ export default function PersonalInfoForm() {
                     if (completeData.id) formData.append('id', completeData.id);
                     if (completeData.user) formData.append('user', completeData.user);
 
-                    await axios.post(`http://localhost:8000/api/auth/profile/edit/`, formData, {
+                    await axios.post(`https://api.chbtkd.ir/api/auth/profile/edit/`, formData, {
                       headers: {
                         ...headers,
                         'Content-Type': 'multipart/form-data'

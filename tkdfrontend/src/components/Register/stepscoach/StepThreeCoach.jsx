@@ -18,7 +18,7 @@ const StepThreeCoach = ({ data, onDataChange, onNext, onBack }) => {
     if (!data.gender) return;
 
     axios
-      .get(`http://localhost:8000/api/auth/form-data/?gender=${data.gender}`)
+      .get(`https://api.chbtkd.ir/api/auth/form-data/?gender=${data.gender}`)
       .then((res) => {
         setHeyats(res.data.heyats || []);
         setClubs(res.data.clubs || []);

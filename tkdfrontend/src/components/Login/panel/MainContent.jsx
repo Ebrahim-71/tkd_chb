@@ -14,12 +14,12 @@ const MainContent = ({ selectedSection }) => {
   const token = localStorage.getItem(`${role}_token`);
 
   const endpoints = {
-    matches: `http://localhost:8000/api/dashboard/${role}/matches/`,
-    exams: `http://localhost:8000/api/dashboard/${role}/exams/`,
-    courses: `http://localhost:8000/api/dashboard/${role}/courses/`,
-    circulars: `http://localhost:8000/api/dashboard/${role}/circulars/`,
-    news: `http://localhost:8000/api/dashboard/${role}/news/`,
-    profile: `http://localhost:8000/api/auth/dashboard/${role}/`,
+    matches: `https://api.chbtkd.ir/api/dashboard/${role}/matches/`,
+    exams: `https://api.chbtkd.ir/api/dashboard/${role}/exams/`,
+    courses: `https://api.chbtkd.ir/api/dashboard/${role}/courses/`,
+    circulars: `https://api.chbtkd.ir/api/dashboard/${role}/circulars/`,
+    news: `https://api.chbtkd.ir/api/dashboard/${role}/news/`,
+    profile: `https://api.chbtkd.ir/api/auth/dashboard/${role}/`,
   };
 
   const fetchData = async () => {

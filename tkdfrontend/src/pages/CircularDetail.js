@@ -99,7 +99,7 @@ const CircularDetail = () => {
             {pdfAttachments.map((att, i) => (
               <a
                 key={i}
-                href={att.file.startsWith('http') ? att.file : `http://localhost:8000${att.file}`}
+                href={att.file.startsWith('http') ? att.file : `https://api.chbtkd.ir${att.file}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 title={`دانلود فایل ${i + 1}`}

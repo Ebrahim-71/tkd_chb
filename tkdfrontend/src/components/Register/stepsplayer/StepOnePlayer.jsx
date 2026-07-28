@@ -40,7 +40,7 @@ const handleChange = (e) => {
   setTouched(prev => ({ ...prev, [name]: true }));
 
   if (name === 'national_code' && value.length === 10) {
-    fetch(`http://localhost:8000/api/auth/check-national-code/?code=${value}`)
+    fetch(`https://api.chbtkd.ir/api/auth/check-national-code/?code=${value}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.exists) {

@@ -10,7 +10,7 @@ const NewsSection = () => {
     const role = localStorage.getItem("user_role");
     const token = localStorage.getItem(`${role}_token`);
 
-    axios.get('http://localhost:8000/api/news/', {
+    axios.get('https://api.chbtkd.ir/api/news/', {
       headers: { Authorization: `Bearer ${token}` },
     }).then((res) => {
       setNews(res.data);

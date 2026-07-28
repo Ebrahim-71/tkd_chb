@@ -1,11 +1,12 @@
 // src/App.js
 import React, { useState, useEffect } from "react";
 import {
-  BrowserRouter as Router,
+  HashRouter as Router,
   Routes,
   Route,
   useLocation,
 } from "react-router-dom";
+
 import { Helmet } from "react-helmet";
 
 import Header from "./components/homepage/heder/header";
@@ -29,13 +30,19 @@ import CompetitionDetails from "./components/Login/competitions/CompetitionDetai
 import CompetitionBracket from "./components/Login/competitions/CompetitionBracket";
 import CompetitionResults from "./components/Login/competitions/CompetitionResults";
 import SeminarDetail from "./components/Login/seminar/SeminarDetail";
+import PoomsaeTeamRegister from "./components/Login/competitions/PoomsaeTeamRegister";
+
+// ✅ صفحه نتیجه پرداخت
+import PaymentResult from "./pages/PaymentResult";
 
 import "./App.css";
 
 /* Scroll to top on route change */
 function ScrollToTop() {
   const { pathname } = useLocation();
-  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return null;
 }
 
@@ -49,7 +56,8 @@ const MainPage = () => {
     location.pathname.startsWith("/news") ||
     location.pathname.startsWith("/circular") ||
     location.pathname.startsWith("/register") ||
-    location.pathname.startsWith("/dashboard");
+    location.pathname.startsWith("/dashboard") ||
+    location.pathname.startsWith("/payment"); // ✅ برای صفحه payment/result هم اسلایدر نیاد
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -84,9 +92,15 @@ const MainPage = () => {
 
       {!isSpecialPage && (
         <div className={`slider ${isMobile && showSlider ? "show-mobile" : ""}`}>
-          <section className="slider-section"><ImageSlider /></section>
-          <section className="slider-section"><NewsSlider /></section>
-          <section className="slider-section"><CircularSlider /></section>
+          <section className="slider-section">
+            <ImageSlider />
+          </section>
+          <section className="slider-section">
+            <NewsSlider />
+          </section>
+          <section className="slider-section">
+            <CircularSlider />
+          </section>
         </div>
       )}
 
@@ -115,20 +129,53 @@ function App() {
               }
             >
               {/* جزئیات مسابقه */}
-              <Route path="competitions/:slug" element={<CompetitionDetails />} />
+              <Route
+                path="competitions/:slug"
+                element={<CompetitionDetails />}
+              />
+
               {/* جدول مسابقات */}
-              <Route path="competitions/:slug/bracket" element={<CompetitionBracket />} />
-              {/* ثبت‌نام گروهی مربی */}
-              <Route path="competitions/:slug/register/athlete" element={<CoachRegisterStudents />} />
+              <Route
+                path="competitions/:slug/bracket"
+                element={<CompetitionBracket />}
+              />
+
+              {/* ثبت‌نام گروهی مربی (تک/تیمی، کیوروگی یا پومسه) */}
+              <Route
+                path="competitions/:slug/register/athlete"
+                element={<CoachRegisterStudents />}
+              />
+
+              {/* ✅ ثبت‌نام تیمی پومسه */}
+              <Route
+                path="competitions/:slug/register/team"
+                element={<PoomsaeTeamRegister />}
+              />
+
               {/* کارت ثبت‌نام تکی */}
-              <Route path="enrollments/:enrollmentId/card" element={<EnrollmentCard />} />
+              <Route
+                path="enrollments/:enrollmentId/card"
+                element={<EnrollmentCard />}
+              />
+
               {/* چاپ کارت‌های گروهی */}
-              <Route path="enrollments/bulk" element={<EnrollmentCardsBulk />} />
-              {/* ✅ مسیر نتایج باید نسبیِ فرزند باشد (بدون / اول) */}
-              <Route path="competitions/:slug/results" element={<CompetitionResults />} />
+              <Route
+                path="enrollments/bulk"
+                element={<EnrollmentCardsBulk />}
+              />
+
+              {/* نتایج مسابقه */}
+              <Route
+                path="competitions/:slug/results"
+                element={<CompetitionResults />}
+              />
+
               {/* دوره/سمینار */}
               <Route path="courses/:slug" element={<SeminarDetail />} />
             </Route>
+
+            {/* ✅ نتیجه پرداخت (برای همهٔ نقش‌ها) */}
+            <Route path="/payment/result" element={<PaymentResult />} />
 
             {/* صفحات محتوا */}
             <Route path="/news/:id" element={<NewsDetail />} />

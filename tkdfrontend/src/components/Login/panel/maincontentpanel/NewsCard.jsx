@@ -21,7 +21,7 @@ const NewsCard = ({ news }) => {
 
   const imageSrc = news.image?.startsWith("http")
     ? news.image
-    : `http://localhost:8000${news.image}`;
+    : `https://api.chbtkd.ir${news.image}`;
 
   return (
     <div className="news-card">

@@ -20,7 +20,7 @@ const StepThreePlayer = ({ data, onDataChange,onSubmit, onNext, onBack }) => {
   useEffect(() => {
     if (!data.gender) return;
 
-    axios.get(`http://localhost:8000/api/auth/form-data-player/?gender=${data.gender}`)
+    axios.get(`https://api.chbtkd.ir/api/auth/form-data-player/?gender=${data.gender}`)
       .then((res) => {
         setHeyats(res.data.heyats || []);
         setClubs(res.data.clubs || []);
@@ -40,7 +40,7 @@ const StepThreePlayer = ({ data, onDataChange,onSubmit, onNext, onBack }) => {
       return;
     }
 
-    axios.get(`http://localhost:8000/api/auth/coaches/?club=${data.club}&gender=${data.gender}`)
+    axios.get(`https://api.chbtkd.ir/api/auth/coaches/?club=${data.club}&gender=${data.gender}`)
       .then((res) => setCoaches(res.data.coaches || []))
       .catch((err) => {
         console.error("Error fetching coaches:", err);

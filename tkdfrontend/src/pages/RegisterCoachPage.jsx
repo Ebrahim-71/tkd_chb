@@ -196,7 +196,7 @@ const handleSubmit = () => {
 
   const csrfToken = getCookie('csrftoken');
 
-  fetch('http://localhost:8000/api/auth/register-coach/', {
+  fetch('https://api.chbtkd.ir/api/auth/register-coach/', {
     method: 'POST',
     body: form,
     headers: {

@@ -10,7 +10,7 @@ const NewsSlider = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/news/slider/')
+    fetch('https://api.chbtkd.ir/api/news/slider/')
       .then(res => res.json())
       .then(data => {
         setNewsList(Array.isArray(data) ? data : []);
@@ -49,7 +49,7 @@ const NewsSlider = () => {
               <Link to={`/news/${news.id}`} className="news-link">
                 {news.image && (
                   <img
-                    src={`http://localhost:8000${news.image}`}
+                    src={`https://api.chbtkd.ir${news.image}`}
                     alt={news.title || "خبر"}
                     className="newsimage"
                     loading="lazy"

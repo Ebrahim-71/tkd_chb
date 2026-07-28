@@ -41,7 +41,7 @@ const PlayerRegisterModal = ({ onClose, role }) => {
     if (cooldownActive) return setError('لطفاً تا پایان شمارنده صبر کنید');
 
     setError('');
-    fetch('http://localhost:8000/api/auth/send-code/', {
+    fetch('https://api.chbtkd.ir/api/auth/send-code/', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ phone, role })  // ✅ نقش اضافه شد
@@ -91,7 +91,7 @@ const PlayerRegisterModal = ({ onClose, role }) => {
   };
 
   const verifyCode = (codeStr) => {
-  fetch('http://localhost:8000/api/auth/verify-code/', {
+  fetch('https://api.chbtkd.ir/api/auth/verify-code/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone, code: codeStr })

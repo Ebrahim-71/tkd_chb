@@ -39,9 +39,9 @@ const StudentsTable = () => {
     const fetchOptions = async () => {
       try {
         let url = "";
-        if (isClub) url = "http://localhost:8000/api/auth/club/coaches/";
-        else if (isCoach) url = "http://localhost:8000/api/auth/coach/clubs/";
-        else if (isHeyat) url = "http://localhost:8000/api/auth/heyat/form-data/";
+        if (isClub) url = "https://api.chbtkd.ir/api/auth/club/coaches/";
+        else if (isCoach) url = "https://api.chbtkd.ir/api/auth/coach/clubs/";
+        else if (isHeyat) url = "https://api.chbtkd.ir/api/auth/heyat/form-data/";
 
         const res = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` },
@@ -86,10 +86,10 @@ const StudentsTable = () => {
         if (filters.search) params.search = filters.search;
 
         const url = isClub
-          ? "http://localhost:8000/api/auth/club/students/"
+          ? "https://api.chbtkd.ir/api/auth/club/students/"
           : isCoach
-          ? "http://localhost:8000/api/auth/coach/students/"
-          : "http://localhost:8000/api/auth/heyat/students/";
+          ? "https://api.chbtkd.ir/api/auth/coach/students/"
+          : "https://api.chbtkd.ir/api/auth/heyat/students/";
 
         const res = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` },

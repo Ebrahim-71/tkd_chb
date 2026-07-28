@@ -137,7 +137,7 @@ const MatchCard = ({ match, onDetailsClick }) => {
           مبلغ ورودی:{" "}
           {fee != null
             ? fee > 0
-              ? `${toPersianDigits(fee.toLocaleString())} تومان`
+              ? `${toPersianDigits(fee.toLocaleString())} ریال`
               : "رایگان"
             : "—"}
         </p>

@@ -30,7 +30,7 @@ const HeyatRefereesTable = () => {
 
   const fetchDropdownOptions = async () => {
     try {
-      const res = await axios.get("http://localhost:8000/api/auth/heyat/form-data/", {
+      const res = await axios.get("https://api.chbtkd.ir/api/auth/heyat/form-data/", {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -62,7 +62,7 @@ const HeyatRefereesTable = () => {
       if (filters.birthTo) params.birth_to = filters.birthTo;
       if (filters.search) params.search = filters.search;
 
-      const res = await axios.get("http://localhost:8000/api/auth/heyat/referees/", {
+      const res = await axios.get("https://api.chbtkd.ir/api/auth/heyat/referees/", {
         headers: { Authorization: `Bearer ${token}` },
         params
       });

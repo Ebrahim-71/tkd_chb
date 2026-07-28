@@ -28,7 +28,7 @@ const HeyatCoachesTable = () => {
 
   const fetchDropdownOptions = async () => {
     try {
-      const res = await axios.get("http://localhost:8000/api/auth/heyat/form-data/", {
+      const res = await axios.get("https://api.chbtkd.ir/api/auth/heyat/form-data/", {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -67,7 +67,7 @@ const HeyatCoachesTable = () => {
       if (filters.birthTo) params.birth_to = filters.birthTo;
       if (filters.search) params.search = filters.search;
 
-      const res = await axios.get("http://localhost:8000/api/auth/heyat/coaches/", {
+      const res = await axios.get("https://api.chbtkd.ir/api/auth/heyat/coaches/", {
         headers: { Authorization: `Bearer ${token}` },
         params
       });

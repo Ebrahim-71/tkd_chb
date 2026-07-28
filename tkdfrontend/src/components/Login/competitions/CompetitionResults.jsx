@@ -4,7 +4,7 @@ import { getCompetitionResults, getCompetitionDetail } from "../../../api/compet
 import "./CompetitionResults.css";
 
 const toFa = (str) => String(str ?? "").replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
-const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+const API_BASE = process.env.REACT_APP_API_BASE_URL || "https://api.chbtkd.ir";
 const absUrl = (u) => (u ? (u.startsWith("http") ? u : `${API_BASE}${u}`) : null);
 
 function showEntry(v) {
@@ -52,6 +52,15 @@ export default function CompetitionResults() {
   }, [slug]);
 
   const poster = useMemo(() => absUrl(meta?.data?.poster) || "/placeholder.jpg", [meta?.data]);
+
+  const hasBeltGroups = useMemo(
+    () => state.rows.some(
+      (row) => Boolean(
+        row.belt_group || row.belt_group_label
+      )
+    ),
+    [state.rows]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim();
@@ -122,6 +131,11 @@ export default function CompetitionResults() {
             <thead>
                 <tr>
                 <th className="col-weight">رده وزنی</th>
+
+                {hasBeltGroups && (
+                  <th className="col-belt">گروه کمربندی</th>
+                )}
+
                 <th className="col-gold">🥇 طلا</th>
                 <th className="col-silver">🥈 نقره</th>
                 <th className="col-bronze">🥉 برنز </th>
@@ -131,7 +145,13 @@ export default function CompetitionResults() {
             <tbody>
                 {filtered.map((r, idx) => (
                 <tr key={idx}>
-                    <td className="col-weight">{r.weight || r.weight_name || "—"}</td>
+                    <td className="col-weight">
+                      {r.weight || r.weight_name || "—"}
+                    </td>
+                    {hasBeltGroups && (
+                      <td className="col-belt">
+                        {r.belt_group || r.belt_group_label || "—"}
+                      </td>)}
                     <td className="col-gold">{showEntry(r.gold || r.gold_enrollment)}</td>
                     <td className="col-silver">{showEntry(r.silver || r.silver_enrollment)}</td>
                     <td className="col-bronze">{showEntry(r.bronze1 || r.bronze1_enrollment || r.b1)}</td>

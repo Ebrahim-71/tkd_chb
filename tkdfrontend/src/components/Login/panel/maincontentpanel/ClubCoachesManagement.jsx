@@ -17,7 +17,7 @@ const ClubCoachesManagement = () => {
   useEffect(() => {
     const fetchCoaches = async () => {
       try {
-        const res = await axios.get("http://localhost:8000/api/auth/club/all-coaches/", {
+        const res = await axios.get("https://api.chbtkd.ir/api/auth/club/all-coaches/", {
           headers: { Authorization: `Bearer ${token}` },
         });
         const active = res.data.filter(c => c.is_active).map(c => c.id);
@@ -58,7 +58,7 @@ const ClubCoachesManagement = () => {
   const confirmFinalSubmit = async () => {
     try {
       setLoading(true);
-      await axios.post("http://localhost:8000/api/auth/club/update-coaches/", {
+      await axios.post("https://api.chbtkd.ir/api/auth/club/update-coaches/", {
         selected_coaches: selectedCoaches,
       }, {
         headers: { Authorization: `Bearer ${token}` },

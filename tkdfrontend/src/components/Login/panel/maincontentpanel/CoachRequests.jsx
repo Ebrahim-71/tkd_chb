@@ -20,7 +20,7 @@ const CoachRequests = () => {
 
     const fetchRequests = async () => {
       try {
-        const res = await axios.get("http://localhost:8000/api/auth/coach/requests/", {
+        const res = await axios.get("https://api.chbtkd.ir/api/auth/coach/requests/", {
           headers: { Authorization: `Bearer ${token}` },
         });
         setRequests(res.data);
@@ -42,7 +42,7 @@ const CoachRequests = () => {
     setRespondingId(id);
     try {
       await axios.post(
-       `http://localhost:8000/api/auth/coach/requests/${id}/respond/`,
+       `https://api.chbtkd.ir/api/auth/coach/requests/${id}/respond/`,
         { action },
         {
           headers: { Authorization: `Bearer ${token}` },

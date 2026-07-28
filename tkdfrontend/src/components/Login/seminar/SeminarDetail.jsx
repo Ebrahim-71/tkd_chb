@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import "./SeminarDetail.css";
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+const API_BASE = process.env.REACT_APP_API_BASE_URL || "https://api.chbtkd.ir";
 
 const toFaDigits = (s) => String(s ?? "").replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
 const fmtDateFa = (gDate, faStr) => {

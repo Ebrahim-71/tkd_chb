@@ -10,7 +10,7 @@ const CircularsSection = () => {
     const role = localStorage.getItem("user_role");
     const token = localStorage.getItem(`${role}_token`);
 
-    axios.get('http://localhost:8000/api/circulars/', {
+    axios.get('https://api.chbtkd.ir/api/circulars/', {
       headers: { Authorization: `Bearer ${token}` },
     }).then((res) => {
       setCirculars(res.data);

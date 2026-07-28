@@ -4,12 +4,14 @@ import './Slider.css';
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 
+const API_BASE = "https://api.chbtkd.ir";
+
 const ImageSlider = () => {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/slider-images/')
+    fetch(`${API_BASE}/api/slider-images/`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -36,7 +38,7 @@ const ImageSlider = () => {
     arrows: true,
     cssEase: 'linear',
     adaptiveHeight: true,
-    fade: false, // ✅ مهم: برای جلوگیری از باگ در رندر چند تصویر
+    fade: false,
     appendDots: dots => (
       <div>
         <ul style={{ margin: 0 }}>{dots}</ul>
@@ -68,7 +70,7 @@ const ImageSlider = () => {
             <div key={index} className="slide">
               {image.image && (
                 <img
-                  src={`https://api.chbtkd.ir${image.image}`}
+                  src={`${API_BASE}${image.image}`}
                   alt={image.title || `اسلایدر ${index + 1}`}
                   className="slider-image"
                   loading="lazy"

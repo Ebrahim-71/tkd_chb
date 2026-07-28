@@ -118,7 +118,7 @@ const RegisterplayerPage = () => {
 
     const csrfToken = getCookie('csrftoken');
 
-fetch('http://localhost:8000/api/auth/register-player/', {
+fetch('https://api.chbtkd.ir/api/auth/register-player/', {
   method: 'POST',
   body: form,
   headers: {
