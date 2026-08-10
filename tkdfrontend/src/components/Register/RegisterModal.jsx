@@ -3,13 +3,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import './RegisterModal.css';
 import { useNavigate } from 'react-router-dom';
 
+import { apiFetch } from '../../api/apiClient';
+import { showGlobalWarning } from '../../services/globalMessage';
+
 const PlayerRegisterModal = ({ onClose, role }) => {
   const [step, setStep] = useState(1);
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState(['', '', '', '']);
   const [timer, setTimer] = useState(0);
   const inputRefs = useRef([]);
-  const [error, setError] = useState('');
   const [cooldownActive, setCooldownActive] = useState(false);
   const navigate = useNavigate();
 
@@ -36,39 +38,77 @@ const PlayerRegisterModal = ({ onClose, role }) => {
     if (newCode.every(d => d.length === 1)) verifyCode(newCode.join(''));
   };
 
-  const sendPhone = () => {
-    if (!/^09\d{9}$/.test(phone)) return setError('شماره معتبر نیست');
-    if (cooldownActive) return setError('لطفاً تا پایان شمارنده صبر کنید');
-
-    setError('');
-    fetch('https://api.chbtkd.ir/api/auth/send-code/', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ phone, role })  // ✅ نقش اضافه شد
-})
-
-      .then(async res => {
-  const data = await res.json();
-  if (!res.ok) {
-    if (data.retry_after) {
-      setStep(2);
-      setTimer(data.retry_after);
-      setCooldownActive(true);
+  const sendPhone = async () => {
+    if (!/^09\d{9}$/.test(phone)) {
+      showGlobalWarning(
+        'شماره موبایل معتبر نیست.',
+        'شماره موبایل نامعتبر'
+      );
+      return;
     }
 
-    // اگر پیام خاصی در پاسخ هست، اون رو نمایش بده
-    if (data.phone) return setError(data.phone);
-    if (data.error) return setError(data.error);
+    if (cooldownActive) {
+      showGlobalWarning(
+        'لطفاً تا پایان شمارنده صبر کنید.',
+        'ارسال کد'
+      );
+      return;
+    }
 
-    return setError('خطا در ارسال کد');
-  }
+    try {
+      const res = await apiFetch(
+        'https://api.chbtkd.ir/api/auth/send-code/',
+        {
+          method: 'POST',
 
-  setStep(2);
-  setTimer(180);
-  setCooldownActive(true);
-})
+          headers: {
+            'Content-Type': 'application/json',
+          },
 
-      .catch(() => setError('خطا در ارتباط با سرور'));
+          body: JSON.stringify({
+            phone,
+            role,
+          }),
+
+          errorTitle: 'ارسال کد تأیید',
+        }
+      );
+
+      const data =
+        await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // در صورت محدودیت ارسال، تایمر Backend حفظ شود.
+        if (data?.retry_after) {
+          const retryAfter = Math.max(
+            0,
+            parseInt(data.retry_after, 10) || 0
+          );
+
+          if (retryAfter > 0) {
+            setStep(2);
+            setTimer(retryAfter);
+            setCooldownActive(true);
+          }
+        }
+
+        // متن خطای Backend توسط apiFetch
+        // در مودال سراسری نمایش داده شده است.
+        return;
+      }
+
+      setStep(2);
+      setTimer(180);
+      setCooldownActive(true);
+
+    } catch (err) {
+      console.error(
+        'REGISTER_SEND_CODE_ERROR',
+        err
+      );
+
+      // خطای شبکه توسط apiFetch نمایش داده شده است.
+    }
   };
   const getTitleFromRole = (role) => {
   switch (role) {
@@ -86,31 +126,103 @@ const PlayerRegisterModal = ({ onClose, role }) => {
 };
 
   const resendCode = () => {
-    if (cooldownActive) return setError('لطفاً صبر کنید');
-    sendPhone(); // دوباره همان تابع را صدا بزن
+    if (cooldownActive) {
+      showGlobalWarning(
+        'لطفاً تا پایان شمارنده صبر کنید.',
+        'ارسال مجدد کد'
+      );
+      return;
+    }
+
+    sendPhone();
   };
 
-  const verifyCode = (codeStr) => {
-  fetch('https://api.chbtkd.ir/api/auth/verify-code/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone, code: codeStr })
-  })
-    .then(res => res.json())
-    .then(data => {
-      if (data.message) {
-        localStorage.setItem("verifiedPhone", phone);  // اگر خواستی بعداً ازش استفاده کنی
-        navigate(`/register-${role || 'player'}`, { state: { role } });
+  const verifyCode = async (codeStr) => {
+    if (!/^\d{4}$/.test(codeStr)) {
+      showGlobalWarning(
+        'کد تأیید باید ۴ رقمی باشد.',
+        'کد تأیید نامعتبر'
+      );
+      return;
+    }
 
+    try {
+      const res = await apiFetch(
+        'https://api.chbtkd.ir/api/auth/verify-code/',
+        {
+          method: 'POST',
 
-      
-      } else {
-        setError('کد اشتباه است');
+          headers: {
+            'Content-Type': 'application/json',
+          },
+
+          body: JSON.stringify({
+            phone,
+            code: codeStr,
+          }),
+
+          errorTitle: 'تأیید کد ثبت‌نام',
+        }
+      );
+
+      const data =
+        await res.json().catch(() => ({}));
+
+      if (!res.ok) {
         setCode(['', '', '', '']);
-        inputRefs.current[0].focus();
+
+        setTimeout(() => {
+          inputRefs.current[0]?.focus();
+        }, 0);
+
+        // apiFetch متن خطای Backend را
+        // در مودال سراسری نمایش داده است.
+        return;
       }
-    });
-};
+
+      if (data?.message) {
+        localStorage.setItem(
+          'verifiedPhone',
+          phone
+        );
+
+        navigate(
+          `/register-${role || 'player'}`,
+          {
+            state: {
+              role,
+              phone,
+            },
+          }
+        );
+
+        return;
+      }
+
+      // برای حالتی که Backend پاسخ 200 بدهد
+      // اما تأیید موفق نباشد.
+      showGlobalWarning(
+        data?.error ||
+          data?.detail ||
+          'کد تأیید صحیح نیست.',
+        'کد تأیید نامعتبر'
+      );
+
+      setCode(['', '', '', '']);
+
+      setTimeout(() => {
+        inputRefs.current[0]?.focus();
+      }, 0);
+
+    } catch (err) {
+      console.error(
+        'REGISTER_VERIFY_CODE_ERROR',
+        err
+      );
+
+      // خطای شبکه قبلاً توسط apiFetch نمایش داده شده است.
+    }
+  };
 
 
   return (
@@ -130,7 +242,6 @@ const PlayerRegisterModal = ({ onClose, role }) => {
               placeholder="مثلاً 09123456789"
               dir="rtl"
             />
-            {error && <p className="error-msg">{error}</p>}
             <button className="action-btn" onClick={sendPhone} disabled={cooldownActive}>
               {cooldownActive ? `صبر کنید (${timer})` : 'ارسال کد'}
             </button>
@@ -155,7 +266,6 @@ const PlayerRegisterModal = ({ onClose, role }) => {
                 />
               ))}
             </div>
-            {error && <p className="error-msg">{error}</p>}
             {timer > 0 ? (
               <p className="timer">ارسال مجدد تا <strong>{timer}</strong> ثانیه</p>
             ) : (

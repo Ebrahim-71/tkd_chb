@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import './CoachRegister.css';
 
+import {
+  showGlobalMessage,
+} from '../../../services/globalMessage';
 const StepFourCoach = ({ data, onDataChange, onSubmit, onBack }) => {
   const [errors, setErrors] = useState({});
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [modalErrorText, setModalErrorText] = useState("");
+
 
   const refereeTypes = [
     { key: 'kyorogi', label: 'کیوروگی' },
@@ -47,9 +49,16 @@ const StepFourCoach = ({ data, onDataChange, onSubmit, onBack }) => {
 
     setErrors(newErrors);
 
-    if (Object.keys(newErrors).length > 0) {
-      setModalErrorText(Object.values(newErrors)[0]);
-      setShowErrorModal(true);
+    const errorMessages =
+      Object.values(newErrors);
+
+    if (errorMessages.length > 0) {
+      showGlobalMessage({
+        type: 'warning',
+        title: 'اطلاعات مربیگری یا داوری ناقص است',
+        messages: errorMessages,
+      });
+
       return false;
     }
 
@@ -188,14 +197,6 @@ const StepFourCoach = ({ data, onDataChange, onSubmit, onBack }) => {
         <button onClick={handleSubmit}>ثبت‌نام</button>
       </div>
 
-      {showErrorModal && (
-        <div className="modal-error-overlay">
-          <div className="modal-error-box">
-            <p>{modalErrorText}</p>
-            <button onClick={() => setShowErrorModal(false)}>باشه</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

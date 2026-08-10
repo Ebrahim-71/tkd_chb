@@ -1,8 +1,12 @@
 // src/components/Login/competitions/PoomsaeTeamRegister.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getEligibleStudentsForCoach, API_BASE, registerPoomsaeTeams } from "../../../api/competitions";
-
+import {
+  getEligibleStudentsForCoach,
+  registerPoomsaeTeams,
+  startPaymentIntent,
+  submitGatewayForm,
+} from "../../../api/competitions";
 import "./PoomsaeTeamRegister.css";
 
 import DatePicker from "react-multi-date-picker";
@@ -20,171 +24,13 @@ const normalizeDigits = (s = "") =>
 
 const stripRtlMarks = (s = "") => s.replace(/[\u200e\u200f\u200c\u202a-\u202e]/g, "");
 
-const getId = (s) => s?.id ?? s?.player_id ?? s?.user_id ?? s?.profile_id;
+const getId = (s) =>
+  s?.id ??
+  s?.player_id ??
+  s?.user_id ??
+  s?.profile_id;
 
-/* ---------- Token ---------- */
-const getAuthToken = () => {
-  const role = (localStorage.getItem("user_role") || "").toLowerCase().trim();
-  const roleTokenKey = role ? `${role}_token` : null;
-  const keys = [
-    roleTokenKey,
-    "coach_token",
-    "both_token",
-    "access_token",
-    "token",
-    "access",
-    "auth_token",
-  ].filter(Boolean);
 
-  for (const k of keys) {
-    const v = localStorage.getItem(k);
-    if (v) return v;
-  }
-  return null;
-};
-
-/* ---------- Payments ---------- */
-
-async function createPaymentIntent({
-  competitionPublicId,
-  amount,
-  description,
-  style = "poomsae_team",
-}) {
-  const token = getAuthToken();
-  if (!token) throw new Error("توکن ورود یافت نشد. لطفاً دوباره وارد شوید.");
-  if (!competitionPublicId) throw new Error("شناسه مسابقه برای پرداخت یافت نشد.");
-
-  const url = `${API_BASE}/api/payments/intent/`;
-
-  const payload = {
-    competition_public_id: competitionPublicId,
-    style: style || "poomsae_team",
-    amount,
-    description: description || "",
-    gateway: "sadad",
-  };
-
-  let resp;
-  try {
-    resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    throw new Error("عدم امکان ارتباط با سرور پرداخت (network error).");
-  }
-
-  let data = null;
-  try {
-    data = await resp.json();
-  } catch {}
-
-  if (!resp.ok) {
-    let msg =
-      data?.detail ||
-      data?.message ||
-      data?.error ||
-      (resp.status === 404
-        ? "سرویس پرداخت برای این مسابقه روی سرور پیدا نشد (404)."
-        : `خطای سرور پرداخت (HTTP ${resp.status}).`);
-    throw new Error(msg);
-  }
-  return data || {};
-}
-
-async function startPaymentIntent(publicId, { callbackUrl } = {}) {
-  const token = getAuthToken();
-  if (!token) throw new Error("توکن ورود یافت نشد. لطفاً دوباره وارد شوید.");
-  if (!publicId) throw new Error("شناسه پرداخت یافت نشد.");
-
-  // مسیر درست بک‌اند طبق payments/urls.py
-  const url = `${API_BASE}/api/payments/link/${publicId}/`;
-
-  const body = { gateway: "sadad" };
-  if (callbackUrl) body.callback_url = callbackUrl;
-
-  let resp;
-  try {
-    resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    throw new Error("عدم امکان ارتباط با سرور پرداخت (network error).");
-  }
-
-  let data = null;
-  try {
-    data = await resp.json();
-  } catch {}
-
-  if (!resp.ok) {
-    let msg =
-      data?.detail ||
-      data?.message ||
-      data?.error ||
-      `خطای شروع پرداخت (HTTP ${resp.status}).`;
-    throw new Error(msg);
-  }
-
-  data = data || {};
-
-  let paymentUrl =
-    data.payment_url ||
-    data.redirect_url ||
-    data.url ||
-    data.payment?.payment_url ||
-    data.payment?.redirect_url ||
-    data.payment?.url;
-
-    const payToken =
-      data.token ||
-      data.payment?.token ||
-      data.payment?.data?.Token ||
-      data.payment?.data?.token;
-
-    // اگر بک‌اند لینک داخلی API داد، نباید مرورگر را به آن بفرستیم
-    // چون Authorization header همراه redirect مرورگر نمی‌رود و 401 می‌گیریم.
-      const isInternalPaymentApi =
-        paymentUrl &&
-        (
-          paymentUrl.includes("/api/payments/start/") ||
-          paymentUrl.includes("/api/payments/link/")
-        );
-
-      if (isInternalPaymentApi && payToken) {
-        paymentUrl = `https://sadad.shaparak.ir/VPG/Purchase?Token=${payToken}`;
-      }
-
-      if (!paymentUrl && payToken) {
-        paymentUrl = `https://sadad.shaparak.ir/VPG/Purchase?Token=${payToken}`;
-      }
-
-      if (
-        paymentUrl &&
-        payToken &&
-        paymentUrl.includes("sadad.shaparak.ir") &&
-        !paymentUrl.includes("Token=") &&
-        !paymentUrl.includes("token=")
-      ) {
-        paymentUrl += `${paymentUrl.includes("?") ? "&" : "?"}Token=${payToken}`;
-      }
-
-      return {
-        ...data,
-        payment_url: paymentUrl,
-        redirect_url: paymentUrl,
-      };
-}
 
 /* ---------- registration window helpers ---------- */
 
@@ -241,9 +87,48 @@ export default function PoomsaeTeamRegister() {
   const [competition, setCompetition] = useState(null);
   const [students, setStudents] = useState([]);
 
-  const [teams, setTeams] = useState([createEmptyTeam(1)]);
-  const [submitting, setSubmitting] = useState(false);
+  const [teams, setTeams] = useState([
+    createEmptyTeam(1),
+  ]);
 
+  const [submitting, setSubmitting] =
+    useState(false);
+
+  const [hasDiscount, setHasDiscount] =
+    useState(false);
+
+  const [discountCode, setDiscountCode] =
+    useState("");
+
+  const [
+    appliedDiscountCode,
+    setAppliedDiscountCode,
+  ] = useState("");
+
+  const [discountError, setDiscountError] =
+    useState("");
+
+  const [discountLoading, setDiscountLoading] =
+    useState(false);
+
+  const [discountApplied, setDiscountApplied] =
+    useState(false);
+
+  const [
+    originalAmountIrr,
+    setOriginalAmountIrr,
+  ] = useState(0);
+
+  const [
+    discountAmountIrr,
+    setDiscountAmountIrr,
+  ] = useState(0);
+
+  const [
+    finalAmountIrr,
+    setFinalAmountIrr,
+  ] = useState(0);
+  
   /* --- load eligible students + competition --- */
   useEffect(() => {
     let alive = true;
@@ -299,51 +184,266 @@ export default function PoomsaeTeamRegister() {
     return true;
   }, [competition]);
 
+  /* --- age categories defined for competition --- */
+  const competitionAgeCategories = useMemo(() => {
+    const rawCategories = Array.isArray(
+      competition?.age_categories
+    )
+      ? competition.age_categories
+      : Array.isArray(competition?.ageCategories)
+      ? competition.ageCategories
+      : [];
+
+    return rawCategories.map((category, index) => {
+      const key = String(
+        category?.id ??
+          category?.key ??
+          category?.code ??
+          category?.name ??
+          category?.title ??
+          `age-${index}`
+      );
+
+      const label =
+        category?.name ||
+        category?.title ||
+        category?.label ||
+        category?.age_category_name ||
+        `رده سنی ${index + 1}`;
+
+      const orderValue = Number(
+        category?.order ??
+          category?.sort_order ??
+          category?.position ??
+          index
+      );
+
+      return {
+        key,
+        label: String(label),
+        order: Number.isFinite(orderValue)
+          ? orderValue
+          : index,
+      };
+    });
+  }, [competition]);
+
   /* --- player options --- */
-  const playerOptions = useMemo(
-    () =>
-      students.map((s) => {
-        const id = getId(s);
-        const name = `${s.first_name || ""} ${s.last_name || ""}`.trim() || "—";
-        const nat = s.national_code || s.national_id || "";
-        const belt = s.belt_grade || s.belt || "";
-        const age = s.age_category_name || s.age_group_name || "";
-        const labelParts = [name];
-        if (nat) labelParts.push(`کدملی: ${nat}`);
-        if (belt) labelParts.push(`کمربند: ${belt}`);
-        if (age) labelParts.push(`رده: ${age}`);
-        return {
-          id,
-          label: labelParts.join(" | "),
-          ageKey: s.age_category_key || s.age_category_name || s.age_group_name || "AGE?",
-          beltKey: s.belt_grade || s.belt || "BELT?",
-        };
-      }),
-    [students]
-  );
+  const playerOptions = useMemo(() => {
+    return students.map((s) => {
+      const id = getId(s);
 
-  const findPlayer = (pid) => playerOptions.find((p) => String(p.id) === String(pid)) || null;
+      const name =
+        `${s.first_name || ""} ${
+          s.last_name || ""
+        }`.trim() || "—";
 
-  /* --- summary & fee --- */
-  const entryFee = Number(competition?.entry_fee || 0);
+      const nat =
+        s.national_code ||
+        s.national_id ||
+        "";
 
-  const summary = useMemo(() => {
-    let standardTeams = 0;
-    let creativeTeams = 0;
-    let totalSlots = 0;
+      const belt =
+        s.belt_grade ||
+        s.belt ||
+        "";
 
-    teams.forEach((t) => {
-      if (!t.type) return;
-      if (t.type === "standard") standardTeams++;
-      if (t.type === "creative") creativeTeams++;
+      const studentAgeId =
+        s.age_category_id ??
+        s.age_group_id ??
+        s.age_category_key ??
+        null;
 
-      const allIds = [...(t.main || []), ...(t.reserve || [])].filter(Boolean);
-      totalSlots += allIds.length;
+      const studentAgeName =
+        s.age_category_name ||
+        s.age_group_name ||
+        null;
+
+      const studentAgeOrder = Number(
+        s.age_category_order ?? 999999
+      );
+
+      /*
+      * رده سنی بازیکن را با رده‌های تعریف‌شده
+      * برای مسابقه تطبیق می‌دهیم.
+      */
+      const definedAgeCategory =
+        competitionAgeCategories.find(
+          (category) =>
+            String(category.key) ===
+              String(studentAgeId) ||
+            String(category.label).trim() ===
+              String(studentAgeName).trim()
+        );
+
+      const ageKey = String(
+        definedAgeCategory?.key ??
+          studentAgeId ??
+          studentAgeName
+      );
+
+      const ageLabel =
+        definedAgeCategory?.label ||
+        studentAgeName ||
+        "بدون رده سنی";
+
+      const ageOrder =
+        definedAgeCategory?.order ?? 999999;
+
+      const labelParts = [name];
+
+      if (nat) {
+        labelParts.push(`کدملی: ${nat}`);
+      }
+
+      if (belt) {
+        labelParts.push(`کمربند: ${belt}`);
+      }
+
+      return {
+        id,
+        name,
+        nationalCode: nat,
+        belt,
+        label: labelParts.join(" | "),
+
+        ageKey,
+        ageLabel,
+        ageOrder,
+
+        beltKey:
+          s.belt_grade_id ||
+          s.belt_grade ||
+          s.belt ||
+          "BELT?",
+      };
+    });
+  }, [students, competitionAgeCategories]);
+
+  /* --- players grouped by age category --- */
+  const groupedPlayerOptions = useMemo(() => {
+    const groupsMap = new Map();
+
+    playerOptions.forEach((player) => {
+      const groupKey =
+        player.ageKey || "unknown-age";
+
+      if (!groupsMap.has(groupKey)) {
+        groupsMap.set(groupKey, {
+          key: groupKey,
+          label:
+            player.ageLabel ||
+            "بدون رده سنی",
+          order:
+            player.ageOrder ?? 999999,
+          players: [],
+        });
+      }
+
+      groupsMap
+        .get(groupKey)
+        .players.push(player);
     });
 
-    const totalAmount = entryFee * totalSlots;
-    return { standardTeams, creativeTeams, totalSlots, totalAmount };
-  }, [teams, entryFee]);
+    return Array.from(groupsMap.values())
+      .sort((a, b) => {
+        if (a.order !== b.order) {
+          return a.order - b.order;
+        }
+
+        return String(a.label).localeCompare(
+          String(b.label),
+          "fa"
+        );
+      })
+      .map((group) => ({
+        ...group,
+        players: [...group.players].sort(
+          (a, b) =>
+            String(a.name).localeCompare(
+              String(b.name),
+              "fa"
+            )
+        ),
+      }));
+  }, [playerOptions]);
+
+  const findPlayer = (pid) =>
+    playerOptions.find(
+      (p) => String(p.id) === String(pid)
+    ) || null;
+
+  /* --- summary & fee ---
+   entry_fee در بک‌اند ریال و هزینه ثبت‌نام هر نفر است.
+*/
+const entryFeeIrr = Number(
+  competition?.entry_fee || 0
+);
+
+const entryFeeToman = Math.floor(
+  entryFeeIrr / 10
+);
+
+const summary = useMemo(() => {
+  let standardTeams = 0;
+  let creativeTeams = 0;
+  let totalSlots = 0;
+
+  teams.forEach((t) => {
+    if (!t.type) return;
+
+    if (t.type === "standard") {
+      standardTeams += 1;
+    }
+
+    if (t.type === "creative") {
+      creativeTeams += 1;
+    }
+
+    const allIds = [
+      ...(t.main || []),
+      ...(t.reserve || []),
+    ].filter(Boolean);
+
+    totalSlots += allIds.length;
+  });
+
+  const totalTeams =
+    standardTeams + creativeTeams;
+
+  const totalAmountIrr =
+    entryFeeIrr * totalSlots;
+
+  const totalAmountToman = Math.floor(
+    totalAmountIrr / 10
+  );
+
+  return {
+    standardTeams,
+    creativeTeams,
+    totalTeams,
+    totalSlots,
+    totalAmountIrr,
+    totalAmountToman,
+  };
+}, [teams, entryFeeIrr]);
+
+useEffect(() => {
+  const rawAmount = Number(
+    summary.totalAmountIrr || 0
+  );
+
+  setOriginalAmountIrr(rawAmount);
+  setDiscountAmountIrr(0);
+  setFinalAmountIrr(rawAmount);
+
+  // با تغییر تعداد تیم یا اعضا،
+  // کد باید دوباره بررسی شود.
+  setDiscountApplied(false);
+  setAppliedDiscountCode("");
+  setDiscountError("");
+}, [summary.totalAmountIrr]);
+
 
   /* ---------- team editing ---------- */
 
@@ -499,28 +599,29 @@ export default function PoomsaeTeamRegister() {
         }
       });
 
-      // سن/کمربند یکسان
+      // رده سنی اعضای تیم باید یکسان باشد.
+      // اختلاف رده کمربندی مجاز است و بک‌اند
+      // رده تیم را از بالاترین عضو تعیین می‌کند.
       if (allIds.length > 0) {
         let ageKey = null;
-        let beltKey = null;
+
         for (const pid of allIds) {
           const p = findPlayer(pid);
           if (!p) continue;
-          if (ageKey == null) ageKey = p.ageKey;
-          if (beltKey == null) beltKey = p.beltKey;
-          if (ageKey !== p.ageKey) {
-            errors.age_mismatch = "رده سنی تمام اعضای تیم باید یکسان باشد.";
-            hasError = true;
-            break;
+
+          if (ageKey == null) {
+            ageKey = p.ageKey;
           }
-          if (beltKey !== p.beltKey) {
-            errors.belt_mismatch = "رده کمربندی تمام اعضای تیم باید یکسان باشد.";
+
+          if (ageKey !== p.ageKey) {
+            errors.age_mismatch =
+              "رده سنی تمام اعضای تیم باید یکسان باشد.";
+
             hasError = true;
             break;
           }
         }
       }
-
       // جلوگیری از چندبار انتخاب در تیم‌های هم‌نوع
       allIds.forEach((pid) => {
         const key = String(pid);
@@ -599,149 +700,587 @@ export default function PoomsaeTeamRegister() {
     };
   };
 
-  const submitTeamsToBackend = async () => {
-    const teamPayloads = teams.map(buildTeamPayload);
+  const submitTeamsToBackend = async ({
+    preview = false,
+    discountCodeValue = "",
+  } = {}) => {
+    const teamPayloads =
+      teams.map(buildTeamPayload);
 
-    // تک تیم
-    if (teamPayloads.length === 1) {
-      const r = await registerPoomsaeTeams(slug, teamPayloads[0]);
+    const normalizedDiscountCode =
+      String(
+        discountCodeValue || ""
+      ).trim();
 
-      const ids = [
-        ...(Array.isArray(r?.enrollment_ids) ? r.enrollment_ids : []),
-        ...(r?.enrollment_id != null ? [r.enrollment_id] : []),
-      ]
-        .map(Number)
-        .filter(Number.isFinite);
+    const payload = {
+      teams: teamPayloads,
+      gateway: "sadad",
+    };
 
-      return { ...r, enrollment_ids: Array.from(new Set(ids)) };
+    if (preview) {
+      payload.preview = true;
     }
 
-    // چند تیم: یکی‌یکی
-    const results = [];
-    const allIds = [];
-
-    for (const one of teamPayloads) {
-      // eslint-disable-next-line no-await-in-loop
-      const r = await registerPoomsaeTeams(slug, one);
-      results.push(r);
-
-      const ids = [
-        ...(Array.isArray(r?.enrollment_ids) ? r.enrollment_ids : []),
-        ...(r?.enrollment_id != null ? [r.enrollment_id] : []),
-      ]
-        .map(Number)
-        .filter(Number.isFinite);
-
-      allIds.push(...ids);
+    if (normalizedDiscountCode) {
+      payload.discount_code =
+        normalizedDiscountCode;
     }
 
-    const unique = Array.from(new Set(allIds));
-    return { results, enrollment_ids: unique };
+    console.log(
+      "POOMSAE TEAM REQUEST",
+      payload
+    );
+
+    const response =
+      await registerPoomsaeTeams(
+        slug,
+        payload
+      );
+
+    console.log(
+      "POOMSAE TEAM RESPONSE",
+      response
+    );
+
+    const ids = [
+      ...(Array.isArray(
+        response?.enrollment_ids
+      )
+        ? response.enrollment_ids
+        : []),
+
+      ...(response?.enrollment_id != null
+        ? [response.enrollment_id]
+        : []),
+    ]
+      .map(Number)
+      .filter(Number.isFinite);
+
+    return {
+      ...response,
+
+      enrollment_ids:
+        Array.from(
+          new Set(ids)
+        ),
+    };
   };
 
-  /* ---------- submit + payment ---------- */
+/* ---------- submit + payment ---------- */
 
-  const handleSubmit = async () => {
-    setErr("");
+const handleApplyDiscount = async () => {
+  setErr("");
+  setDiscountError("");
+  setDiscountApplied(false);
+  setAppliedDiscountCode("");
 
-    if (!registrationOpen) {
-      setErr("در حال حاضر ثبت‌نام این مسابقه غیرفعال است.");
-      return;
+  const normalizedCode =
+    String(discountCode || "").trim();
+
+  if (!hasDiscount) {
+    setDiscountCode("");
+    setDiscountAmountIrr(0);
+    setAppliedDiscountCode("");
+
+    setOriginalAmountIrr(
+      summary.totalAmountIrr
+    );
+
+    setFinalAmountIrr(
+      summary.totalAmountIrr
+    );
+
+    return;
+  }
+
+  if (!normalizedCode) {
+    setDiscountError(
+      "کد تخفیف را وارد کنید."
+    );
+    return;
+  }
+
+  if (!summary.totalSlots) {
+    setDiscountError(
+      "ابتدا اعضای تیم‌ها را انتخاب کنید."
+    );
+    return;
+  }
+
+  if (!validateTeams()) {
+    setDiscountError(
+      "ابتدا خطاهای اطلاعات تیم‌ها را برطرف کنید."
+    );
+    return;
+  }
+
+  try {
+    setDiscountLoading(true);
+
+    const result =
+      await submitTeamsToBackend({
+        preview: true,
+
+        // مهم: ارسال کد تخفیف به بک‌اند
+        discountCodeValue:
+          normalizedCode,
+      });
+
+    const returnedCode =
+      String(
+        result?.discount_code || ""
+      ).trim();
+
+    if (!returnedCode) {
+      throw new Error(
+        "کد تخفیف توسط سرور تأیید نشد."
+      );
     }
-    if (!validateTeams()) {
-      setErr("لطفاً خطاهای فرم تیم‌ها را برطرف کنید.");
-      return;
+
+    const rawAmount = Number(
+      result?.raw_total_irr ??
+      result?.original_amount_irr ??
+      summary.totalAmountIrr ??
+      0
+    );
+
+    const discountAmount = Number(
+      result?.discount_amount_irr ??
+      0
+    );
+
+    const payableAmount = Number(
+      result?.amount_irr ??
+      result?.payable_amount_irr ??
+      Math.max(
+        0,
+        rawAmount - discountAmount
+      )
+    );
+
+    setOriginalAmountIrr(
+      Number.isFinite(rawAmount)
+        ? rawAmount
+        : summary.totalAmountIrr
+    );
+
+    setDiscountAmountIrr(
+      Number.isFinite(discountAmount)
+        ? discountAmount
+        : 0
+    );
+
+    setFinalAmountIrr(
+      Number.isFinite(payableAmount)
+        ? payableAmount
+        : summary.totalAmountIrr
+    );
+
+    // کدی که واقعاً توسط سرور تأیید شده
+    setAppliedDiscountCode(
+      returnedCode
+    );
+
+    setDiscountApplied(true);
+    setDiscountError("");
+  } catch (error) {
+    const payload =
+      error?.payload ||
+      error?.response?.data ||
+      {};
+
+    const discountCodeError =
+      payload?.discount_code;
+
+    let message = "";
+
+    if (
+      Array.isArray(
+        discountCodeError
+      )
+    ) {
+      message = discountCodeError
+        .filter(Boolean)
+        .map(String)
+        .join("، ");
+    } else if (
+      discountCodeError &&
+      typeof discountCodeError ===
+        "object"
+    ) {
+      message = Object.values(
+        discountCodeError
+      )
+        .flat(Infinity)
+        .filter(Boolean)
+        .map(String)
+        .join("، ");
+    } else if (discountCodeError) {
+      message = String(
+        discountCodeError
+      );
     }
-    if (!summary.totalSlots) {
-      setErr("هیچ عضوی برای تیم‌ها انتخاب نشده است.");
-      return;
+
+    setDiscountAmountIrr(0);
+
+    setOriginalAmountIrr(
+      summary.totalAmountIrr
+    );
+
+    setFinalAmountIrr(
+      summary.totalAmountIrr
+    );
+
+    setDiscountApplied(false);
+    setAppliedDiscountCode("");
+
+    setDiscountError(
+      message ||
+      payload?.detail ||
+      payload?.message ||
+      error?.message ||
+      "امکان اعمال کد تخفیف وجود ندارد."
+    );
+  } finally {
+    setDiscountLoading(false);
+  }
+};
+
+
+
+const handleSubmit = async () => {
+  setErr("");
+
+  if (!registrationOpen) {
+    setErr(
+      "در حال حاضر ثبت‌نام این مسابقه غیرفعال است."
+    );
+    return;
+  }
+
+  if (!validateTeams()) {
+    setErr(
+      "لطفاً خطاهای فرم تیم‌ها را برطرف کنید."
+    );
+    return;
+  }
+
+  if (!summary.totalSlots) {
+    setErr(
+      "هیچ عضوی برای تیم‌ها انتخاب نشده است."
+    );
+    return;
+  }
+
+  if (
+    hasDiscount &&
+    !discountCode.trim()
+  ) {
+    setErr(
+      "کد تخفیف را وارد کنید."
+    );
+    return;
+  }
+
+  if (
+    hasDiscount &&
+    discountCode.trim() &&
+    !discountApplied
+  ) {
+    setErr(
+      "کد تخفیف هنوز اعمال نشده است. ابتدا روی دکمه «اعمال» بزنید."
+    );
+    return;
+  }
+
+  if (!competition?.public_id) {
+    setErr(
+      "شناسه مسابقه روی سرور یافت نشد."
+    );
+    return;
+  }
+
+  try {
+    setSubmitting(true);
+
+    const currentDiscountCode =
+      String(discountCode || "").trim();
+
+    const finalDiscountCode =
+      hasDiscount
+        ? String(
+            appliedDiscountCode || ""
+          ).trim()
+        : "";
+
+    if (
+      hasDiscount &&
+      currentDiscountCode &&
+      finalDiscountCode !==
+        currentDiscountCode
+    ) {
+      throw new Error(
+        "کد تخفیف تغییر کرده است؛ دوباره روی «اعمال» بزنید."
+      );
     }
-    if (!competition?.public_id) {
-      setErr("شناسه مسابقه روی سرور یافت نشد.");
-      return;
+
+    if (
+      hasDiscount &&
+      currentDiscountCode &&
+      !finalDiscountCode
+    ) {
+      throw new Error(
+        "ابتدا کد تخفیف را اعمال کنید."
+      );
     }
 
-    try {
-      setSubmitting(true);
+    const res =
+      await submitTeamsToBackend({
+        preview: false,
+        discountCodeValue:
+          finalDiscountCode,
+      });
 
-      const res = await submitTeamsToBackend();
+    const eids = Array.isArray(
+      res?.enrollment_ids
+    )
+      ? res.enrollment_ids
+      : [];
 
-      const eids = Array.isArray(res?.enrollment_ids) ? res.enrollment_ids : [];
+    if (
+      res?.errors &&
+      Object.keys(res.errors).length &&
+      !eids.length
+    ) {
+      const firstError =
+        Object.values(res.errors)[0];
 
-      // اگر بک‌اند خودش payment_url داد
-      if (res?.payment_url) {
-        window.location.href = res.payment_url;
-        return;
+      throw new Error(
+        typeof firstError === "string"
+          ? firstError
+          : "اطلاعات تیم‌ها معتبر نیست."
+      );
+    }
+
+    const paymentRequired =
+      res?.payment_required ??
+      res?.paymentRequired;
+
+    // مسابقه رایگان یا پرداخت غیرفعال
+    if (paymentRequired === false) {
+      if (!eids.length) {
+        throw new Error(
+          res?.detail ||
+            "ثبت انجام شد، اما شناسه ثبت‌نام از سرور برنگشت."
+        );
       }
 
-      // اگر ثبت‌نام رایگان است: مستقیم برو صفحه کارت‌ها
-      if (Number(summary.totalAmount || 0) === 0) {
-        if (eids.length) {
-          const qs = encodeURIComponent(eids.join(","));
-          navigate(
-            `/dashboard/${encodeURIComponent(role || "coach")}/enrollments/bulk?ids=${qs}`,
-            { state: { ids: eids }, replace: true }
-          );
-          return;
+      const qs = encodeURIComponent(
+        eids.join(",")
+      );
+
+      navigate(
+        `/dashboard/${encodeURIComponent(
+          role || "coach"
+        )}/enrollments/bulk?ids=${qs}&kind=poomsae`,
+        {
+          state: {
+            ids: eids,
+            kind: "poomsae",
+          },
+          replace: true,
         }
-        setErr("ثبت انجام شد، اما enrollment_id از سرور برنگشت.");
-        return;
-      }
+      );
 
-            // اگر مبلغ غیر صفر است: پرداخت انجام شود
-            // اول از intent ساخته‌شده توسط ثبت‌نام تیمی استفاده کن
-            let intentPublicId =
-              res?.payment_intent_public_id ||
-              res?.public_id ||
-              res?.payment?.public_id;
-
-            // فقط اگر بک‌اند ثبت‌نام intent نداد، fallback بزن و intent جدا بساز
-            if (!intentPublicId) {
-              const intent = await createPaymentIntent({
-                competitionPublicId: competition.public_id,
-                amount: Number(summary.totalAmount || 0),
-                description: `ثبت‌نام تیمی پومسه در مسابقه ${competition?.title || ""}`,
-                style: "poomsae_team",
-              });
-
-              intentPublicId = intent.public_id || intent.id;
-            }
-
-            if (!intentPublicId) {
-              setErr("ثبت تیم‌ها انجام شد، اما شناسهٔ پرداخت از سرور دریافت نشد.");
-              return;
-            }
-
-            const params = new URLSearchParams();
-            if (competition?.id) params.set("cid", String(competition.id));
-            params.set("flow", "poomsae_team_after_payment");
-            if (eids.length) params.set("ids", eids.join(","));
-
-            const callbackUrl = `${window.location.origin}/#/payment/result?${params.toString()}`;
-
-            const payRes = await startPaymentIntent(intentPublicId, { callbackUrl });
-
-            const paymentUrl =
-              payRes?.payment_url ||
-              payRes?.redirect_url ||
-              payRes?.url ||
-              payRes?.payment?.payment_url ||
-              payRes?.payment?.redirect_url ||
-              payRes?.payment?.url;
-
-            if (paymentUrl) {
-              window.location.href = paymentUrl;
-              return;
-            }
-
-            setErr("تیم‌ها ثبت شدند، اما لینک انتقال به درگاه بانکی از سرور دریافت نشد.");
-    } catch (e) {
-      setErr(e?.message || "خطا در ثبت تیم‌ها / شروع پرداخت");
-    } finally {
-      setSubmitting(false);
+      return;
     }
-  };
 
+    if (paymentRequired !== true) {
+      throw new Error(
+        res?.detail ||
+          "وضعیت پرداخت در پاسخ سرور مشخص نیست."
+      );
+    }
+
+    localStorage.setItem(
+      "last_payment_kind",
+      "poomsae"
+    );
+
+    localStorage.setItem(
+      "last_payment_comp",
+      String(
+        slug ||
+          competition?.public_id ||
+          ""
+      )
+    );
+
+    if (eids.length) {
+      localStorage.setItem(
+        "last_payment_enrollment_ids",
+        eids.join(",")
+      );
+    }
+
+    // اگر سرور لینک مستقیم درگاه داده باشد
+    const directPaymentUrl =
+      res?.payment_url ||
+      res?.paymentUrl ||
+      res?.redirect_url ||
+      res?.redirectUrl ||
+      res?.payment?.payment_url ||
+      res?.payment?.redirect_url;
+
+    if (directPaymentUrl) {
+      window.location.href =
+        directPaymentUrl;
+      return;
+    }
+
+    // شناسه PaymentIntent ساخته‌شده در بک‌اند
+    const intentPublicId =
+      res?.payment_intent_public_id ||
+      res?.paymentIntentPublicId ||
+      res?.public_id ||
+      res?.payment?.public_id;
+
+    if (!intentPublicId) {
+      throw new Error(
+        "شناسه پرداخت تیم‌ها از سرور دریافت نشد."
+      );
+    }
+
+    const params =
+      new URLSearchParams();
+
+    params.set(
+      "flow",
+      "poomsae_team_after_payment"
+    );
+
+    params.set(
+      "kind",
+      "poomsae"
+    );
+
+    if (competition?.id) {
+      params.set(
+        "cid",
+        String(competition.id)
+      );
+    }
+
+    if (eids.length) {
+      params.set(
+        "ids",
+        eids.join(",")
+      );
+    }
+
+    const callbackUrl =
+      `${window.location.origin}` +
+      `/#/payment/result?${params.toString()}`;
+
+    const payRes =
+      await startPaymentIntent(
+        intentPublicId,
+        {
+          gateway: "sadad",
+          callbackUrl,
+        }
+      );
+
+    if (payRes?.redirect_url) {
+      window.location.href =
+        payRes.redirect_url;
+      return;
+    }
+
+    if (payRes?.payment) {
+      submitGatewayForm(
+        payRes.payment
+      );
+      return;
+    }
+
+    throw new Error(
+      "اطلاعات انتقال به درگاه بانکی از سرور دریافت نشد."
+    );
+  } catch (e) {
+    const payload = e?.payload || {};
+    const serverErrors = payload?.errors;
+
+    if (
+      serverErrors &&
+      typeof serverErrors === "object" &&
+      !Array.isArray(serverErrors) &&
+      Object.keys(serverErrors).length
+    ) {
+      const normalizeErrorText = (value) => {
+        if (Array.isArray(value)) {
+          return value.filter(Boolean).join("، ");
+        }
+
+        if (value && typeof value === "object") {
+          return Object.values(value)
+            .flat(Infinity)
+            .filter(Boolean)
+            .map(String)
+            .join("، ");
+        }
+
+        return String(value || "خطای نامشخص");
+      };
+
+      const messages = Object.entries(serverErrors).map(
+        ([key, value]) => {
+          const teamMatch = key.match(/^team_(\d+)$/);
+
+          const title = teamMatch
+            ? `تیم ${toFa(teamMatch[1])}`
+            : key;
+
+          return `${title}: ${normalizeErrorText(value)}`;
+        }
+      );
+
+      // نمایش خلاصه تمام خطاها بالای صفحه
+      setErr(messages.join(" | "));
+
+      // اتصال خطای هر تیم به کارت همان تیم
+      setTeams((prev) =>
+        prev.map((team, index) => {
+          const teamError =
+            serverErrors[`team_${index + 1}`];
+
+          if (!teamError) {
+            return team;
+          }
+
+          return {
+            ...team,
+            errors: {
+              ...(team.errors || {}),
+              server: normalizeErrorText(teamError),
+            },
+          };
+        })
+      );
+
+      return;
+    }
+
+    setErr(
+      payload?.detail ||
+        payload?.message ||
+        e?.message ||
+        "خطا در ثبت تیم‌ها یا شروع پرداخت"
+    );
+  } finally {
+    setSubmitting(false);
+  }
+};
   /* ---------- UI ---------- */
 
   if (loading && !competition) {
@@ -776,11 +1315,13 @@ export default function PoomsaeTeamRegister() {
           <h1 className="cd-title">ثبت‌نام تیمی پومسه – {titleText}</h1>
           <div className="cd-chips">
             <span className="cd-chip">
-              هزینه ورودی هر نفر:{" "}
-              <strong>{toFa(Number(entryFee || 0).toLocaleString())}</strong> تومان
-            </span>
-            <span className={`cd-chip ${registrationOpen ? "ok" : "nok"}`}>
-              ثبت‌نام تیمی: <strong>{registrationOpen ? "باز" : "بسته"}</strong>
+               هزینه ثبت‌نام هر نفر:{" "}
+              <strong>
+                {toFa(
+                  entryFeeToman.toLocaleString()
+                )}
+              </strong>{" "}
+              تومان
             </span>
           </div>
         </div>
@@ -807,15 +1348,30 @@ export default function PoomsaeTeamRegister() {
             const errNo = pid ? t.errors?.[`ins_no_${pid}`] : null;
             const errDate = pid ? t.errors?.[`ins_date_${pid}`] : null;
 
-            const optionEls = playerOptions.map((p) => (
-              <option
-                key={p.id}
-                value={p.id}
-                disabled={selectedIdsInThisTeam.has(p.id) && String(p.id) !== String(currentValue)}
-              >
-                {p.label}
-              </option>
-            ));
+            const optionEls = groupedPlayerOptions.map(
+              (group) => (
+                <optgroup
+                  key={group.key}
+                  label={`${group.label} — ${toFa(
+                    group.players.length
+                  )} بازیکن`}
+                >
+                  {group.players.map((p) => (
+                    <option
+                      key={p.id}
+                      value={p.id}
+                      disabled={
+                        selectedIdsInThisTeam.has(p.id) &&
+                        String(p.id) !==
+                          String(currentValue)
+                      }
+                    >
+                      {p.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )
+            );
 
             return (
               <div className="poomsae-member-card">
@@ -941,7 +1497,18 @@ export default function PoomsaeTeamRegister() {
                   </button>
                 </div>
               </div>
-
+              {t.errors?.server && (
+                <div
+                  className="cd-error"
+                  style={{
+                    marginTop: 10,
+                    marginBottom: 12,
+                    padding: "10px 12px",
+                  }}
+                >
+                  {`تیم ${toFa(idx + 1)}: ${t.errors.server}`}
+                </div>
+              )}
               {t.type && (
                 <div className="cd-grid">
                   {/* main */}
@@ -982,9 +1549,12 @@ export default function PoomsaeTeamRegister() {
                   {t.errors.age_mismatch}
                 </div>
               )}
-              {t.errors.belt_mismatch && (
-                <div className="cd-error" style={{ marginTop: 10 }}>
-                  {t.errors.belt_mismatch}
+              {t.errors.age_mismatch && (
+                <div
+                  className="cd-error"
+                  style={{ marginTop: 10 }}
+                >
+                  {t.errors.age_mismatch}
                 </div>
               )}
               {t.errors.player_multi_standard && (
@@ -1016,7 +1586,145 @@ export default function PoomsaeTeamRegister() {
       <section className="cd-section">
         <h2 className="cd-section-title">خلاصه</h2>
 
-        <div className="cd-discount-summary">
+        <div
+          className="cd-card"
+          style={{
+            marginBottom: 16,
+            padding: 16,
+          }}
+        >
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              cursor: "pointer",
+              marginBottom: hasDiscount
+                ? 12
+                : 0,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={hasDiscount}
+              disabled={
+                submitting ||
+                discountLoading ||
+                !registrationOpen
+              }
+              onChange={(event) => {
+                const checked =
+                  event.target.checked;
+
+                setHasDiscount(checked);
+                setDiscountError("");
+                setDiscountApplied(false);
+                setAppliedDiscountCode("");
+
+                if (!checked) {
+                  setDiscountCode("");
+                  setDiscountAmountIrr(0);
+
+                  setOriginalAmountIrr(
+                    summary.totalAmountIrr
+                  );
+
+                  setFinalAmountIrr(
+                    summary.totalAmountIrr
+                  );
+                }
+              }}
+            />
+
+            <span>
+              کد تخفیف دارم
+            </span>
+          </label>
+
+          {hasDiscount && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "minmax(0, 1fr) auto",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              <input
+                className="cd-input"
+                value={discountCode}
+                placeholder="کد تخفیف مربی"
+                disabled={
+                  submitting ||
+                  discountLoading ||
+                  !registrationOpen
+                }
+                onChange={(event) => {
+                  setDiscountCode(
+                    event.target.value
+                  );
+
+                  // هر تغییر در متن کد، تأیید قبلی
+                  // سرور را باطل می‌کند.
+                  setDiscountApplied(false);
+                  setAppliedDiscountCode("");
+                  setDiscountError("");
+                  setDiscountAmountIrr(0);
+
+                  setOriginalAmountIrr(
+                    summary.totalAmountIrr
+                  );
+
+                  setFinalAmountIrr(
+                    summary.totalAmountIrr
+                  );
+                }}
+              />
+
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={
+                  handleApplyDiscount
+                }
+                disabled={
+                  discountLoading ||
+                  submitting ||
+                  !registrationOpen
+                }
+              >
+                {discountLoading
+                  ? "در حال بررسی…"
+                  : "اعمال"}
+              </button>
+            </div>
+          )}
+
+          {discountError && (
+            <div
+              className="cd-error"
+              style={{
+                marginTop: 8,
+              }}
+            >
+              {discountError}
+            </div>
+          )}
+
+          {discountApplied && (
+            <div
+              className="cd-note cd-note--poomsae"
+              style={{
+                marginTop: 10,
+              }}
+            >
+              کد تخفیف با موفقیت اعمال شد.
+            </div>
+          )}
+        </div>
+
+  <div className="cd-discount-summary">
           <div>
             تعداد تیم‌های استاندارد: <strong>{toFa(summary.standardTeams)}</strong>
           </div>
@@ -1027,8 +1735,45 @@ export default function PoomsaeTeamRegister() {
             تعداد کل اسلات‌های پرشده (نفر): <strong>{toFa(summary.totalSlots)}</strong>
           </div>
           <div>
-            مبلغ کل قابل پرداخت:{" "}
-            <strong>{toFa(Number(summary.totalAmount || 0).toLocaleString())}</strong> تومان
+            مبلغ اولیه:{" "}
+            <strong>
+              {toFa(
+                Math.floor(
+                  Number(
+                    originalAmountIrr || 0
+                  ) / 10
+                ).toLocaleString()
+              )}
+            </strong>{" "}
+            تومان
+          </div>
+
+          <div>
+            مبلغ تخفیف:{" "}
+            <strong>
+              {toFa(
+                Math.floor(
+                  Number(
+                    discountAmountIrr || 0
+                  ) / 10
+                ).toLocaleString()
+              )}
+            </strong>{" "}
+            تومان
+          </div>
+
+          <div>
+            مبلغ قابل پرداخت:{" "}
+            <strong>
+              {toFa(
+                Math.floor(
+                  Number(
+                    finalAmountIrr || 0
+                  ) / 10
+                ).toLocaleString()
+              )}
+            </strong>{" "}
+            تومان
           </div>
         </div>
 
@@ -1047,18 +1792,28 @@ export default function PoomsaeTeamRegister() {
           <button
             className="btn btn-primary"
             onClick={handleSubmit}
-            disabled={!canSubmit || submitting}
+            disabled={
+              !canSubmit ||
+              submitting ||
+              discountLoading
+            }
             title={
               !registrationOpen
                 ? "ثبت‌نام تیمی در حال حاضر بسته است"
                 : !summary.totalSlots
                 ? "هیچ عضوی برای تیم‌ها انتخاب نشده است"
+                : hasDiscount &&
+                  discountCode.trim() &&
+                  !discountApplied
+                ? "ابتدا کد تخفیف را اعمال کنید"
                 : ""
             }
           >
             {submitting
               ? "در حال ثبت…"
-              : Number(summary.totalAmount || 0) === 0
+              : Number(
+                  finalAmountIrr || 0
+                ) === 0
               ? "ثبت نهایی"
               : "تأیید و پرداخت"}
           </button>

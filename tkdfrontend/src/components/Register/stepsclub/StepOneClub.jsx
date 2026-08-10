@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import './ClubRegister.css';
 
+import {
+  showGlobalMessage,
+} from '../../../services/globalMessage';
 const StepOneClub = ({ data, onDataChange, onNext }) => {
   const [errors, setErrors] = useState({});
-  const [showErrorModal, setShowErrorModal] = useState(false);
 
   const handleChange = (e) => {
    onDataChange({ [e.target.name]: e.target.value.trim() });
@@ -20,8 +22,16 @@ const StepOneClub = ({ data, onDataChange, onNext }) => {
 
     setErrors(newErrors);
 
-    if (Object.keys(newErrors).length > 0) {
-      setShowErrorModal(true);
+    const errorMessages =
+      Object.values(newErrors);
+
+    if (errorMessages.length > 0) {
+      showGlobalMessage({
+        type: 'warning',
+        title: 'اطلاعات اولیه باشگاه ناقص است',
+        messages: errorMessages,
+      });
+
       return false;
     }
 
@@ -97,16 +107,6 @@ const StepOneClub = ({ data, onDataChange, onNext }) => {
         <button type="button" onClick={handleNext}>مرحله بعد</button>
       </div>
 
-      {showErrorModal && (
-        <div className="modal-error-overlay">
-          <div className="modal-error-box">
-            {Object.values(errors).map((err, i) => (
-              <p key={i}>{err}</p>
-            ))}
-            <button onClick={() => setShowErrorModal(false)}>بستن</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

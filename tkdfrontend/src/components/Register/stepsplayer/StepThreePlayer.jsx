@@ -4,15 +4,15 @@ import DatePicker from "react-multi-date-picker";
 import persian from "react-date-object/calendars/persian";
 import persian_fa from "react-date-object/locales/persian_fa";
 import "./PlayerRegister.css";
-
+import {
+  showGlobalMessage,
+} from '../../../services/globalMessage';
 const StepThreePlayer = ({ data, onDataChange,onSubmit, onNext, onBack }) => {
   const [clubs, setClubs] = useState([]);
   const [coaches, setCoaches] = useState([]);
   const [heyats, setHeyats] = useState([]);
   const [beltChoices, setBeltChoices] = useState([]);
   const [errors, setErrors] = useState({});
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [modalErrorText, setModalErrorText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
 
@@ -69,11 +69,19 @@ const StepThreePlayer = ({ data, onDataChange,onSubmit, onNext, onBack }) => {
 
     setErrors(newErrors);
 
-    if (Object.keys(newErrors).length > 0) {
-      setModalErrorText(Object.values(newErrors)[0]);
-      setShowErrorModal(true);
+    const errorMessages =
+      Object.values(newErrors);
+
+    if (errorMessages.length > 0) {
+      showGlobalMessage({
+        type: 'warning',
+        title: 'اطلاعات تکواندو ناقص است',
+        messages: errorMessages,
+      });
+
       return false;
     }
+
     return true;
   };
 
@@ -203,14 +211,6 @@ const StepThreePlayer = ({ data, onDataChange,onSubmit, onNext, onBack }) => {
         <button onClick={handleSubmit} disabled={isSubmitting}>ثبت‌نام</button>
       </div>
 
-      {showErrorModal && (
-        <div className="modal-error-overlay">
-          <div className="modal-error-box">
-            <p>{modalErrorText}</p>
-            <button onClick={() => setShowErrorModal(false)}>باشه</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

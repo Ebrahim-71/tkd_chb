@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
+import { apiFetch } from '../api/apiClient';
+
+import {
+  showGlobalMessage,
+  showGlobalSuccess,
+  showGlobalError,
+} from '../services/globalMessage';
+
 import StepOneCoach from '../components/Register/stepscoach/StepOneCoach';
 import StepTwoCoach from '../components/Register/stepscoach/StepTwoCoach';
 import StepThreeCoach from '../components/Register/stepscoach/StepThreeCoach';
@@ -9,14 +17,6 @@ import StepFourCoach from '../components/Register/stepscoach/StepFourCoach';
 import sampleImg from '../assets/img/register-coach.jpg';
 import '../components/Register/stepscoach/CoachRegister.css';
 
-const Modal = ({ message, onClose }) => (
-  <div className="modal-error-overlay">
-    <div className="modal-error-box">
-      <p>{message}</p>
-      <button onClick={onClose}>باشه</button>
-    </div>
-  </div>
-);
 
 // تابع تبدیل نام فیلدها به فارسی
 const translateField = (field) => {
@@ -51,18 +51,23 @@ const translateField = (field) => {
 const parseServerErrors = (errors) => {
   const messages = [];
 
-  for (const field in errors) {
+  for (const field in errors || {}) {
     const fieldErrors = errors[field];
+
     if (Array.isArray(fieldErrors)) {
       fieldErrors.forEach((err) => {
-        messages.push(`${translateField(field)}: ${err}`);
+        messages.push(
+          `${translateField(field)}: ${err}`
+        );
       });
-    } else {
-      messages.push(`${translateField(field)}: ${fieldErrors}`);
+    } else if (fieldErrors) {
+      messages.push(
+        `${translateField(field)}: ${fieldErrors}`
+      );
     }
   }
 
-  return messages.join('\n');
+  return messages;
 };
 
 const RegisterCoachPage = () => {
@@ -128,18 +133,6 @@ const RegisterCoachPage = () => {
     confirmInfo: false,
   });
 
-  const [modalMessage, setModalMessage] = useState('');
-  const [showModal, setShowModal] = useState(false);
-
-  const showError = (msg) => {
-    setModalMessage(msg);
-    setShowModal(true);
-  };
-
-  const showSuccess = (msg) => {
-    setModalMessage(msg);
-    setShowModal(true);
-  };
 
   const handleDataChange = (newData) => {
     setFormData((prev) => ({ ...prev, ...newData }));
@@ -160,76 +153,195 @@ const RegisterCoachPage = () => {
     return cookieValue;
   };
 
-const handleSubmit = () => {
+const handleSubmit = async () => {
   const form = new FormData();
 
-  const preparedData = { ...formData };
+  const preparedData = {
+    ...formData,
+  };
 
-  // ✅ ۱. هندل مربی دیگر
+
+  // مربی دیگر
   if (preparedData.coach === "other") {
-    preparedData.coach = null; // یا: delete preparedData.coach;
-    preparedData.coach_name = preparedData.customCoachName;
+    preparedData.coach = null;
+    preparedData.coach_name =
+      preparedData.customCoachName;
   } else {
-    try {
-      preparedData.coach = Number(preparedData.coach);
-    } catch {
-      preparedData.coach = null;
-    }
+    const coachId =
+      Number(preparedData.coach);
+
+    preparedData.coach =
+      Number.isFinite(coachId)
+        ? coachId
+        : null;
+
     delete preparedData.coach_name;
   }
+
   delete preparedData.customCoachName;
 
-  // ✅ ۲. اطمینان از رشته‌بودن این فیلدها در بک‌اند
-  preparedData.selectedClubs = JSON.stringify(preparedData.selectedClubs || []);
-  preparedData.refereeTypes = JSON.stringify(preparedData.refereeTypes || {});
 
-  // ✅ ۳. اضافه کردن همه به FormData
-  Object.entries(preparedData).forEach(([key, value]) => {
-    if (value instanceof File) {
-      form.append(key, value);
-    } else if (typeof value === 'object' && value !== null) {
-      form.append(key, JSON.stringify(value));
-    } else if (value !== undefined && value !== null) {
-      form.append(key, value);
+  // این فیلدها در Backend به صورت JSON دریافت می‌شوند
+  preparedData.selectedClubs =
+    JSON.stringify(
+      preparedData.selectedClubs || []
+    );
+
+  preparedData.refereeTypes =
+    JSON.stringify(
+      preparedData.refereeTypes || {}
+    );
+
+
+  Object.entries(preparedData).forEach(
+    ([key, value]) => {
+      if (value instanceof File) {
+        form.append(key, value);
+      } else if (
+        typeof value === 'object' &&
+        value !== null
+      ) {
+        form.append(
+          key,
+          JSON.stringify(value)
+        );
+      } else if (
+        value !== undefined &&
+        value !== null
+      ) {
+        form.append(key, value);
+      }
     }
-  });
+  );
 
-  const csrfToken = getCookie('csrftoken');
 
-  fetch('https://api.chbtkd.ir/api/auth/register-coach/', {
-    method: 'POST',
-    body: form,
-    headers: {
-      'X-CSRFToken': csrfToken,
-    },
-    credentials: 'include',
-  })
-    .then(async (res) => {
-      const contentType = res.headers.get("content-type");
-      const isJson = contentType && contentType.includes("application/json");
-      const data = isJson ? await res.json() : await res.text();
+  const csrfToken =
+    getCookie('csrftoken');
 
-      if (!res.ok) {
-        if (isJson && data.errors) {
-          const parsed = parseServerErrors(data.errors);
-          showError(parsed);
-        } else {
-          showError("خطای ناشناخته:\n" + JSON.stringify(data));
-        }
+
+  try {
+    const res = await apiFetch(
+      'https://api.chbtkd.ir/api/auth/register-coach/',
+      {
+        method: 'POST',
+
+        body: form,
+
+        headers: {
+          'X-CSRFToken': csrfToken,
+        },
+
+        credentials: 'include',
+
+        // اینجا خطا را خودمان پردازش می‌کنیم
+        // تا نام فیلدها فارسی نمایش داده شود.
+        globalError: false,
+      }
+    );
+
+
+    const contentType =
+      res.headers.get(
+        'content-type'
+      ) || '';
+
+    const isJson =
+      contentType.includes(
+        'application/json'
+      );
+
+    const data = isJson
+      ? await res.json().catch(() => ({}))
+      : await res.text().catch(() => '');
+
+
+    if (!res.ok) {
+      if (
+        isJson &&
+        data?.errors
+      ) {
+        const messages =
+          parseServerErrors(
+            data.errors
+          );
+
+        showGlobalMessage({
+          type: 'error',
+          title: 'خطا در ثبت‌نام مربی',
+          messages:
+            messages.length
+              ? messages
+              : [
+                  'اطلاعات ارسال‌شده معتبر نیست.',
+                ],
+        });
+
         return;
       }
 
-      if (data.status === 'ok') {
-        showSuccess(data.message || 'اطلاعات شما ثبت و در انتظار تایید هیئت استان می‌باشد.');
-        localStorage.removeItem('verifiedPhone');
-      } else {
-        showError(data.message || 'خطایی در ثبت‌نام رخ داد.');
-      }
-    })
-    .catch((err) => {
-      console.error('Error:', err);
-      showError('خطای ارتباط با سرور. لطفاً دوباره تلاش کنید.');
+
+      const serverMessage =
+        isJson
+          ? (
+              data?.detail ||
+              data?.error ||
+              data?.message
+            )
+          : null;
+
+
+      showGlobalMessage({
+        type: 'error',
+        title: 'خطا در ثبت‌نام مربی',
+        message:
+          serverMessage ||
+          'ثبت‌نام انجام نشد. لطفاً اطلاعات واردشده را بررسی کنید.',
+      });
+
+      return;
+    }
+
+
+    if (data?.status === 'ok') {
+      localStorage.removeItem(
+        'verifiedPhone'
+      );
+
+      showGlobalSuccess(
+        data.message ||
+          'اطلاعات شما ثبت شد و در انتظار تأیید هیئت استان است.',
+        'ثبت‌نام موفق',
+        () => {
+          window.location.href = '/';
+        }
+      );
+
+      return;
+    }
+
+
+    showGlobalMessage({
+      type: 'warning',
+      title: 'ثبت‌نام تکمیل نشد',
+      message:
+        data?.message ||
+        'خطایی در ثبت‌نام رخ داد.',
     });
+
+  } catch (err) {
+    console.error(
+      'REGISTER_COACH_ERROR',
+      err
+    );
+
+    showGlobalError(
+      err,
+      {
+        title:
+          'خطا در ارتباط با سرور',
+      }
+    );
+  }
 };
 
 
@@ -276,17 +388,6 @@ const handleSubmit = () => {
         <img src={sampleImg} alt="register visual" />
       </div>
 
-      {showModal && (
-        <Modal
-          message={modalMessage}
-          onClose={() => {
-            setShowModal(false);
-            if (modalMessage.includes('موفقیت')) {
-              window.location.href = '/';
-            }
-          }}
-        />
-      )}
     </div>
   );
 };

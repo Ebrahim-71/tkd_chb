@@ -1,17 +1,23 @@
 import React, { useRef, useState } from 'react';
 import './ClubRegister.css';
 
+import {
+  showGlobalMessage,
+} from '../../../services/globalMessage';
+
 const StepThreeClub = ({ data, onDataChange, onBack, onSubmit }) => {
   const fileInputRef = useRef();
   const [invalidFields, setInvalidFields] = useState([]);
-  const [customErrors, setCustomErrors] = useState([]);
-  const [showErrorModal, setShowErrorModal] = useState(false);
-
+  
   const handleChange = (e) => {
     const { name, value, type, checked, files } = e.target;
 
+    setInvalidFields((prev) =>
+      prev.filter((field) => field !== name)
+    );
+
     if (type === 'file') {
-      onDataChange({ license_image: files[0] });
+      onDataChange({ license_image: files?.[0] || null });
     } else if (type === 'checkbox') {
       onDataChange({ [name]: checked });
     } else {
@@ -69,10 +75,18 @@ const StepThreeClub = ({ data, onDataChange, onBack, onSubmit }) => {
     }
 
     setInvalidFields(invalids);
-    setCustomErrors(errors);
-    setShowErrorModal(errors.length > 0);
 
-    return errors.length === 0;
+    if (errors.length > 0) {
+      showGlobalMessage({
+        type: 'warning',
+        title: 'اطلاعات حقوقی باشگاه ناقص است',
+        messages: errors,
+      });
+
+      return false;
+    }
+
+    return true;
   };
 
   const handleSubmit = () => {
@@ -141,16 +155,6 @@ const StepThreeClub = ({ data, onDataChange, onBack, onSubmit }) => {
         <button type="button" onClick={handleSubmit}>ثبت نهایی</button>
       </div>
 
-      {showErrorModal && (
-        <div className="modal-error-overlay">
-          <div className="modal-error-box">
-            {customErrors.map((err, i) => (
-              <p key={i}>{err}</p>
-            ))}
-            <button onClick={() => setShowErrorModal(false)}>باشه</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

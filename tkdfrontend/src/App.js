@@ -28,9 +28,16 @@ import CoachRegisterStudents from "./components/Login/competitions/CoachRegister
 import EnrollmentCardsBulk from "./components/Login/competitions/EnrollmentCardsBulk";
 import CompetitionDetails from "./components/Login/competitions/CompetitionDetails";
 import CompetitionBracket from "./components/Login/competitions/CompetitionBracket";
+import PoomsaeDrawView from "./components/Login/competitions/PoomsaeDrawView";
+
 import CompetitionResults from "./components/Login/competitions/CompetitionResults";
 import SeminarDetail from "./components/Login/seminar/SeminarDetail";
 import PoomsaeTeamRegister from "./components/Login/competitions/PoomsaeTeamRegister";
+
+import GlobalMessageModal from "./components/common/GlobalMessageModal/GlobalMessageModal";
+import {
+  setupGlobalAxiosErrors,
+} from "./api/setupGlobalAxiosErrors";
 
 // ✅ صفحه نتیجه پرداخت
 import PaymentResult from "./pages/PaymentResult";
@@ -109,10 +116,15 @@ const MainPage = () => {
   );
 };
 
+setupGlobalAxiosErrors();
+
+
 function App() {
   return (
     <Router>
       <ScrollToTop />
+
+      <GlobalMessageModal />
 
       <div className="App">
         <Header />
@@ -135,9 +147,16 @@ function App() {
               />
 
               {/* جدول مسابقات */}
+              {/* جدول مسابقات کیوروگی */}
               <Route
                 path="competitions/:slug/bracket"
                 element={<CompetitionBracket />}
+              />
+
+              {/* جدول قرعه پومسه */}
+              <Route
+                path="competitions/:slug/poomsae-draw"
+                element={<PoomsaeDrawView />}
               />
 
               {/* ثبت‌نام گروهی مربی (تک/تیمی، کیوروگی یا پومسه) */}

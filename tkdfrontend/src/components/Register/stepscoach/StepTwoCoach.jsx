@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import provincesData from '../provincesData.js';
 import './CoachRegister.css';
 
+import {
+  showGlobalMessage,
+} from '../../../services/globalMessage';
 const StepTwoCoach = ({ data, onNext, onBack, onDataChange }) => {
   const [invalidFields, setInvalidFields] = useState([]);
-  const [customErrors, setCustomErrors] = useState([]);
-  const [showErrorModal, setShowErrorModal] = useState(false);
 
   const validate = () => {
     const required = ['province', 'county', 'city', 'address', 'profile_image'];
@@ -61,10 +62,18 @@ const StepTwoCoach = ({ data, onNext, onBack, onDataChange }) => {
 
 
     setInvalidFields(invalids);
-    setCustomErrors(errors);
-    setShowErrorModal(errors.length > 0);
 
-    return errors.length === 0;
+    if (errors.length > 0) {
+      showGlobalMessage({
+        type: 'warning',
+        title: 'اطلاعات ناقص یا نامعتبر',
+        messages: errors,
+      });
+
+      return false;
+    }
+
+    return true;
   };
 
   const handleChange = (e) => {
@@ -177,16 +186,6 @@ const StepTwoCoach = ({ data, onNext, onBack, onDataChange }) => {
         <button type="button" onClick={handleNext}>مرحله بعد</button>
       </div>
 
-      {showErrorModal && (
-        <div className="modal-error-overlay">
-          <div className="modal-error-box">
-            {customErrors.map((err, index) => (
-              <p key={index}>{err}</p>
-            ))}
-            <button onClick={() => setShowErrorModal(false)}>باشه</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

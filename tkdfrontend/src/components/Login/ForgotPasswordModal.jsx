@@ -2,6 +2,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./LoginModal.css";
 
+import { apiFetch } from "../../api/apiClient";
+import { showGlobalWarning } from "../../services/globalMessage";
+
 // آدرس پایه‌ی API فقط با متغیرهای محیطی CRA
 const API_BASE = (
   process.env.REACT_APP_API_BASE_URL ||   // اگر تو .env تعریف کرده باشی
@@ -29,12 +32,11 @@ const normalizeDigits = (s = "") => {
 };
 
 const ForgotPasswordModal = ({ onClose }) => {
-  const [step, setStep] = useState("phone"); // 'phone' | 'code' | 'result'
+  const [step, setStep] = useState("phone");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null); // { username, password, role, message }
+  const [result, setResult] = useState(null);
 
   const [cooldown, setCooldown] = useState(0);
   useEffect(() => {
@@ -54,35 +56,71 @@ const ForgotPasswordModal = ({ onClose }) => {
 
   const handleSendCode = async (e) => {
     e?.preventDefault?.();
-    setError("");
 
     const p = normalizeDigits(phone);
+
     if (!/^09\d{9}$/.test(p)) {
-      setError("شماره موبایل معتبر نیست.");
+      showGlobalWarning(
+        "شماره موبایل معتبر نیست.",
+        "شماره موبایل نامعتبر"
+      );
       return;
     }
 
     setLoading(true);
+
     try {
-      const res = await fetch(SEND_URL, {
+      const res = await apiFetch(SEND_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: p }),
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          phone: p,
+        }),
+
+        errorTitle: "ارسال کد بازیابی",
       });
-      const data = await res.json().catch(() => ({}));
+
+      const data =
+        await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        if (res.status === 429 && typeof data.retry_after === "number") {
-          setCooldown(Math.max(0, parseInt(data.retry_after, 10)));
+        // در خطای 429 همچنان زمان انتظار
+        // Backend را نگه می‌داریم.
+        if (
+          res.status === 429 &&
+          typeof data?.retry_after === "number"
+        ) {
+          setCooldown(
+            Math.max(
+              0,
+              parseInt(data.retry_after, 10)
+            )
+          );
         }
-        throw new Error(data?.error || data?.detail || "ارسال کد ناموفق بود.");
+
+        // apiFetch پیام خطای Backend
+        // را قبلاً در Modal نمایش داده است.
+        return;
       }
 
       setPhone(p);
       setStep("code");
       setCooldown(180);
+
     } catch (err) {
-      setError(err.message || "مشکلی پیش آمد.");
+      if (err?.name !== "AbortError") {
+        console.error(
+          "FORGOT_PASSWORD_SEND_ERROR",
+          err
+        );
+
+        // خطای شبکه توسط apiFetch
+        // نمایش داده شده است.
+      }
     } finally {
       setLoading(false);
     }
@@ -90,42 +128,74 @@ const ForgotPasswordModal = ({ onClose }) => {
 
   const handleVerify = async (e) => {
     e?.preventDefault?.();
-    setError("");
 
     const p = normalizeDigits(phone);
     const c = normalizeDigits(code);
 
     if (!/^09\d{9}$/.test(p)) {
-      setError("شماره موبایل معتبر نیست.");
+      showGlobalWarning(
+        "شماره موبایل معتبر نیست.",
+        "شماره موبایل نامعتبر"
+      );
       return;
     }
+
     if (!/^\d{4}$/.test(c)) {
-      setError("کد باید ۴ رقمی باشد.");
+      showGlobalWarning(
+        "کد تأیید باید دقیقاً ۴ رقم باشد.",
+        "کد تأیید نامعتبر"
+      );
       return;
     }
 
     setLoading(true);
+
     try {
-      const res = await fetch(VERIFY_URL, {
+      const res = await apiFetch(VERIFY_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: p, code: c }),
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          phone: p,
+          code: c,
+        }),
+
+        errorTitle: "تأیید کد بازیابی",
       });
-      const data = await res.json().catch(() => ({}));
+
+      const data =
+        await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data?.error || data?.detail || "تأیید کد ناموفق بود.");
+        // apiFetch خطای Backend را
+        // در Modal نمایش داده است.
+        return;
       }
 
       setResult({
         username: data.username,
         password: data.password,
         role: data.role,
-        message: data.message || "رمز عبور شما بازنشانی شد.",
+        message:
+          data.message ||
+          "رمز عبور شما بازنشانی شد.",
       });
+
       setStep("result");
+
     } catch (err) {
-      setError(err.message || "مشکلی پیش آمد.");
+      if (err?.name !== "AbortError") {
+        console.error(
+          "FORGOT_PASSWORD_VERIFY_ERROR",
+          err
+        );
+
+        // خطای شبکه توسط apiFetch
+        // نمایش داده شده است.
+      }
     } finally {
       setLoading(false);
     }
@@ -157,7 +227,6 @@ const ForgotPasswordModal = ({ onClose }) => {
                   inputMode="numeric"
                   autoFocus
                 />
-                {error && <p className="login-error-msg">{error}</p>}
                 <button type="submit" className="login-action-btn" disabled={loading}>
                   {loading ? "در حال ارسال..." : "ارسال کد ۴ رقمی"}
                 </button>
@@ -225,7 +294,6 @@ const ForgotPasswordModal = ({ onClose }) => {
                         ))}
                     </div>
 
-                    {error && <p className="login-error-msg">{error}</p>}
 
                     <button type="submit" className="login-action-btn" disabled={loading}>
                         {loading ? "در حال بررسی..." : "تأیید کد"}

@@ -1,7 +1,11 @@
 // src/components/Login/competitions/CoachAgreementFlow.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import {
+  showGlobalMessage,
+  showGlobalSuccess,
+  showGlobalWarning,
+} from "../../../services/globalMessage";
 import {
   // مشترک
   getCompetitionTerms,
@@ -69,7 +73,10 @@ export default function CoachAgreementFlow({ competition, onDone, onCancel }) {
 const goToDetails = () => {
   const targetKey = competition?.slug || competition?.public_id || competition?.id;
   if (!targetKey) {
-    alert("شناسه مسابقه در دسترس نیست. لطفاً از لیست مسابقات وارد شوید.");
+    showGlobalWarning(
+      "شناسه مسابقه در دسترس نیست. لطفاً از لیست مسابقات وارد شوید.",
+      "شناسه مسابقه موجود نیست"
+    );
     return;
   }
 
@@ -193,7 +200,10 @@ const goToDetails = () => {
   const copyCode = async () => {
     try {
       await navigator.clipboard.writeText(String(code || ""));
-      alert("کد کپی شد.");
+      showGlobalSuccess(
+        "کد مربی با موفقیت در کلیپ‌بورد کپی شد.",
+        "کپی موفق"
+      );
     } catch {
       window.prompt("برای کپی، کد را انتخاب و کپی کنید:", String(code || ""));
     }

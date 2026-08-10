@@ -1,13 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import PaginatedList from '../../common/PaginatedList';
 import { useNavigate } from 'react-router-dom';
-import PersonalInfoForm from '../panel/maincontentpanel/PersonalInfoForm'; // این خط مهمه
+import PersonalInfoForm from '../panel/maincontentpanel/PersonalInfoForm';
 import "./dashboard.css";
+
+import {
+  apiFetch,
+} from '../../../api/apiClient';
+
+import {
+  showGlobalMessage,
+} from '../../../services/globalMessage';
 
 const MainContent = ({ selectedSection }) => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const role = localStorage.getItem("user_role");
@@ -23,40 +30,130 @@ const MainContent = ({ selectedSection }) => {
   };
 
   const fetchData = async () => {
-    if (!selectedSection || !role || !token) {
-      setError('دسترسی نامعتبر. لطفاً دوباره وارد شوید.');
-      return;
-    }
-
-    const url = endpoints[selectedSection];
-    if (!url) {
-      setError('یک گزینه انتخاب کنید');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+    if (
+      !selectedSection ||
+      !role ||
+      !token
+    ) {
+      showGlobalMessage({
+        type: 'warning',
+        title: 'دسترسی نامعتبر',
+        message:
+          'اطلاعات ورود معتبر نیست. لطفاً دوباره وارد حساب کاربری شوید.',
       });
 
+      return;
+    }
+
+
+    const url =
+      endpoints[selectedSection];
+
+
+    if (!url) {
+      showGlobalMessage({
+        type: 'warning',
+        title: 'بخش نامعتبر',
+        message:
+          'بخش انتخاب‌شده معتبر نیست.',
+      });
+
+      return;
+    }
+
+
+    setLoading(true);
+
+
+    try {
+      const res = await apiFetch(
+        url,
+        {
+          method: 'GET',
+
+          headers: {
+            Authorization:
+              `Bearer ${token}`,
+          },
+
+          // چون 401 در این فایل
+          // رفتار اختصاصی دارد،
+          // خطا را اینجا مدیریت می‌کنیم.
+          globalError: false,
+        }
+      );
+
+
+      const responseData =
+        await res
+          .json()
+          .catch(() => null);
+
+
       if (res.status === 401) {
-        localStorage.removeItem(`${role}_token`);
-        localStorage.removeItem("user_role");
-        setError("دسترسی غیرمجاز. لطفاً دوباره وارد شوید.");
-        navigate("/");
+        localStorage.removeItem(
+          `${role}_token`
+        );
+
+        localStorage.removeItem(
+          'user_role'
+        );
+
+
+        showGlobalMessage({
+          type: 'warning',
+          title: 'پایان اعتبار ورود',
+          message:
+            'نشست کاربری شما معتبر نیست یا منقضی شده است. لطفاً دوباره وارد شوید.',
+        });
+
+
+        navigate('/');
         return;
       }
 
-      const data = await res.json();
-      setItems(Array.isArray(data) ? data : [data]);
+
+      if (!res.ok) {
+        const serverMessage =
+          responseData?.detail ||
+          responseData?.error ||
+          responseData?.message;
+
+
+        showGlobalMessage({
+          type: 'error',
+          title: 'خطا در دریافت اطلاعات',
+          message:
+            serverMessage ||
+            'دریافت اطلاعات از سرور انجام نشد.',
+        });
+
+        return;
+      }
+
+
+      setItems(
+        Array.isArray(responseData)
+          ? responseData
+          : responseData
+          ? [responseData]
+          : []
+      );
+
     } catch (err) {
-      console.error("Fetch error:", err);
-      setError("خطا در دریافت اطلاعات.");
+      console.error(
+        'MAIN_CONTENT_FETCH_ERROR',
+        err
+      );
+
+
+      showGlobalMessage({
+        type: 'error',
+        title: 'خطا در ارتباط با سرور',
+        message:
+          'ارتباط با سرور برقرار نشد. لطفاً اتصال اینترنت را بررسی کرده و دوباره تلاش کنید.',
+      });
+
     } finally {
       setLoading(false);
     }
@@ -69,8 +166,6 @@ const MainContent = ({ selectedSection }) => {
   }, [selectedSection]);
 
   if (!selectedSection) return <div className="maincontent">یک بخش را انتخاب کنید</div>;
-  if (loading) return <div className="main-content">در حال بارگذاری...</div>;
-  if (error) return <div className="main-content error-msg">{error}</div>;
 
   // 🔹 اگر بخش پروفایل انتخاب شده، فرم رو نمایش بده
   if (selectedSection === "profile") {

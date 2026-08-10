@@ -2,20 +2,64 @@ import React, { useEffect, useState } from 'react';
 import provincesData from '../provincesData.js';
 import './ClubRegister.css';
 
+import {
+  apiFetch,
+} from '../../../api/apiClient';
+
+import {
+  showGlobalMessage,
+} from '../../../services/globalMessage';
 const StepTwoClub = ({ data, onDataChange, onNext, onBack }) => {
   const [boards, setBoards] = useState([]);
   const [invalidFields, setInvalidFields] = useState([]);
-  const [customErrors, setCustomErrors] = useState([]);
-  const [showErrorModal, setShowErrorModal] = useState(false);
 
   useEffect(() => {
-    fetch('https://api.chbtkd.ir/api/auth/form-data/')
-      .then((res) => res.json())
-      .then((resData) => {
-        setBoards(resData.heyats || []);
-      })
-      .catch((err) => console.error("خطا در دریافت لیست هیئت‌ها:", err));
+    let active = true;
+
+    const loadBoards = async () => {
+      try {
+        const res = await apiFetch(
+          'https://api.chbtkd.ir/api/auth/form-data/',
+          {
+            method: 'GET',
+            errorTitle:
+              'دریافت لیست هیئت‌ها',
+          }
+        );
+
+        if (!res.ok) {
+          return;
+        }
+
+        const resData =
+          await res
+            .json()
+            .catch(() => ({}));
+
+        if (active) {
+          setBoards(
+            resData?.heyats || []
+          );
+        }
+      } catch (err) {
+        console.error(
+          'CLUB_BOARDS_LOAD_ERROR',
+          err
+        );
+
+        // apiFetch خطای شبکه را
+        // در مودال سراسری نمایش داده است.
+      }
+    };
+
+    loadBoards();
+
+    return () => {
+      active = false;
+    };
   }, []);
+
+
 const handleChange = (e) => {
   const { name, value } = e.target;
 
@@ -24,7 +68,8 @@ const handleChange = (e) => {
   } else if (name === 'county') {
     onDataChange({ county: value, city: '' });
   } else if (name === 'tkd_board') {
-    const intValue = parseInt(value);
+    const intValue =
+      parseInt(value, 10);
     onDataChange({ [name]: intValue });
     console.log("✅ فرم داده:", intValue, typeof intValue);  
   } else {
@@ -65,10 +110,18 @@ const handleChange = (e) => {
         }
 
         setInvalidFields(invalids);
-        setCustomErrors(errors);
-        setShowErrorModal(errors.length > 0);
 
-        return errors.length === 0;
+        if (errors.length > 0) {
+          showGlobalMessage({
+            type: 'warning',
+            title: 'اطلاعات مکان باشگاه ناقص است',
+            messages: errors,
+          });
+
+          return false;
+        }
+
+        return true;
         };
 
         const handleNext = () => {
@@ -179,14 +232,7 @@ const handleChange = (e) => {
         <button onClick={handleNext}>مرحله بعد</button>
       </div>
 
-      {showErrorModal && (
-        <div className="modal-error-overlay">
-          <div className="modal-error-box">
-            {customErrors.map((err, i) => <p key={i}>{err}</p>)}
-            <button onClick={() => setShowErrorModal(false)}>باشه</button>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };

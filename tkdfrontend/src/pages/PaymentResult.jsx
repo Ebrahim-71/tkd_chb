@@ -1,286 +1,1112 @@
 // src/pages/payment/PaymentResult.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { API_BASE } from "../api/competitions";
 
-/* ---------------- Query helper (robust) ---------------- */
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import {
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+
+import {
+  API_BASE,
+} from "../api/competitions";
+
+import {
+  apiFetchSilent,
+} from "../api/apiClient";
+
+import {
+  showGlobalMessage,
+  showGlobalSuccess,
+} from "../services/globalMessage";
+
+
+/* ======================================================
+   Query helper
+====================================================== */
+
 function useQuery() {
-  const { search } = useLocation();
+  const { search } =
+    useLocation();
+
 
   return useMemo(() => {
-    if (!search) return new URLSearchParams("");
+    if (!search) {
+      return new URLSearchParams(
+        ""
+      );
+    }
 
-    // اگر چندتا ? داشتیم، همه‌ی ? بعد از اولی را & کن
-    const firstQ = search.indexOf("?");
-    if (firstQ === -1) return new URLSearchParams(search);
 
-    const head = search.slice(0, firstQ + 1);
-    const tail = search.slice(firstQ + 1).replace(/\?/g, "&");
-    return new URLSearchParams(head + tail);
+    /*
+     * اگر به هر دلیل callback بانک
+     * بیش از یک ? داشته باشد،
+     * ?های بعدی به & تبدیل می‌شوند.
+     */
+
+    const firstQ =
+      search.indexOf("?");
+
+
+    if (firstQ === -1) {
+      return new URLSearchParams(
+        search
+      );
+    }
+
+
+    const head =
+      search.slice(
+        0,
+        firstQ + 1
+      );
+
+
+    const tail =
+      search
+        .slice(firstQ + 1)
+        .replace(
+          /\?/g,
+          "&"
+        );
+
+
+    return new URLSearchParams(
+      head + tail
+    );
+
   }, [search]);
 }
 
-/* ---------------- Token helpers ---------------- */
+
+/* ======================================================
+   Token helpers
+====================================================== */
+
 const pickToken = () => {
-  const role = (localStorage.getItem("user_role") || "").toLowerCase().trim();
-  const roleTokenKey = role ? `${role}_token` : null;
+  const role =
+    (
+      localStorage.getItem(
+        "user_role"
+      ) || ""
+    )
+      .toLowerCase()
+      .trim();
+
+
+  const roleTokenKey =
+    role
+      ? `${role}_token`
+      : null;
+
+
+  /*
+   * ابتدا توکن نقش فعلی.
+   * این کار مانع استفاده اتفاقی
+   * از توکن قدیمی یک نقش دیگر می‌شود.
+   */
 
   const keys = [
-    "coach_token",
-    "both_token",
     roleTokenKey,
     "access_token",
     "access",
     "auth_token",
     "token",
+    "both_token",
+    "coach_token",
   ].filter(Boolean);
 
-  for (const k of keys) {
-    const v = localStorage.getItem(k);
-    if (v) return v;
+
+  for (const key of keys) {
+    const value =
+      localStorage.getItem(
+        key
+      );
+
+
+    if (value) {
+      return value;
+    }
   }
+
+
   return null;
 };
 
+
 const authHeaders = () => {
-  const t = pickToken();
-  const h = { Accept: "application/json" };
-  if (t) h.Authorization = `Bearer ${t}`;
-  return h;
+  const token =
+    pickToken();
+
+
+  const headers = {
+    Accept:
+      "application/json",
+  };
+
+
+  if (token) {
+    headers.Authorization =
+      `Bearer ${token}`;
+  }
+
+
+  return headers;
 };
 
-/* ---------------- helpers ---------------- */
-const parseIds = (idsStr) => {
-  if (!idsStr) return [];
-  return String(idsStr)
+
+/* ======================================================
+   Helpers
+====================================================== */
+
+const parseIds = (
+  idsString
+) => {
+  if (!idsString) {
+    return [];
+  }
+
+
+  return String(idsString)
     .split(",")
-    .map((x) => Number(String(x).trim()))
-    .filter((n) => Number.isFinite(n) && n > 0);
+    .map(
+      (value) =>
+        Number(
+          String(value).trim()
+        )
+    )
+    .filter(
+      (number) =>
+        Number.isFinite(number) &&
+        number > 0
+    );
 };
 
-function pickDashboardRoleForFlow(flow) {
-  const roleFromStorage = (localStorage.getItem("user_role") || "").toLowerCase().trim();
-  if (String(flow || "").includes("bulk")) return roleFromStorage || "coach";
-  return roleFromStorage || "player";
+
+/* ======================================================
+   Dashboard role
+====================================================== */
+
+function pickDashboardRoleForFlow(
+  flow
+) {
+  const roleFromStorage =
+    (
+      localStorage.getItem(
+        "user_role"
+      ) || ""
+    )
+      .toLowerCase()
+      .trim();
+
+
+  if (
+    String(flow || "")
+      .toLowerCase()
+      .includes("bulk")
+  ) {
+    return (
+      roleFromStorage ||
+      "coach"
+    );
+  }
+
+
+  return (
+    roleFromStorage ||
+    "player"
+  );
 }
 
-function pickKind({ flow, queryKind }) {
-  const k = String(queryKind || "").toLowerCase().trim();
-  if (k === "poomsae" || k === "kyorugi") return k;
 
-  const f = String(flow || "").toLowerCase();
-  if (f.includes("poomsae")) return "poomsae";
-  if (f.includes("kyorugi")) return "kyorugi";
+/* ======================================================
+   Competition kind
+====================================================== */
 
-  // fallback: از آخرین انتخاب ذخیره شده (اختیاری)
-  const last = (localStorage.getItem("last_payment_kind") || "").toLowerCase().trim();
-  if (last === "poomsae" || last === "kyorugi") return last;
+function pickKind({
+  flow,
+  queryKind,
+}) {
+  const kind =
+    String(
+      queryKind || ""
+    )
+      .toLowerCase()
+      .trim();
+
+
+  if (
+    kind === "poomsae" ||
+    kind === "kyorugi"
+  ) {
+    return kind;
+  }
+
+
+  const normalizedFlow =
+    String(flow || "")
+      .toLowerCase();
+
+
+  if (
+    normalizedFlow.includes(
+      "poomsae"
+    )
+  ) {
+    return "poomsae";
+  }
+
+
+  if (
+    normalizedFlow.includes(
+      "kyorugi"
+    )
+  ) {
+    return "kyorugi";
+  }
+
+
+  const lastKind =
+    (
+      localStorage.getItem(
+        "last_payment_kind"
+      ) || ""
+    )
+      .toLowerCase()
+      .trim();
+
+
+  if (
+    lastKind === "poomsae" ||
+    lastKind === "kyorugi"
+  ) {
+    return lastKind;
+  }
+
 
   return "kyorugi";
 }
 
-// تلاش برای گرفتن enrollment_ids از pid (هر دو مسیر intent/intents)
-async function resolveEnrollmentIdsByPid(pid, kind) {
-  if (!pid) return [];
 
-  const cached = (localStorage.getItem("last_payment_enrollment_ids") || "").trim();
-  if (cached) {
-    const ids = parseIds(cached);
-    if (ids.length) return ids;
+/* ======================================================
+   Resolve enrollment ids by PaymentIntent pid
+
+   مهم:
+   این تابع عمداً Silent است.
+   چون endpoint اول ممکن است 404 بدهد
+   ولی endpoint دوم درست باشد.
+====================================================== */
+
+async function resolveEnrollmentIdsByPid(
+  pid,
+  kind,
+  signal
+) {
+  if (!pid) {
+    return [];
   }
 
-  const candidates = [
-    `${API_BASE}/api/payments/intents/${encodeURIComponent(pid)}/enrollments/`,
-    `${API_BASE}/api/payments/intent/${encodeURIComponent(pid)}/enrollments/`,
-  ].map((u) => (kind ? `${u}?kind=${encodeURIComponent(kind)}` : u));
 
-  for (const url of candidates) {
-    try {
-      const res = await fetch(url, {
-        method: "GET",
-        headers: authHeaders(),
-        credentials: "omit",
-      });
-      if (!res.ok) continue;
+  /*
+   * Cache فقط زمانی معتبر است که
+   * متعلق به همین PaymentIntent باشد.
+   *
+   * در نسخه قبلی ممکن بود ids پرداخت
+   * قبلی اشتباهاً استفاده شود.
+   */
 
-      const data = await res.json().catch(() => null);
-      const raw = Array.isArray(data?.enrollment_ids) ? data.enrollment_ids : [];
-      const clean = raw.map(Number).filter((n) => Number.isFinite(n) && n > 0);
+  const cachedPid =
+    (
+      localStorage.getItem(
+        "last_payment_pid"
+      ) || ""
+    ).trim();
 
-      if (clean.length) {
-        localStorage.setItem("last_payment_enrollment_ids", clean.join(","));
-        return clean;
-      }
-    } catch {
-      // ignore and try next
+
+  const cachedIds =
+    (
+      localStorage.getItem(
+        "last_payment_enrollment_ids"
+      ) || ""
+    ).trim();
+
+
+  if (
+    cachedPid === pid &&
+    cachedIds
+  ) {
+    const ids =
+      parseIds(
+        cachedIds
+      );
+
+
+    if (ids.length) {
+      return ids;
     }
   }
+
+
+  const candidates = [
+    `${API_BASE}/api/payments/intents/${encodeURIComponent(
+      pid
+    )}/enrollments/`,
+
+    `${API_BASE}/api/payments/intent/${encodeURIComponent(
+      pid
+    )}/enrollments/`,
+  ].map(
+    (url) =>
+      kind
+        ? `${url}?kind=${encodeURIComponent(
+            kind
+          )}`
+        : url
+  );
+
+
+  for (
+    const url of candidates
+  ) {
+    try {
+      const response =
+        await apiFetchSilent(
+          url,
+          {
+            method: "GET",
+
+            headers:
+              authHeaders(),
+
+            credentials:
+              "omit",
+
+            signal,
+          }
+        );
+
+
+      /*
+       * 404 در اینجا ممکن است
+       * صرفاً به معنی این باشد
+       * که باید candidate بعدی
+       * امتحان شود.
+       */
+
+      if (!response.ok) {
+        continue;
+      }
+
+
+      const data =
+        await response
+          .json()
+          .catch(
+            () => null
+          );
+
+
+      const raw =
+        Array.isArray(
+          data?.enrollment_ids
+        )
+          ? data.enrollment_ids
+          : [];
+
+
+      const clean =
+        raw
+          .map(Number)
+          .filter(
+            (number) =>
+              Number.isFinite(
+                number
+              ) &&
+              number > 0
+          );
+
+
+      if (clean.length) {
+        localStorage.setItem(
+          "last_payment_pid",
+          pid
+        );
+
+        localStorage.setItem(
+          "last_payment_enrollment_ids",
+          clean.join(",")
+        );
+
+
+        return clean;
+      }
+
+    } catch (error) {
+      /*
+       * Abort یعنی صفحه ترک شده.
+       */
+
+      if (
+        error?.name ===
+          "AbortError" ||
+        signal?.aborted
+      ) {
+        return [];
+      }
+
+
+      /*
+       * سایر خطاهای candidate
+       * عمداً نمایش داده نمی‌شوند.
+       *
+       * candidate بعدی امتحان می‌شود.
+       */
+      console.warn(
+        "PAYMENT_ENROLLMENT_RESOLVE_CANDIDATE_FAILED",
+        url,
+        error
+      );
+    }
+  }
+
 
   return [];
 }
 
-/* ---------------- Component ---------------- */
-const PaymentResult = () => {
-  const query = useQuery();
-  const navigate = useNavigate();
 
-  const [status, setStatus] = useState("loading"); // loading | success | failed
-  const [errorMsg, setErrorMsg] = useState("");
+/* ======================================================
+   Component
+====================================================== */
+
+const PaymentResult = () => {
+  const query =
+    useQuery();
+
+  const navigate =
+    useNavigate();
+
+
+  const [
+    status,
+    setStatus,
+  ] = useState(
+    "loading"
+  );
+
+
+  /*
+   * جلوگیری از اجرای دوباره callback
+   * در development / StrictMode.
+   */
+
+  const handledRef =
+    useRef(false);
+
 
   useEffect(() => {
+    if (
+      handledRef.current
+    ) {
+      return undefined;
+    }
+
+
+    handledRef.current =
+      true;
+
+
+    const controller =
+      new AbortController();
+
+
     let alive = true;
 
-    (async () => {
-      const ok = (query.get("ok") || "").trim(); // "1" یا "0"
-      const pid = (query.get("pid") || "").trim(); // PaymentIntent public_id
-      const ref = (query.get("ref") || "").trim(); // ref بانک
-      const tc = (query.get("tc") || "").trim(); // tracking code اگر داشتی
-      const token = (query.get("token") || "").trim(); // توکن بانک اگر داشتی
-      const flow = (query.get("flow") || "").trim();
 
-      // ids ممکنه با چند نام مختلف بیاد (بک‌اند شما enrollment_ids می‌فرسته)
-      const idsFromUrl =
-        (query.get("ids") ||
-          query.get("enrollment_ids") ||
-          query.get("enrollmentIds") ||
-          query.get("enrollments") ||
-          "").trim();
+    const processPayment =
+      async () => {
+        try {
+          // ============================
+          // Query parameters
+          // ============================
 
-      // enrollment تکی ممکنه با چند نام مختلف بیاد
-      const enrollmentIdSingle =
-        (query.get("enrollment_id") ||
-          query.get("enrollment") ||
-          query.get("enroll") ||
-          query.get("eid") ||
-          "").trim();
+          const ok =
+            (
+              query.get("ok") ||
+              ""
+            ).trim();
 
-      const kind = pickKind({ flow, queryKind: query.get("kind") });
 
-      // پرداخت ناموفق
-      if (ok !== "1") {
-        if (!alive) return;
-        setStatus("failed");
-        setErrorMsg("پرداخت ناموفق بود یا لغو شد.");
-        return;
-      }
+          const pid =
+            (
+              query.get("pid") ||
+              ""
+            ).trim();
 
-      if (!alive) return;
-      setStatus("success");
 
-      // ✅ 1) اگر enrollment_id تکی داریم → برو کارت تکی
-      if (enrollmentIdSingle) {
-        const params = new URLSearchParams();
-        params.set("ok", "1");
-        params.set("kind", kind);
-        if (pid) params.set("pid", pid);
-        if (ref) params.set("ref", ref);
-        if (tc) params.set("tc", tc);
-        if (token) params.set("token", token);
-        if (flow) params.set("flow", flow);
+          const ref =
+            (
+              query.get("ref") ||
+              ""
+            ).trim();
 
-        const dashRole =
-          (query.get("role") || "").toLowerCase().trim() ||
-          pickDashboardRoleForFlow(flow);
 
-        navigate(
-          `/dashboard/${encodeURIComponent(dashRole)}/enrollments/${encodeURIComponent(
+          const trackingCode =
+            (
+              query.get("tc") ||
+              ""
+            ).trim();
+
+
+          const bankToken =
+            (
+              query.get("token") ||
+              ""
+            ).trim();
+
+
+          const flow =
+            (
+              query.get("flow") ||
+              ""
+            ).trim();
+
+
+          const queryRole =
+            (
+              query.get("role") ||
+              ""
+            )
+              .toLowerCase()
+              .trim();
+
+
+          // ============================
+          // enrollment ids
+          // ============================
+
+          const idsFromUrl =
+            (
+              query.get("ids") ||
+              query.get(
+                "enrollment_ids"
+              ) ||
+              query.get(
+                "enrollmentIds"
+              ) ||
+              query.get(
+                "enrollments"
+              ) ||
+              ""
+            ).trim();
+
+
+          // ============================
+          // enrollment تکی
+          // ============================
+
+          const enrollmentIdSingle =
+            (
+              query.get(
+                "enrollment_id"
+              ) ||
+              query.get(
+                "enrollment"
+              ) ||
+              query.get(
+                "enroll"
+              ) ||
+              query.get("eid") ||
+              ""
+            ).trim();
+
+
+          const kind =
+            pickKind({
+              flow,
+              queryKind:
+                query.get(
+                  "kind"
+                ),
+            });
+
+
+          const dashboardRole =
+            queryRole ||
+            pickDashboardRoleForFlow(
+              flow
+            );
+
+
+          // ============================
+          // پرداخت ناموفق / لغو
+          // ============================
+
+          if (ok !== "1") {
+            if (!alive) {
+              return;
+            }
+
+
+            setStatus(
+              "failed"
+            );
+
+
+            showGlobalMessage({
+              type:
+                "warning",
+
+              title:
+                "پرداخت انجام نشد",
+
+              message:
+                "پرداخت ناموفق بود یا توسط کاربر لغو شد.",
+            });
+
+
+            return;
+          }
+
+
+          // ============================
+          // ساخت پارامترهای مشترک
+          // ============================
+
+          const appendCommonParams =
+            (
+              params
+            ) => {
+              params.set(
+                "ok",
+                "1"
+              );
+
+              params.set(
+                "kind",
+                kind
+              );
+
+
+              if (pid) {
+                params.set(
+                  "pid",
+                  pid
+                );
+              }
+
+
+              if (ref) {
+                params.set(
+                  "ref",
+                  ref
+                );
+              }
+
+
+              if (
+                trackingCode
+              ) {
+                params.set(
+                  "tc",
+                  trackingCode
+                );
+              }
+
+
+              if (
+                bankToken
+              ) {
+                params.set(
+                  "token",
+                  bankToken
+                );
+              }
+
+
+              if (flow) {
+                params.set(
+                  "flow",
+                  flow
+                );
+              }
+            };
+
+
+          // ============================
+          // 1) کارت ثبت‌نام تکی
+          // ============================
+
+          if (
             enrollmentIdSingle
-          )}/card?${params.toString()}`,
-          { replace: true }
-        );
-        return;
-      }
+          ) {
+            const params =
+              new URLSearchParams();
 
-      // ✅ 2) اگر ids/enrollment_ids داریم → برو bulk cards
-      let idsStr = idsFromUrl;
 
-      // گاهی بک‌اند یک عدد می‌فرسته؛ ما یکسان‌سازی می‌کنیم
-      if (idsStr) {
-        const parsed = parseIds(idsStr);
-        idsStr = parsed.length ? parsed.join(",") : "";
-      }
+            appendCommonParams(
+              params
+            );
 
-      // ✅ 3) اگر ids نداریم ولی pid داریم، از بک‌اند resolve کن
-      if (!idsStr && pid) {
-        const resolved = await resolveEnrollmentIdsByPid(pid, kind);
-        if (resolved.length) idsStr = resolved.join(",");
-      }
 
-      // اگر به ids رسیدیم → برو صفحه چاپ کارت‌ها
-      if (idsStr) {
-        const params = new URLSearchParams();
-        params.set("ids", idsStr);
-        params.set("kind", kind);
-        params.set("ok", "1");
+            const target =
+              `/dashboard/${encodeURIComponent(
+                dashboardRole
+              )}/enrollments/${encodeURIComponent(
+                enrollmentIdSingle
+              )}/card?${params.toString()}`;
 
-        if (pid) params.set("pid", pid);
-        if (ref) params.set("ref", ref);
-        if (tc) params.set("tc", tc);
-        if (token) params.set("token", token);
-        if (flow) params.set("flow", flow);
 
-        const dashRole =
-          (query.get("role") || "").toLowerCase().trim() ||
-          pickDashboardRoleForFlow(flow || "bulk_after_payment");
+            if (!alive) {
+              return;
+            }
 
-        // ✅ این مسیر با App.js شما match می‌شود
-        navigate(
-          `/dashboard/${encodeURIComponent(dashRole)}/enrollments/bulk?${params.toString()}`,
-          { replace: true }
-        );
-        return;
-      }
 
-      // ✅ اگر هیچ چیز نداشتیم، حداقل با pid برگرد داشبورد
-      const dashRole =
-        (query.get("role") || "").toLowerCase().trim() ||
-        pickDashboardRoleForFlow(flow);
+            setStatus(
+              "success"
+            );
 
-      navigate(
-        `/dashboard/${encodeURIComponent(dashRole)}?ok=1${pid ? `&pid=${encodeURIComponent(pid)}` : ""}${
-          ref ? `&ref=${encodeURIComponent(ref)}` : ""
-        }`,
-        { replace: true }
-      );
-    })();
+
+            showGlobalSuccess(
+              "پرداخت با موفقیت انجام شد.",
+              "پرداخت موفق"
+            );
+
+
+            navigate(
+              target,
+              {
+                replace: true,
+              }
+            );
+
+
+            return;
+          }
+
+
+          // ============================
+          // 2) ids از URL
+          // ============================
+
+          let idsString =
+            idsFromUrl;
+
+
+          if (idsString) {
+            const parsed =
+              parseIds(
+                idsString
+              );
+
+
+            idsString =
+              parsed.length
+                ? parsed.join(
+                    ","
+                  )
+                : "";
+          }
+
+
+          // ============================
+          // 3) resolve توسط pid
+          // ============================
+
+          if (
+            !idsString &&
+            pid
+          ) {
+            const resolved =
+              await resolveEnrollmentIdsByPid(
+                pid,
+                kind,
+                controller.signal
+              );
+
+
+            if (
+              controller
+                .signal
+                .aborted ||
+              !alive
+            ) {
+              return;
+            }
+
+
+            if (
+              resolved.length
+            ) {
+              idsString =
+                resolved.join(
+                  ","
+                );
+            }
+          }
+
+
+          // ============================
+          // Bulk cards
+          // ============================
+
+          if (idsString) {
+            const params =
+              new URLSearchParams();
+
+
+            params.set(
+              "ids",
+              idsString
+            );
+
+
+            appendCommonParams(
+              params
+            );
+
+
+            const bulkRole =
+              queryRole ||
+              pickDashboardRoleForFlow(
+                flow ||
+                  "bulk_after_payment"
+              );
+
+
+            const target =
+              `/dashboard/${encodeURIComponent(
+                bulkRole
+              )}/enrollments/bulk?${params.toString()}`;
+
+
+            if (!alive) {
+              return;
+            }
+
+
+            setStatus(
+              "success"
+            );
+
+
+            showGlobalSuccess(
+              "پرداخت با موفقیت انجام شد.",
+              "پرداخت موفق"
+            );
+
+
+            navigate(
+              target,
+              {
+                replace: true,
+              }
+            );
+
+
+            return;
+          }
+
+
+          // ============================
+          // هیچ enrollment id پیدا نشد
+          //
+          // پرداخت موفق بوده، بنابراین
+          // کاربر را به Dashboard می‌بریم.
+          // ============================
+
+          const params =
+            new URLSearchParams();
+
+
+          params.set(
+            "ok",
+            "1"
+          );
+
+
+          if (pid) {
+            params.set(
+              "pid",
+              pid
+            );
+          }
+
+
+          if (ref) {
+            params.set(
+              "ref",
+              ref
+            );
+          }
+
+
+          const target =
+            `/dashboard/${encodeURIComponent(
+              dashboardRole
+            )}?${params.toString()}`;
+
+
+          if (!alive) {
+            return;
+          }
+
+
+          setStatus(
+            "success"
+          );
+
+
+          showGlobalSuccess(
+            "پرداخت با موفقیت انجام شد.",
+            "پرداخت موفق"
+          );
+
+
+          navigate(
+            target,
+            {
+              replace: true,
+            }
+          );
+
+        } catch (error) {
+          if (
+            controller
+              .signal
+              .aborted ||
+            !alive
+          ) {
+            return;
+          }
+
+
+          console.error(
+            "PAYMENT_RESULT_PROCESS_ERROR",
+            error
+          );
+
+
+          setStatus(
+            "failed"
+          );
+
+
+          showGlobalMessage({
+            type:
+              "error",
+
+            title:
+              "خطا در پردازش نتیجه پرداخت",
+
+            message:
+              "نتیجه پرداخت دریافت شد اما پردازش آن با خطا مواجه شد. لطفاً دوباره از داشبورد وضعیت ثبت‌نام را بررسی کنید.",
+          });
+        }
+      };
+
+
+    processPayment();
+
 
     return () => {
       alive = false;
-    };
-  }, [query, navigate]);
 
-  /* ---------------- UI ---------------- */
-  if (status === "loading") {
+      controller.abort();
+    };
+
+  }, [
+    query,
+    navigate,
+  ]);
+
+
+  // ==============================
+  // Dashboard fallback
+  // ==============================
+
+  const goToDashboard =
+    () => {
+      const flow =
+        (
+          query.get("flow") ||
+          ""
+        ).trim();
+
+
+      const role =
+        (
+          query.get("role") ||
+          ""
+        )
+          .toLowerCase()
+          .trim() ||
+        pickDashboardRoleForFlow(
+          flow
+        );
+
+
+      navigate(
+        `/dashboard/${encodeURIComponent(
+          role
+        )}`,
+        {
+          replace: true,
+        }
+      );
+    };
+
+
+  /* ======================================================
+     UI
+  ====================================================== */
+
+  if (
+    status === "loading"
+  ) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <h2>در حال پردازش نتیجه پرداخت...</h2>
+      <div className="payment-result-page">
+        <p>
+          در حال پردازش نتیجه پرداخت...
+        </p>
       </div>
     );
   }
 
-  if (status === "failed") {
+
+  if (
+    status === "failed"
+  ) {
     return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <h2 className="text-red-600 font-bold mb-3">
-          {errorMsg || "پرداخت ناموفق بود یا لغو شد."}
-        </h2>
+      <div className="payment-result-page">
+
         <button
-          onClick={() => navigate("/dashboard", { replace: true })}
+          type="button"
+          onClick={
+            goToDashboard
+          }
           className="px-4 py-2 rounded bg-red-500 text-white"
         >
           بازگشت به داشبورد
         </button>
+
       </div>
     );
   }
 
+
   return (
-    <div className="flex items-center justify-center h-full">
-      <h2 className="text-green-600 font-bold">
+    <div className="payment-result-page">
+      <p>
         پرداخت با موفقیت انجام شد، در حال انتقال...
-      </h2>
+      </p>
     </div>
   );
 };
+
 
 export default PaymentResult;

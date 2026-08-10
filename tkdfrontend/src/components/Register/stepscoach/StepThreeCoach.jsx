@@ -4,15 +4,16 @@ import DatePicker from "react-multi-date-picker";
 import persian from "react-date-object/calendars/persian";
 import persian_fa from "react-date-object/locales/persian_fa";
 import "./CoachRegister.css";
-
+import {
+  showGlobalMessage,
+} from '../../../services/globalMessage';
 const StepThreeCoach = ({ data, onDataChange, onNext, onBack }) => {
   const [clubs, setClubs] = useState([]);
   const [coaches, setCoaches] = useState([]);
   const [heyats, setHeyats] = useState([]);
   const [errors, setErrors] = useState({});
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [modalErrorText, setModalErrorText] = useState("");
+
 
   useEffect(() => {
     if (!data.gender) return;
@@ -65,19 +66,35 @@ const StepThreeCoach = ({ data, onDataChange, onNext, onBack }) => {
   };
 
   const handleClubCheck = (e) => {
-    const { value, checked } = e.target;
-    const clubId = parseInt(value, 10);
-    let updated = data.selectedClubs || [];
+    const {
+      value,
+      checked,
+    } = e.target;
+
+    const clubId =
+      parseInt(value, 10);
+
+    let updated = [
+      ...(data.selectedClubs || []),
+    ];
 
     if (checked) {
-      if (!updated.includes(clubId) && updated.length < 3) {
+      if (
+        !updated.includes(clubId) &&
+        updated.length < 3
+      ) {
         updated.push(clubId);
       }
     } else {
-      updated = updated.filter((id) => id !== clubId);
+      updated =
+        updated.filter(
+          (id) => id !== clubId
+        );
     }
 
-    onDataChange({ selectedClubs: updated });
+    onDataChange({
+      selectedClubs: updated,
+    });
   };
 
   const validate = () => {
@@ -93,10 +110,16 @@ const StepThreeCoach = ({ data, onDataChange, onNext, onBack }) => {
 
     setErrors(newErrors);
 
-    if (Object.keys(newErrors).length > 0) {
-      const firstError = Object.values(newErrors)[0];
-      setModalErrorText(firstError);
-      setShowErrorModal(true);
+    const errorMessages =
+      Object.values(newErrors);
+
+    if (errorMessages.length > 0) {
+      showGlobalMessage({
+        type: 'warning',
+        title: 'اطلاعات تکواندو ناقص است',
+        messages: errorMessages,
+      });
+
       return false;
     }
 
@@ -222,14 +245,6 @@ const StepThreeCoach = ({ data, onDataChange, onNext, onBack }) => {
         <button type="button" onClick={handleNext}>مرحله بعد</button>
       </div>
 
-      {showErrorModal && (
-        <div className="modal-error-overlay">
-          <div className="modal-error-box">
-            <p>{modalErrorText}</p>
-            <button onClick={() => setShowErrorModal(false)}>باشه</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -6,7 +6,10 @@ import DatePicker from "react-multi-date-picker";
 import persian from "react-date-object/calendars/persian";
 import persian_fa from "react-date-object/locales/persian_fa";
 import provincesData from "../../../Register/provincesData";
-
+import {
+  showGlobalMessage,
+  showGlobalSuccess,
+} from "../../../../services/globalMessage";
 export default function PersonalInfoForm() {
   const [data, setData] = useState(null);
   const [originalData, setOriginalData] = useState(null);
@@ -14,7 +17,6 @@ export default function PersonalInfoForm() {
   const [editableFields, setEditableFields] = useState({});
   const [pendingEditField, setPendingEditField] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [modalMessage, setModalMessage] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
@@ -25,22 +27,43 @@ export default function PersonalInfoForm() {
 
   const [counties, setCounties] = useState([]);
   const [cities, setCities] = useState([]);
+
+  
   const validateRefereeLevels = () => {
-    if (!data.is_referee) return true;
+    if (!data.is_referee) {
+      return true;
+    }
+
+    const typeLabels = {
+      kyorogi: "کیوروگی",
+      poomseh: "پومسه",
+      hanmadang: "هانمادانگ",
+    };
 
     const errors = [];
 
-    ['kyorogi', 'poomseh', 'hanmadang'].forEach(type => {
-      if (data[type]) {
-        const national = data[`${type}_level`];
-        if (!national) {
-          errors.push(`درجه ملی داوری «${type}» الزامی است.`);
+    ['kyorogi', 'poomseh', 'hanmadang'].forEach(
+      (type) => {
+        if (data[type]) {
+          const national =
+            data[`${type}_level`];
+
+          if (!national) {
+            errors.push(
+              `درجه ملی داوری ${typeLabels[type] || type} الزامی است.`
+            );
+          }
         }
       }
-    });
+    );
 
     if (errors.length > 0) {
-      setModalMessage(errors.join('\n'));
+      showGlobalMessage({
+        type: "warning",
+        title: "اطلاعات داوری ناقص است",
+        messages: errors,
+      });
+
       return false;
     }
 
@@ -284,15 +307,6 @@ export default function PersonalInfoForm() {
         </div>
       )}
 
-      {modalMessage && (
-        <div className="custom-modal">
-          <div className="modal-content">
-            <p>{modalMessage}</p>
-            <button onClick={() => setModalMessage("")}>باشه</button>
-          </div>
-        </div>
-      )}
-
       {showConfirmModal && (
         <div className="custom-modal">
           <div className="modal-content">
@@ -372,36 +386,122 @@ export default function PersonalInfoForm() {
                     if (completeData.id) formData.append('id', completeData.id);
                     if (completeData.user) formData.append('user', completeData.user);
 
-                    await axios.post(`https://api.chbtkd.ir/api/auth/profile/edit/`, formData, {
-                      headers: {
-                        ...headers,
-                        'Content-Type': 'multipart/form-data'
+                    await axios.post(
+                      'https://api.chbtkd.ir/api/auth/profile/edit/',
+                      formData,
+                      {
+                        headers: {
+                          ...headers,
+                          'Content-Type':
+                            'multipart/form-data',
+                        },
+
+                        // خطای این درخواست را خودمان
+                        // پایین‌تر پردازش می‌کنیم.
+                        // بنابراین interceptor سراسری
+                        // نباید Modal دوم ایجاد کند.
+                        skipGlobalError: true,
                       }
+                    );
+
+
+                    const shouldReload =
+                      data.profile_image instanceof File;
+
+
+                    if (!shouldReload) {
+                      setOriginalData({
+                        ...data,
+                      });
+                    }
+
+
+                    showGlobalSuccess(
+                      "اطلاعات با موفقیت ثبت شد و پس از تأیید هیئت اعمال می‌شود.",
+                      "ویرایش اطلاعات ثبت شد",
+                      shouldReload
+                        ? () => {
+                            window.location.reload();
+                          }
+                        : null
+                    );
+                 } catch (err) {
+                  console.error(
+                    "PROFILE_EDIT_ERROR",
+                    err?.response?.data || err
+                  );
+
+
+                  const responseData =
+                    err?.response?.data;
+
+                  const errors =
+                    responseData?.errors;
+
+
+                  if (
+                    errors &&
+                    typeof errors === 'object'
+                  ) {
+                    const errorMessages =
+                      Object.entries(errors)
+                        .flatMap(
+                          ([field, messages]) => {
+                            const fieldTitle =
+                              placeholders[field] ||
+                              field;
+
+                            if (
+                              Array.isArray(messages)
+                            ) {
+                              return messages.map(
+                                (message) =>
+                                  `${fieldTitle}: ${message}`
+                              );
+                            }
+
+                            return [
+                              `${fieldTitle}: ${messages}`,
+                            ];
+                          }
+                        );
+
+
+                    showGlobalMessage({
+                      type: 'error',
+                      title:
+                        'خطا در ویرایش اطلاعات',
+                      messages:
+                        errorMessages.length
+                          ? errorMessages
+                          : [
+                              'برخی اطلاعات واردشده معتبر نیست.',
+                            ],
                     });
 
-                    setModalMessage("اطلاعات با موفقیت ثبت شد و پس از تأیید هیئت اعمال می‌شود.");
+                    return;
+                  }
 
-                    if (data.profile_image instanceof File) {
-                      setTimeout(() => window.location.reload(), 1500);
-                    } else {
-                      setOriginalData(data);
-                    }
 
-                 } catch (err) {
-                      console.error("Server error:", err.response?.data);
+                  const serverMessage =
+                    responseData?.detail ||
+                    responseData?.error ||
+                    responseData?.message;
 
-                      const errors = err.response?.data?.errors;
 
-                      if (errors && typeof errors === 'object') {
-                        const errorMessages = Object.entries(errors)
-                          .map(([field, msgs]) => `${placeholders[field] || field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
-                          .join('\n');
-
-                        setModalMessage(`⚠️ خطا در برخی فیلدها:\n\n${errorMessages}`);
-                      } else {
-                        setModalMessage("⚠️ خطا در ثبت اطلاعات. لطفاً دوباره تلاش کنید.");
-                      }
-                    }
+                  showGlobalMessage({
+                    type: 'error',
+                    title:
+                      'خطا در ویرایش اطلاعات',
+                    message:
+                      serverMessage ||
+                      (
+                        err?.response
+                          ? 'ثبت اطلاعات انجام نشد. لطفاً دوباره تلاش کنید.'
+                          : 'ارتباط با سرور برقرار نشد. لطفاً اتصال اینترنت را بررسی کنید.'
+                      ),
+                  });
+                }
 
                       finally {
                     setIsSubmitting(false);
@@ -441,12 +541,34 @@ export default function PersonalInfoForm() {
                 onChange={(e) => {
                   const file = e.target.files[0];
                   if (file) {
-                    if (!['image/jpeg', 'image/jpg'].includes(file.type)) {
-                      setModalMessage("فرمت فایل باید JPG یا JPEG باشد.");
+                    if (
+                      ![
+                        'image/jpeg',
+                        'image/jpg',
+                      ].includes(file.type)
+                    ) {
+                      showGlobalMessage({
+                        type: 'warning',
+                        title: 'فرمت تصویر نامعتبر',
+                        message:
+                          'فرمت فایل باید JPG یا JPEG باشد.',
+                      });
+
                       return;
                     }
-                    if (file.size > 200 * 1024) {
-                      setModalMessage("حجم فایل نباید بیشتر از ۲۰۰ کیلوبایت باشد.");
+
+
+                    if (
+                      file.size >
+                      200 * 1024
+                    ) {
+                      showGlobalMessage({
+                        type: 'warning',
+                        title: 'حجم تصویر زیاد است',
+                        message:
+                          'حجم فایل نباید بیشتر از ۲۰۰ کیلوبایت باشد.',
+                      });
+
                       return;
                     }
                     setData(prev => ({ ...prev, profile_image: file }));
@@ -523,9 +645,15 @@ export default function PersonalInfoForm() {
               onClick={() => {
                 if (hasFormChanged()) {
                   setShowConfirmModal(true);
-                } else {
-                  setModalMessage("هیچ تغییری در اطلاعات ایجاد نشده است.");
+                  return;
                 }
+
+                showGlobalMessage({
+                  type: 'info',
+                  title: 'ویرایشی انجام نشده',
+                  message:
+                    'هیچ تغییری در اطلاعات ایجاد نشده است.',
+                });
               }}
               disabled={!hasFormChanged() || isSubmitting}
             >

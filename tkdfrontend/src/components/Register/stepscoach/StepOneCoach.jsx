@@ -4,10 +4,13 @@ import DateObject from 'react-date-object';
 import persian from 'react-date-object/calendars/persian';
 import persian_fa from 'react-date-object/locales/persian_fa';
 import './CoachRegister.css';
-import axios from 'axios';
 
+import { apiFetch } from '../../../api/apiClient';
+
+import {
+  showGlobalWarning,
+} from '../../../services/globalMessage';
 const StepOneCoach = ({ data, onNext, onDataChange }) => {
-  const [error, setError] = useState('');
   const [touched, setTouched] = useState({});
   const [nationalCodeExists, setNationalCodeExists] = useState(false);
 
@@ -36,23 +39,56 @@ const StepOneCoach = ({ data, onNext, onDataChange }) => {
 };
 const handleChange = (e) => {
   const { name, value } = e.target;
-  onDataChange({ [name]: value });
-  setTouched(prev => ({ ...prev, [name]: true }));
 
-  if (name === 'national_code' && value.length === 10) {
-    fetch(`https://api.chbtkd.ir/api/auth/check-national-code/?code=${value}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.exists) {
-          setError('این کد ملی قبلاً ثبت شده است.');
-          setNationalCodeExists(true);
-        } else {
-          setNationalCodeExists(false);
+  onDataChange({
+    [name]: value,
+  });
+
+  setTouched((prev) => ({
+    ...prev,
+    [name]: true,
+  }));
+
+
+  if (name === 'national_code') {
+    setNationalCodeExists(false);
+
+    if (value.length === 10) {
+      apiFetch(
+        `https://api.chbtkd.ir/api/auth/check-national-code/?code=${encodeURIComponent(value)}`,
+        {
+          method: 'GET',
+          errorTitle: 'بررسی کد ملی',
         }
-      })
-      .catch((err) => {
-        console.error('خطا در بررسی کد ملی:', err);
-      });
+      )
+        .then(async (res) => {
+          if (!res.ok) {
+            return;
+          }
+
+          const result =
+            await res
+              .json()
+              .catch(() => ({}));
+
+          if (result?.exists) {
+            setNationalCodeExists(true);
+
+            showGlobalWarning(
+              'این کد ملی قبلاً ثبت شده است.',
+              'کد ملی تکراری'
+            );
+          } else {
+            setNationalCodeExists(false);
+          }
+        })
+        .catch((err) => {
+          console.error(
+            'COACH_NATIONAL_CODE_CHECK_ERROR',
+            err
+          );
+        });
+    }
   }
 };
 
@@ -68,35 +104,101 @@ const handleChange = (e) => {
       birth_date,
       gender,
     } = data;
-    
-    if (!first_name || !last_name || !father_name || !national_code || !birth_date || !gender) {
-      return setError('لطفاً همه فیلدها را کامل کنید.');
-    }
-    
-  if (nationalCodeExists) {
-    return setError('این کد ملی قبلاً ثبت شده است.');
-  }
 
-    const isPersian = (text) => /^[\u0600-\u06FF\s]+$/.test(text);
-    const isNumeric = (text) => /^\d+$/.test(text);
 
-    if (![first_name, last_name, father_name].every(isPersian)) {
-      return setError('فیلدها باید با حروف فارسی وارد شوند.');
-    }
+    if (
+      !first_name ||
+      !last_name ||
+      !father_name ||
+      !national_code ||
+      !birth_date ||
+      !gender
+    ) {
+      showGlobalWarning(
+        'لطفاً همه فیلدها را کامل کنید.',
+        'اطلاعات ناقص'
+      );
 
-    if (!isNumeric(national_code) || national_code.length !== 10) {
-      return setError('کد ملی باید ۱۰ رقم و فقط شامل عدد باشد.');
-    }
-    
-    const age = calculateAge(birth_date);
-    if (gender === 'female' && age < 21) {
-      return setError('حداقل سن برای خانم‌ها باید ۲۱ سال باشد.');
-    }
-    if (gender === 'male' && age < 22) {
-      return setError('حداقل سن برای آقایان باید ۲۲ سال باشد.');
+      return;
     }
 
-    setError('');
+
+    if (nationalCodeExists) {
+      showGlobalWarning(
+        'این کد ملی قبلاً ثبت شده است.',
+        'کد ملی تکراری'
+      );
+
+      return;
+    }
+
+
+    const isPersian = (text) =>
+      /^[\u0600-\u06FF\s]+$/.test(text);
+
+    const isNumeric = (text) =>
+      /^\d+$/.test(text);
+
+
+    if (
+      ![
+        first_name,
+        last_name,
+        father_name,
+      ].every(isPersian)
+    ) {
+      showGlobalWarning(
+        'نام، نام خانوادگی و نام پدر باید با حروف فارسی وارد شوند.',
+        'اطلاعات نامعتبر'
+      );
+
+      return;
+    }
+
+
+    if (
+      !isNumeric(national_code) ||
+      national_code.length !== 10
+    ) {
+      showGlobalWarning(
+        'کد ملی باید ۱۰ رقم و فقط شامل عدد باشد.',
+        'کد ملی نامعتبر'
+      );
+
+      return;
+    }
+
+
+    const age =
+      calculateAge(birth_date);
+
+
+    if (
+      gender === 'female' &&
+      age < 21
+    ) {
+      showGlobalWarning(
+        'حداقل سن برای خانم‌ها باید ۲۱ سال باشد.',
+        'سن نامعتبر'
+      );
+
+      return;
+    }
+
+
+    if (
+      gender === 'male' &&
+      age < 22
+    ) {
+      showGlobalWarning(
+        'حداقل سن برای آقایان باید ۲۲ سال باشد.',
+        'سن نامعتبر'
+      );
+
+      return;
+    }
+
+
     onNext();
   };
 
@@ -186,14 +288,6 @@ const handleChange = (e) => {
         <button type="submit">مرحله بعد</button>
       </div>
 
-      {error && (
-        <div className="modal-error-overlay">
-          <div className="modal-error-box">
-            <p>{error}</p>
-            <button onClick={() => setError('')}>بستن</button>
-          </div>
-        </div>
-      )}
     </form>
   );
 };

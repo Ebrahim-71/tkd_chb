@@ -4,6 +4,9 @@ import "./LoginModal.css";
 import { Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { apiFetch } from "../../api/apiClient";
+import { showGlobalWarning } from "../../services/globalMessage";
+
 // ---------- تنظیمات API ----------
 const API_BASE = "https://api.chbtkd.ir";   // آدرس API روی سرور
 const ACCOUNTS_PREFIX = "/api/auth/";       // prefix برای auth (طبق بک‌اند)
@@ -74,7 +77,6 @@ const LoginModal = ({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const abortRef = useRef(null);
@@ -115,13 +117,32 @@ const LoginModal = ({
     e.preventDefault();
     if (loading) return;
 
-    setError("");
     const u = normalizeDigits(username || "");
     const p = String(password || "").trim();
 
-    if (!u || !p) return setError("نام کاربری و رمز عبور الزامی است.");
-    if (!isValidUsername(u)) return setError("فرمت نام کاربری صحیح نیست.");
-    if (p.length < 6) return setError("حداقل طول رمز عبور ۶ کاراکتر است.");
+    if (!u || !p) {
+      showGlobalWarning(
+        "نام کاربری و رمز عبور الزامی است.",
+        "اطلاعات ناقص"
+      );
+      return;
+    }
+
+    if (!isValidUsername(u)) {
+      showGlobalWarning(
+        "فرمت نام کاربری صحیح نیست.",
+        "نام کاربری نامعتبر"
+      );
+      return;
+    }
+
+    if (p.length < 6) {
+      showGlobalWarning(
+        "حداقل طول رمز عبور ۶ کاراکتر است.",
+        "رمز عبور نامعتبر"
+      );
+      return;
+    }
 
     setLoading(true);
     const controller = new AbortController();
@@ -132,19 +153,24 @@ const LoginModal = ({
       const url = joinUrl(API_BASE, ACCOUNTS_PREFIX, PATHS.login) + "/";
       console.log("[LOGIN] POST", url);
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json",
           "X-Role-Group": role,
         },
+
         credentials: "include",
         signal: controller.signal,
+
         body: JSON.stringify({
           identifier: u,
           password: p,
           roleGroup: role,
         }),
+
+        errorTitle: "ورود به حساب کاربری",
       });
 
       let data = {};
@@ -153,19 +179,15 @@ const LoginModal = ({
       } catch (_) {}
 
       if (!res.ok) {
-        console.error("LOGIN_ERROR", res.status, data);
-        const msg =
-          data?.error ||
-          data?.detail ||
-          data?.message ||
-          (res.status === 401
-            ? "نام کاربری یا رمز عبور اشتباه است."
-            : res.status === 403
-            ? "این فرم مخصوص نقش دیگری است."
-            : res.status === 404
-            ? "مسیر لاگین یافت نشد."
-            : "مشکلی در ورود پیش آمد.");
-        throw new Error(msg);
+        console.error(
+          "LOGIN_ERROR",
+          res.status,
+          data
+        );
+
+        // apiFetch پیام Backend را
+        // در GlobalMessageModal نمایش داده است.
+        return;
       }
 
       const roleFromAPI = normalizeRole(
@@ -177,10 +199,16 @@ const LoginModal = ({
       const okCoachRef =
         role === "coachref" &&
         ["coach", "referee", "both"].includes(roleFromAPI);
-      if (!allowed.includes(roleFromAPI) && !okCoachRef) {
-        throw new Error(
-          "این فرم مخصوص نقش دیگری است. لطفاً از فرم صحیح ورود استفاده کنید."
+      if (
+        !allowed.includes(roleFromAPI) &&
+        !okCoachRef
+      ) {
+        showGlobalWarning(
+          "این فرم مخصوص نقش دیگری است. لطفاً از فرم صحیح ورود استفاده کنید.",
+          "عدم تطابق نقش کاربری"
         );
+
+        return;
       }
 
       if (token) localStorage.setItem(`${roleFromAPI}_token`, token);
@@ -197,8 +225,14 @@ const LoginModal = ({
           : "/dashboard/coachref";
       navigate(nextPath);
     } catch (err) {
-      if (err.name !== "AbortError") {
-        setError(err.message || "مشکلی پیش آمد.");
+      if (err?.name !== "AbortError") {
+        console.error(
+          "LOGIN_REQUEST_ERROR",
+          err
+        );
+
+        // خطای شبکه توسط apiFetch
+        // در Modal نمایش داده شده است.
       }
     } finally {
       setLoading(false);
@@ -273,9 +307,6 @@ const LoginModal = ({
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-
-            {error && <p className="login-error-msg">{error}</p>}
-
             <button
               type="submit"
               className="login-action-btn"
