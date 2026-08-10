@@ -1,0 +1,295 @@
+import React, { useState } from 'react';
+import DatePicker from 'react-multi-date-picker';
+import DateObject from 'react-date-object';
+import persian from 'react-date-object/calendars/persian';
+import persian_fa from 'react-date-object/locales/persian_fa';
+import './CoachRegister.css';
+
+import { apiFetch } from '../../../api/apiClient';
+
+import {
+  showGlobalWarning,
+} from '../../../services/globalMessage';
+const StepOneCoach = ({ data, onNext, onDataChange }) => {
+  const [touched, setTouched] = useState({});
+  const [nationalCodeExists, setNationalCodeExists] = useState(false);
+
+  
+  const toEnglishNumber = (str) => {
+  const persianNumbers = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+  const englishNumbers = ['0','1','2','3','4','5','6','7','8','9'];
+  let output = str;
+  persianNumbers.forEach((num, idx) => {
+    const regex = new RegExp(num, 'g');
+    output = output.replace(regex, englishNumbers[idx]);
+  });
+  return output;
+};
+
+  const calculateAge = (birthDateStr) => {
+  if (!birthDateStr) return 0;
+  const normalizedDateStr = toEnglishNumber(birthDateStr);  // تبدیل اعداد فارسی به انگلیسی
+  const birth = new DateObject({ date: normalizedDateStr, format: "YYYY/MM/DD", calendar: persian });
+  const today = new DateObject({ calendar: persian });
+  let age = today.year - birth.year;
+  if (today.month < birth.month || (today.month === birth.month && today.day < birth.day)) {
+    age--;
+  }
+  return age;
+};
+const handleChange = (e) => {
+  const { name, value } = e.target;
+
+  onDataChange({
+    [name]: value,
+  });
+
+  setTouched((prev) => ({
+    ...prev,
+    [name]: true,
+  }));
+
+
+  if (name === 'national_code') {
+    setNationalCodeExists(false);
+
+    if (value.length === 10) {
+      apiFetch(
+        `https://api.chbtkd.ir/api/auth/check-national-code/?code=${encodeURIComponent(value)}`,
+        {
+          method: 'GET',
+          errorTitle: 'بررسی کد ملی',
+        }
+      )
+        .then(async (res) => {
+          if (!res.ok) {
+            return;
+          }
+
+          const result =
+            await res
+              .json()
+              .catch(() => ({}));
+
+          if (result?.exists) {
+            setNationalCodeExists(true);
+
+            showGlobalWarning(
+              'این کد ملی قبلاً ثبت شده است.',
+              'کد ملی تکراری'
+            );
+          } else {
+            setNationalCodeExists(false);
+          }
+        })
+        .catch((err) => {
+          console.error(
+            'COACH_NATIONAL_CODE_CHECK_ERROR',
+            err
+          );
+        });
+    }
+  }
+};
+
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    const {
+      first_name,
+      last_name,
+      father_name,
+      national_code,
+      birth_date,
+      gender,
+    } = data;
+
+
+    if (
+      !first_name ||
+      !last_name ||
+      !father_name ||
+      !national_code ||
+      !birth_date ||
+      !gender
+    ) {
+      showGlobalWarning(
+        'لطفاً همه فیلدها را کامل کنید.',
+        'اطلاعات ناقص'
+      );
+
+      return;
+    }
+
+
+    if (nationalCodeExists) {
+      showGlobalWarning(
+        'این کد ملی قبلاً ثبت شده است.',
+        'کد ملی تکراری'
+      );
+
+      return;
+    }
+
+
+    const isPersian = (text) =>
+      /^[\u0600-\u06FF\s]+$/.test(text);
+
+    const isNumeric = (text) =>
+      /^\d+$/.test(text);
+
+
+    if (
+      ![
+        first_name,
+        last_name,
+        father_name,
+      ].every(isPersian)
+    ) {
+      showGlobalWarning(
+        'نام، نام خانوادگی و نام پدر باید با حروف فارسی وارد شوند.',
+        'اطلاعات نامعتبر'
+      );
+
+      return;
+    }
+
+
+    if (
+      !isNumeric(national_code) ||
+      national_code.length !== 10
+    ) {
+      showGlobalWarning(
+        'کد ملی باید ۱۰ رقم و فقط شامل عدد باشد.',
+        'کد ملی نامعتبر'
+      );
+
+      return;
+    }
+
+
+    const age =
+      calculateAge(birth_date);
+
+
+    if (
+      gender === 'female' &&
+      age < 21
+    ) {
+      showGlobalWarning(
+        'حداقل سن برای خانم‌ها باید ۲۱ سال باشد.',
+        'سن نامعتبر'
+      );
+
+      return;
+    }
+
+
+    if (
+      gender === 'male' &&
+      age < 22
+    ) {
+      showGlobalWarning(
+        'حداقل سن برای آقایان باید ۲۲ سال باشد.',
+        'سن نامعتبر'
+      );
+
+      return;
+    }
+
+
+    onNext();
+  };
+
+  return (
+    <form className="step" onSubmit={handleSubmit}>
+      <h2>مشخصات فردی</h2>
+
+      <label>
+        نام:
+        <input
+          type="text"
+          name="first_name"
+          value={data.first_name || ''}
+          onChange={handleChange}
+          className={touched.first_name && !data.first_name ? 'invalid' : ''}
+        />
+      </label>
+
+      <label>
+        نام خانوادگی:
+        <input
+          type="text"
+          name="last_name"
+          value={data.last_name || ''}
+          onChange={handleChange}
+          className={touched.last_name && !data.last_name ? 'invalid' : ''}
+        />
+      </label>
+
+      <label>
+        نام پدر:
+        <input
+          type="text"
+          name="father_name"
+          value={data.father_name || ''}
+          onChange={handleChange}
+          className={touched.father_name && !data.father_name ? 'invalid' : ''}
+        />
+      </label>
+
+      <label>
+        کد ملی:
+        <input
+          type="text"
+          name="national_code"
+          value={data.national_code || ''}
+          onChange={handleChange}
+          maxLength="10"
+          className={touched.national_code && !data.national_code ? 'invalid' : ''}
+        />
+      </label>
+
+      <label>
+        جنسیت:
+        <select
+          name="gender"
+          value={data.gender || ''}
+          onChange={handleChange}
+          className={touched.gender && !data.gender ? 'invalid' : ''}
+          style={{ width: '104%' }}
+        >
+          <option value="">انتخاب کنید</option>
+          <option value="male">مرد</option>
+          <option value="female">زن</option>
+        </select>
+      </label>
+
+      <label className="birth-date">
+  تاریخ تولد:
+  <DatePicker
+    calendar={persian}
+    locale={persian_fa}
+    maxDate={new Date()}
+    value={data.birth_date || null}
+    onChange={(date) =>
+      date && onDataChange({ birth_date: date.format("YYYY/MM/DD") })
+    }
+    format="YYYY/MM/DD"
+    calendarPosition="bottom-right"
+    placeholder="انتخاب کنید"
+  />
+</label>
+
+
+
+      <div className="step-buttons">
+        <button type="submit">مرحله بعد</button>
+      </div>
+
+    </form>
+  );
+};
+
+export default StepOneCoach;

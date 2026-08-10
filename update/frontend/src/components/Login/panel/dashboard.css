@@ -1,0 +1,943 @@
+/* src/components/Login/panel/dashboard.css */
+
+
+/* =========================================================
+   Dashboard Container
+========================================================= */
+
+.dashboard-container {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+
+  direction: rtl;
+
+  background-color: #f5f7fa;
+
+  overflow: visible;
+
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   Sidebar
+========================================================= */
+
+.sidebar {
+  position: sticky;
+  top: 0;
+
+  width: 240px;
+  min-width: 240px;
+  height: 100vh;
+
+  padding: 20px;
+
+  background-color: #ffffff;
+
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+
+  z-index: 100;
+
+  overflow-y: auto;
+
+  transition: all 0.3s ease-in-out;
+
+  box-sizing: border-box;
+}
+
+
+.sidebar.show {
+  max-height: 1000px;
+}
+
+
+/* =========================================================
+   Main Dashboard Content
+========================================================= */
+
+.dashboard-main {
+  flex: 1;
+
+  min-width: 0;
+
+  padding: 30px 15px;
+
+  background-color: #f3f4f6;
+
+  overflow-y: auto;
+
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   Mobile Sidebar Toggle
+========================================================= */
+
+.toggle-sidebar-btn {
+  display: block;
+
+  position: absolute;
+
+  right: 16px;
+  top: 245px;
+
+  padding: 8px 12px;
+
+  background-color: #2563eb;
+  color: #ffffff;
+
+  border: none;
+  border-radius: 8px;
+
+  font-size: 14px;
+
+  cursor: pointer;
+
+  z-index: 1000;
+
+  transition: background-color 0.2s ease;
+}
+
+
+.toggle-sidebar-btn:hover {
+  background-color: #1d4ed8;
+}
+
+
+/* =========================================================
+   Sidebar Header / Profile
+========================================================= */
+
+.sidebar-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  margin-bottom: 20px;
+}
+
+
+.profile-image {
+  width: 80px;
+  height: 80px;
+
+  object-fit: cover;
+
+  border-radius: 50%;
+
+  margin-bottom: 10px;
+}
+
+
+.profile-info {
+  width: 100%;
+
+  text-align: center;
+}
+
+
+.profile-name {
+  margin: 5px 0;
+
+  font-size: 16px;
+  font-weight: bold;
+
+  color: #222;
+}
+
+
+.profile-role-logout {
+  display: flex;
+
+  justify-content: center;
+  align-items: center;
+
+  flex-wrap: wrap;
+
+  gap: 8px;
+
+  margin-top: 8px;
+}
+
+
+.role-label {
+  padding: 4px 10px;
+
+  border-radius: 10px;
+
+  background-color: #e0e7ff;
+
+  color: #1e3a8a;
+
+  font-size: 13px;
+}
+
+
+/* =========================================================
+   Logout Button
+========================================================= */
+
+.logout-btn {
+  padding: 8px 18px;
+
+  background-color: #f44336;
+
+  color: #ffffff;
+
+  border: none;
+  border-radius: 18px;
+
+  font-size: 13px;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+
+.logout-btn:hover {
+  background-color: #d32f2f;
+}
+
+
+.logout-btn:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
+}
+
+
+/* =========================================================
+   Sidebar Divider
+========================================================= */
+
+.sidebar-divider {
+  margin: 20px 0;
+
+  border-top: 1px solid #dddddd;
+}
+
+
+/* =========================================================
+   Sidebar Menu
+========================================================= */
+
+.sidebar-menu {
+  list-style: none;
+
+  padding: 0;
+  margin: 0;
+}
+
+
+.sidebar-menu li {
+  padding: 10px 14px;
+
+  margin-bottom: 4px;
+
+  border-radius: 8px;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+
+.sidebar-menu li:hover {
+  background-color: #f0f0f0;
+}
+
+
+.sidebar-menu li.active {
+  background-color: #dbeafe;
+
+  color: #1e40af;
+
+  font-weight: bold;
+}
+
+
+/* =========================================================
+   Badge
+========================================================= */
+
+.badge-dot {
+  display: inline-block;
+
+  width: 8px;
+  height: 8px;
+
+  margin-right: 6px;
+
+  background-color: red;
+
+  border-radius: 50%;
+
+  vertical-align: middle;
+}
+
+
+/* =========================================================
+   Stats Section
+========================================================= */
+
+.stats-section {
+  position: relative;
+
+  width: 100%;
+  max-width: 100%;
+
+  min-height: 170px;
+
+  margin: 0 0 35px 0;
+
+  padding: 20px 58px;
+
+  border: 2px solid #b8c0cc;
+  border-radius: 22px;
+
+  background-color: #f6f8fb;
+
+  box-sizing: border-box;
+
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   Stats Carousel
+========================================================= */
+
+.stats-carousel {
+  display: flex;
+  align-items: stretch;
+
+  gap: 16px;
+
+  width: 100%;
+  max-width: 100%;
+
+  padding: 8px 0;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  scroll-behavior: smooth;
+
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  box-sizing: border-box;
+}
+
+.stats-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+
+/* =========================================================
+   Stats Cards
+========================================================= */
+
+.carousel-card {
+  flex: 0 0 170px;
+
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
+
+  min-height: 120px;
+
+  padding: 14px 12px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 14px;
+
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  text-align: center;
+
+  box-sizing: border-box;
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.carousel-card:hover {
+  transform: translateY(-3px);
+
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.12);
+}
+
+
+.emoji {
+  margin-bottom: 6px;
+
+  font-size: 26px;
+  line-height: 1;
+}
+
+.title {
+  margin-bottom: 5px;
+
+  font-size: 15px;
+  font-weight: bold;
+
+  color: #222;
+}
+
+.value {
+  font-size: 17px;
+  font-weight: 500;
+
+  color: #111827;
+}
+
+
+/* =========================================================
+   Stats Navigation Buttons
+========================================================= */
+
+.scroll-btn {
+  position: absolute;
+
+  top: 10px;
+  bottom: 10px;
+
+  width: 38px;
+  height: auto;
+
+  padding: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background-color: rgba(255, 255, 255, 0.96);
+
+  color: #7a838f;
+
+  border: 1px solid #ccd2da;
+  border-radius: 10px;
+
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.08);
+
+  font-size: 25px;
+  font-weight: bold;
+
+  cursor: pointer;
+
+  z-index: 20;
+
+  box-sizing: border-box;
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.scroll-btn:hover:not(:disabled) {
+  background-color: #e9edf2;
+  color: #374151;
+}
+
+.scroll-btn.left {
+  left: 9px;
+  right: auto;
+}
+
+.scroll-btn.right {
+  right: 9px;
+  left: auto;
+}
+
+.scroll-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+/* =========================================================
+   Details Button
+========================================================= */
+
+.details-btn-wrapper {
+  margin-top: 20px;
+
+  text-align: center;
+}
+
+
+.details-btn {
+  padding: 10px 24px;
+
+  background-color: #2563eb;
+
+  color: #ffffff;
+
+  border: none;
+  border-radius: 8px;
+
+  font-size: 15px;
+  font-weight: bold;
+
+  cursor: pointer;
+
+  transition: background-color 0.2s ease-in-out;
+}
+
+
+.details-btn:hover {
+  background-color: #1e3a8a;
+}
+
+
+/* =========================================================
+   Main Content Block
+========================================================= */
+.dashboard-main .maincontent,
+.dashboard-main .main-content {
+  width: 100%;
+  margin-top: 20px;
+  padding: 24px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   Item Card
+========================================================= */
+
+.item-card {
+  width: 100%;
+
+  margin-top: 20px;
+  margin-bottom: 16px;
+
+  padding: 20px;
+
+  background-color: #ffffff;
+
+  border: 1px solid #eeeeee;
+  border-radius: 12px;
+
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.05);
+
+  box-sizing: border-box;
+
+  font-family: "IRANSansWeb", sans-serif;
+
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+
+.item-card:hover {
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+}
+
+
+.item-card h2,
+.item-card h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+
+  color: #333333;
+}
+
+
+.item-card h2 {
+  font-size: 22px;
+}
+
+
+.item-card h3 {
+  font-size: 20px;
+}
+
+
+/* =========================================================
+   Item Card Form Fields
+========================================================= */
+
+.item-card label {
+  display: block;
+
+  margin-bottom: 12px;
+
+  color: #444444;
+
+  font-weight: bold;
+}
+
+
+.item-card input[type="text"],
+.item-card input[type="tel"],
+.item-card input[type="number"],
+.item-card input[type="email"],
+.item-card input[type="password"],
+.item-card input[type="date"],
+.item-card select,
+.item-card textarea,
+.item-card input[type="file"] {
+  width: 100%;
+
+  margin-top: 6px;
+
+  padding: 10px;
+
+  background-color: #f9f9f9;
+
+  border: 1px solid #cccccc;
+  border-radius: 8px;
+
+  box-sizing: border-box;
+
+  font-size: 14px;
+
+  font-family: inherit;
+
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+
+.item-card input:focus,
+.item-card select:focus,
+.item-card textarea:focus {
+  background-color: #ffffff;
+
+  border-color: #1976d2;
+
+  outline: none;
+
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.08);
+}
+
+
+.item-card textarea {
+  resize: vertical;
+
+  min-height: 120px;
+}
+
+
+/* =========================================================
+   Generic Success / Error Messages
+   باقی مانده برای بخش‌هایی که هنوز inline هستند
+========================================================= */
+
+.success-msg {
+  margin-top: 10px;
+
+  padding: 10px;
+
+  background-color: #e0f2f1;
+
+  border: 1px solid #26a69a;
+  border-radius: 8px;
+
+  color: #004d40;
+
+  font-size: 14px;
+}
+
+
+.error-msg {
+  margin-top: 10px;
+
+  padding: 10px;
+
+  background-color: #ffebee;
+
+  border: 1px solid #e57373;
+  border-radius: 8px;
+
+  color: #c62828;
+
+  font-size: 14px;
+}
+
+
+/* =========================================================
+   Invalid Fields
+========================================================= */
+
+.invalid {
+  border-color: #dc2626 !important;
+
+  background-color: #fff7f7 !important;
+}
+
+
+/* =========================================================
+   Generic Loading / Empty States
+========================================================= */
+
+.loading-state,
+.empty-state {
+  width: 100%;
+
+  padding: 24px;
+
+  text-align: center;
+
+  color: #555555;
+
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   Tables
+========================================================= */
+
+.dashboard-main table {
+  width: 100%;
+
+  border-collapse: collapse;
+
+  background-color: #ffffff;
+}
+
+
+.dashboard-main th,
+.dashboard-main td {
+  padding: 10px 12px;
+
+  border-bottom: 1px solid #eeeeee;
+
+  text-align: center;
+}
+
+
+.dashboard-main th {
+  background-color: #f8fafc;
+
+  font-weight: bold;
+}
+
+
+/* =========================================================
+   Mobile
+========================================================= */
+
+@media (max-width: 768px) {
+
+  .dashboard-container {
+    flex-direction: column;
+
+    min-height: 100vh;
+  }
+
+
+  .sidebar {
+    position: relative;
+
+    top: auto;
+
+    width: 100%;
+    min-width: 100%;
+
+    height: auto;
+
+    max-height: 0;
+
+    padding: 0 20px;
+
+    overflow: hidden;
+
+    border-bottom: 1px solid #dddddd;
+
+    box-shadow: none;
+
+    box-sizing: border-box;
+  }
+
+
+  .sidebar.show {
+    max-height: 1000px;
+
+    padding: 20px;
+
+    overflow-y: auto;
+  }
+
+
+  .dashboard-main {
+    width: 100%;
+
+    padding: 20px 12px;
+
+    overflow: visible;
+
+    box-sizing: border-box;
+  }
+
+
+  .toggle-sidebar-btn {
+    position: relative;
+
+    top: auto;
+    right: auto;
+
+    width: calc(100% - 24px);
+
+    margin: 12px;
+
+    box-sizing: border-box;
+  }
+
+
+  .stats-section {
+    padding: 15px 20px;
+
+    border-radius: 20px;
+  }
+
+
+  .stats-carousel {
+    gap: 12px;
+  }
+
+
+  .carousel-card {
+    min-width: 150px;
+
+    padding: 12px;
+  }
+
+
+  .scroll-btn {
+    display: none;
+  }
+
+
+  .profile-role-logout {
+    flex-direction: column;
+
+    gap: 6px;
+  }
+
+
+  .sidebar-menu li {
+    padding: 8px 12px;
+
+    font-size: 14px;
+  }
+
+
+  .profile-name {
+    font-size: 16px;
+  }
+
+
+  .role-label {
+    padding: 3px 8px;
+
+    font-size: 12px;
+  }
+
+
+  .logout-btn {
+    padding: 6px 12px;
+
+    font-size: 12px;
+  }
+
+
+  .dashboard-main .maincontent,
+  .dashboard-main .main-content {
+    padding: 16px;
+  }
+
+
+  .item-card {
+    padding: 16px;
+
+    margin-top: 12px;
+  }
+
+
+  .item-card h2 {
+    font-size: 19px;
+  }
+
+
+  .item-card h3 {
+    font-size: 18px;
+  }
+
+
+  .dashboard-main table {
+    min-width: 650px;
+  }
+
+
+  .dashboard-main {
+    overflow-x: auto;
+  }
+}
+
+
+/* =========================================================
+   Very Small Screens
+========================================================= */
+
+@media (max-width: 480px) {
+
+  .dashboard-main {
+    padding: 14px 8px;
+  }
+
+
+  .sidebar.show {
+    padding: 15px;
+  }
+
+
+  .stats-section {
+    padding: 12px;
+  }
+
+
+  .carousel-card {
+    min-width: 135px;
+  }
+
+
+  .emoji {
+    font-size: 28px;
+  }
+
+
+  .title {
+    font-size: 13px;
+  }
+
+
+  .value {
+    font-size: 16px;
+  }
+
+
+  .item-card {
+    padding: 14px;
+  }
+}

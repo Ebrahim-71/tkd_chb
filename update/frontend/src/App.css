@@ -1,0 +1,201 @@
+body {
+    font-family: 'IRANSansWeb', sans-serif;
+    text-align: center;
+    overflow-x: hidden;
+    margin: 0;
+    direction: rtl;
+}
+
+/* محتوای اصلی */
+.main-content {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: 15px;
+}
+
+/* ستون اسلایدر */
+.slider {
+    width: 23%;
+}
+
+.slider-section {
+    max-width: 465px;
+    margin-top: 10px;
+}
+
+
+/* بخش‌های خبری */
+.news-section,
+.announcements-section,
+.letters-section {
+    margin-bottom: 2rem;
+}
+
+
+/* دکمه اسلایدر موبایل */
+.slider-toggle-btn {
+    display: none;
+}
+
+
+/* =========================
+      Mobile Responsive
+========================= */
+
+@media (max-width: 768px) {
+
+    body {
+        font-size: 14px;
+    }
+
+
+    .main-content {
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        padding: 0 10px;
+        gap: 10px;
+    }
+
+
+    .slider {
+
+        width: 100%;
+        max-width: 100%;
+
+        display: flex;
+        flex-direction: column;
+
+        gap: 1rem;
+
+        margin-top: 10px;
+
+        animation: slideDown .4s ease forwards;
+    }
+
+
+    /*
+      اگر خواستی اسلایدر مخفی باشد
+      با کلاس show-mobile فعال می‌شود
+    */
+
+    .slider.hide-mobile {
+        display: none;
+    }
+
+
+    .slider.show-mobile {
+        display: flex !important;
+    }
+
+
+    .slider-toggle-btn {
+
+        display: block;
+
+        width: fit-content;
+
+        background-color: #2185d0;
+        color: white;
+
+        padding: 10px 18px;
+
+        margin: 10px auto;
+
+        border: none;
+
+        border-radius: 8px;
+
+        font-size: 14px;
+
+        cursor: pointer;
+
+    }
+
+
+    .slider-section {
+
+        width: 100%;
+
+        max-width: 100%;
+
+        padding: 0;
+
+        margin-top: 5px;
+
+    }
+
+
+    .news-section,
+    .announcements-section,
+    .letters-section {
+
+        width: 100%;
+
+        margin-bottom: 1.5rem;
+
+    }
+
+}
+
+
+
+/* موبایل کوچک */
+@media (max-width:480px){
+
+    body {
+
+        font-size:13px;
+
+    }
+
+
+    .main-content {
+
+        padding:0 6px;
+
+    }
+
+
+    .slider-toggle-btn {
+
+        width:90%;
+
+        font-size:13px;
+
+    }
+
+
+    .news-section,
+    .announcements-section,
+    .letters-section {
+
+        margin-bottom:1rem;
+
+    }
+
+}
+
+
+
+@keyframes slideDown {
+
+    from {
+
+        opacity:0;
+
+        transform:translateY(-20px);
+
+    }
+
+
+    to {
+
+        opacity:1;
+
+        transform:translateY(0);
+
+    }
+
+}
