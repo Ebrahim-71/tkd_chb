@@ -5,13 +5,14 @@ export const GLOBAL_MESSAGE_EVENT =
 
 
 /* =========================================================
-   Collect messages recursively
+Collect messages recursively
 ========================================================= */
 
 function collectMessages(
   value,
   output = []
 ) {
+
   if (
     value === null ||
     value === undefined ||
@@ -24,24 +25,18 @@ function collectMessages(
   if (
     typeof value === "string"
   ) {
+
     const text =
       value.trim();
 
-
     if (text) {
-      output.push(
-        text
-      );
+      output.push(text);
     }
-
 
     return output;
   }
 
 
-  /*
-   * عدد و boolean معمولاً پیام قابل نمایش نیستند.
-   */
   if (
     typeof value === "number" ||
     typeof value === "boolean"
@@ -53,6 +48,7 @@ function collectMessages(
   if (
     Array.isArray(value)
   ) {
+
     value.forEach(
       (item) => {
         collectMessages(
@@ -62,7 +58,6 @@ function collectMessages(
       }
     );
 
-
     return output;
   }
 
@@ -70,16 +65,16 @@ function collectMessages(
   if (
     typeof value === "object"
   ) {
-    Object.values(
-      value
-    ).forEach(
-      (item) => {
-        collectMessages(
-          item,
-          output
-        );
-      }
-    );
+
+    Object.values(value)
+      .forEach(
+        (item) => {
+          collectMessages(
+            item,
+            output
+          );
+        }
+      );
   }
 
 
@@ -88,34 +83,23 @@ function collectMessages(
 
 
 /* =========================================================
-   Extract API messages
+Extract API messages
 ========================================================= */
 
 export function extractApiMessages(
   error
 ) {
+
   const messages = [];
 
 
   if (!error) {
     return [
-      "خطای نامشخصی رخ داده است.",
+      "خطای نامشخصی رخ داده است."
     ];
   }
 
 
-  /*
-   * ترتیب مهم است:
-   *
-   * Axios:
-   * error.response.data
-   *
-   * competitions.js:
-   * error.payload
-   *
-   * سایر helperها:
-   * error.data / error.body
-   */
   const data =
     error?.response?.data ||
     error?.payload ||
@@ -124,26 +108,25 @@ export function extractApiMessages(
     null;
 
 
+
   if (data) {
-    /*
-     * اگر کل پاسخ string بود.
-     */
+
+
     if (
-      typeof data ===
-      "string"
+      typeof data === "string"
     ) {
+
       collectMessages(
         data,
         messages
       );
 
+
     } else if (
-      typeof data ===
-      "object"
+      typeof data === "object"
     ) {
-      /*
-       * کلیدهای رایج DRF / backend
-       */
+
+
       const preferredKeys = [
         "detail",
         "message",
@@ -158,95 +141,82 @@ export function extractApiMessages(
 
       preferredKeys.forEach(
         (key) => {
+
           if (
-            data?.[key] !==
-            undefined
+            data?.[key] !== undefined
           ) {
+
             collectMessages(
               data[key],
               messages
             );
+
           }
+
         }
       );
 
 
-      /*
-       * خطاهای Serializer مثل:
-       *
-       * email
-       * national_code
-       * insurance_number
-       * team_1
-       * team_2
-       * coach_code
-       * ...
-       */
-      Object.entries(
-        data
-      ).forEach(
-        ([
-          key,
-          value,
-        ]) => {
-          if (
-            preferredKeys.includes(
-              key
-            )
-          ) {
-            return;
+      Object.entries(data)
+        .forEach(
+          ([key,value]) => {
+
+            if (
+              preferredKeys.includes(key)
+            ) {
+              return;
+            }
+
+
+            collectMessages(
+              value,
+              messages
+            );
+
           }
-
-
-          collectMessages(
-            value,
-            messages
-          );
-        }
-      );
+        );
     }
   }
 
 
-  /*
-   * اگر payload پیام نداشت
-   * از Error.message استفاده کن.
-   */
+
   if (
     messages.length === 0 &&
     error?.message
   ) {
+
     collectMessages(
       error.message,
       messages
     );
+
   }
 
 
-  /*
-   * حذف پیام‌های تکراری
-   */
-  const uniqueMessages = [
-    ...new Set(
-      messages
-        .map(
-          (message) =>
-            String(
-              message ||
-              ""
-            ).trim()
-        )
-        .filter(Boolean)
-    ),
-  ];
+
+  const uniqueMessages =
+    [
+      ...new Set(
+        messages
+          .map(
+            message =>
+              String(message || "")
+                .trim()
+          )
+          .filter(Boolean)
+      )
+    ];
+
 
 
   if (
     !uniqueMessages.length
   ) {
+
     return [
-      "خطایی در انجام عملیات رخ داده است.",
+      "خطایی در انجام عملیات رخ داده است."
     ];
+
   }
 
 
@@ -254,127 +224,174 @@ export function extractApiMessages(
 }
 
 
+
 /* =========================================================
-   Base global message
+Base global message
 ========================================================= */
 
 export function showGlobalMessage({
+
   type = "info",
+
   title = "",
+
   message = "",
+
   messages = [],
+
   closable = true,
+
   onClose = null,
+
+  onConfirm = null,
+
+  onCancel = null,
+
 } = {}) {
+
+
   let finalMessages = [];
 
 
+
   if (
-    Array.isArray(
-      messages
-    ) &&
+    Array.isArray(messages) &&
     messages.length
   ) {
+
     finalMessages =
       messages;
 
-  } else if (message) {
+
+  } else if (
+    message
+  ) {
+
     finalMessages = [
-      message,
+      message
     ];
+
   }
+
 
 
   finalMessages =
     finalMessages
       .map(
-        (item) =>
-          String(
-            item ||
-            ""
-          ).trim()
+        item =>
+          String(item || "")
+            .trim()
       )
       .filter(Boolean);
 
 
-  /*
-   * پروژه React در Browser اجرا می‌شود،
-   * ولی این check مانع خطای احتمالی خارج Browser می‌شود.
-   */
+
   if (
-    typeof window ===
-      "undefined"
+    typeof window === "undefined"
   ) {
     return;
   }
 
 
+
   window.dispatchEvent(
+
     new CustomEvent(
+
       GLOBAL_MESSAGE_EVENT,
+
       {
+
         detail: {
+
           type,
 
           title,
+
 
           messages:
             finalMessages.length
               ? finalMessages
               : [
-                  "پیامی برای نمایش وجود ندارد.",
+                  "پیامی برای نمایش وجود ندارد."
                 ],
+
 
           closable,
 
+
           onClose:
-            typeof onClose ===
-            "function"
+            typeof onClose === "function"
               ? onClose
               : null,
-        },
+
+
+          // جدید
+          onConfirm:
+            typeof onConfirm === "function"
+              ? onConfirm
+              : null,
+
+
+          // جدید
+          onCancel:
+            typeof onCancel === "function"
+              ? onCancel
+              : null,
+
+        }
+
       }
+
     )
+
   );
+
 }
 
 
+
 /* =========================================================
-   Error
+Error
 ========================================================= */
 
 export function showGlobalError(
   error,
   options = {}
 ) {
+
   showGlobalMessage({
+
     type:
       "error",
+
 
     title:
       options.title ||
       "خطا",
 
+
     messages:
-      extractApiMessages(
-        error
-      ),
+      extractApiMessages(error),
+
 
     closable:
-      options.closable !==
-      false,
+      options.closable !== false,
+
 
     onClose:
-      typeof options.onClose ===
-      "function"
+      typeof options.onClose === "function"
         ? options.onClose
         : null,
+
   });
+
 }
 
 
+
 /* =========================================================
-   Success
+Success
 ========================================================= */
 
 export function showGlobalSuccess(
@@ -382,21 +399,29 @@ export function showGlobalSuccess(
   title = "عملیات موفق",
   onClose = null
 ) {
+
   showGlobalMessage({
+
     type:
       "success",
 
+
     title,
+
 
     message,
 
+
     onClose,
+
   });
+
 }
 
 
+
 /* =========================================================
-   Warning
+Warning
 ========================================================= */
 
 export function showGlobalWarning(
@@ -404,21 +429,29 @@ export function showGlobalWarning(
   title = "هشدار",
   onClose = null
 ) {
+
   showGlobalMessage({
+
     type:
       "warning",
 
+
     title,
+
 
     message,
 
+
     onClose,
+
   });
+
 }
 
 
+
 /* =========================================================
-   Info
+Info
 ========================================================= */
 
 export function showGlobalInfo(
@@ -426,14 +459,21 @@ export function showGlobalInfo(
   title = "اطلاع",
   onClose = null
 ) {
+
   showGlobalMessage({
+
     type:
       "info",
 
+
     title,
+
 
     message,
 
+
     onClose,
+
   });
+
 }

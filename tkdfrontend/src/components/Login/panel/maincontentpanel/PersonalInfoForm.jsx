@@ -15,7 +15,6 @@ export default function PersonalInfoForm() {
   const [originalData, setOriginalData] = useState(null);
   const [dropdowns, setDropdowns] = useState({});
   const [editableFields, setEditableFields] = useState({});
-  const [pendingEditField, setPendingEditField] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -103,8 +102,10 @@ export default function PersonalInfoForm() {
   }, [navigate]);
 
   const handleEditConfirm = (field) => {
-    setEditableFields(prev => ({ ...prev, [field]: true }));
-    setPendingEditField(null);
+    setEditableFields(prev => ({
+      ...prev,
+      [field]: true
+    }));
   };
 
   const handleChange = (field, value) => {
@@ -269,7 +270,24 @@ export default function PersonalInfoForm() {
                     <button
                       type="button"
                       className="edit-btn"
-                      onClick={() => setPendingEditField(field)}
+                      onClick={() => {
+
+                      showGlobalMessage({
+
+                      type:"confirm",
+
+                      title:"تأیید ویرایش",
+
+                      message:
+                      `آیا می‌خواهید فیلد "${placeholders[field]}" را ویرایش کنید؟`,
+
+                      onConfirm: () => {
+                          handleEditConfirm(field);
+                      }
+
+                      });
+
+                      }}
                     >
                       ویرایش
                     </button>
@@ -279,7 +297,24 @@ export default function PersonalInfoForm() {
                   <button
                     type="button"
                     className="edit-btn"
-                    onClick={() => setPendingEditField(field)}
+                    onClick={() => {
+
+                    showGlobalMessage({
+
+                    type:"confirm",
+
+                    title:"تأیید ویرایش",
+
+                    message:
+                    `آیا می‌خواهید فیلد "${placeholders[field]}" را ویرایش کنید؟`,
+
+                    onConfirm: () => {
+                        handleEditConfirm(field);
+                    }
+
+                    });
+
+                    }}
                   >
                     ویرایش
                   </button>
@@ -295,17 +330,7 @@ export default function PersonalInfoForm() {
 
   return (
     <>
-      {pendingEditField && (
-        <div className="custom-modal">
-          <div className="modal-content">
-            <p>آیا می‌خواهید فیلد "{placeholders[pendingEditField]}" را ویرایش کنید؟</p>
-            <div className="modal-actions">
-              <button onClick={() => handleEditConfirm(pendingEditField)}>بله</button>
-              <button onClick={() => setPendingEditField(null)}>خیر</button>
-            </div>
-          </div>
-        </div>
-      )}
+   
 
       {showConfirmModal && (
         <div className="custom-modal">
@@ -576,7 +601,7 @@ export default function PersonalInfoForm() {
                 }}
               />
             ) : (
-              <button type="button" className="edit-btn" onClick={() => setPendingEditField('profile_image')}>
+              <button type="button" className="edit-btn" onClick={() => {showGlobalMessage({type:"confirm",title:"ویرایش تصویر",message:"آیا می‌خواهید تصویر پروفایل را ویرایش کنید؟",onConfirm:()=>{setEditableFields(prev=>({...prev,profile_image:true}));}});}}>
                 ویرایش تصویر 
               </button>
             )}

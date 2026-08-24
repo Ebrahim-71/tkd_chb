@@ -73,34 +73,137 @@
   cursor: zoom-in;
 }
 
+/* =========================
+   Mobile Responsive Final
+========================= */
 
-/* 🔻 ریسپانسیو برای موبایل و تبلت */
-@media (max-width: 768px) {
-  .lightbox-content {
-    max-width: 100vw;
-    max-height: 100vh;
-    overflow: auto;
-  }
+@media (max-width:768px){
 
-  .lightbox-nav {
-    display: none;
-  }
+    .lightbox-overlay{
 
-  .lightbox-close {
-    top: 10px;
-    right: 10px;
-    font-size: 28px;
-  }
+        padding:8px;
 
-  .zoom-container {
-    max-height: none;
-    overflow: visible;
-  }
+        box-sizing:border-box;
 
-  .lightbox-image {
-    transform: none !important;
-    max-width: 100%;
-    max-height: none;
-    cursor: default;
-  }
+    }
+
+
+
+    .lightbox-content{
+
+        width:100%;
+
+        max-width:100%;
+
+        max-height:100vh;
+
+        padding:0;
+
+        overflow:hidden;
+
+    }
+
+
+
+    .lightbox-nav{
+
+        display:none;
+
+    }
+
+
+
+    .lightbox-close{
+
+        top:8px;
+
+        right:8px;
+
+        font-size:30px;
+
+        z-index:5;
+
+    }
+
+
+
+    .zoom-container{
+
+        width:100%;
+
+        max-height:90vh;
+
+        overflow:hidden;
+
+        border-radius:8px;
+
+        display:flex;
+
+        justify-content:center;
+
+        align-items:center;
+
+    }
+
+
+
+    .lightbox-image{
+
+        width:auto;
+
+        max-width:100%;
+
+        max-height:85vh;
+
+        object-fit:contain;
+
+        transform:none !important;
+
+        cursor:default;
+
+    }
+
+}
+
+
+
+/* گوشی کوچک */
+
+@media(max-width:400px){
+
+
+    .lightbox-overlay{
+
+        padding:5px;
+
+    }
+
+
+
+    .lightbox-close{
+
+        font-size:26px;
+
+        top:5px;
+
+        right:5px;
+
+    }
+
+
+
+    .zoom-container{
+
+        max-height:88vh;
+
+    }
+
+
+
+    .lightbox-image{
+
+        max-height:80vh;
+
+    }
+
 }

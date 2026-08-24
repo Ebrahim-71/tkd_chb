@@ -609,20 +609,29 @@ const StudentsTable = () => {
   const renderMedals = (
     student
   ) => {
-    const gold =
-      student?.gold_medals ??
-      0;
+      const gold =
+        Number(
+          student?.gold_total ??
+          student?.gold_medals ??
+          0
+        ) || 0;
 
-    const silver =
-      student?.silver_medals ??
-      0;
+      const silver =
+        Number(
+          student?.silver_total ??
+          student?.silver_medals ??
+          0
+        ) || 0;
 
-    const bronze =
-      student?.bronze_medals ??
-      0;
+      const bronze =
+        Number(
+          student?.bronze_total ??
+          student?.bronze_medals ??
+          0
+        ) || 0;
 
 
-    return (
+      return (
       <div
         className="medal-badges"
         title={

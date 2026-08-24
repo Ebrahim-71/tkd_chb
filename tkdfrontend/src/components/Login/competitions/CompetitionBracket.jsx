@@ -1,5 +1,3 @@
-// src/components/Login/competitions/CompetitionBracket.jsx
-
 import React, {
   useCallback,
   useEffect,
@@ -186,6 +184,34 @@ function getErrorMessage(
 
 
 /* =========================================================
+   Player slot
+   ساختار واحد برای نام بازیکن + نام مربی
+========================================================= */
+
+function PlayerSlot({
+  round,
+  index,
+  position,
+}) {
+  return (
+    <div className="player-box">
+
+      <input
+        className="player-input"
+        data-r={round}
+        data-i={index}
+        data-pos={position}
+        readOnly
+      />
+
+      <div className="coach-name" />
+
+    </div>
+  );
+}
+
+
+/* =========================================================
    Bracket Card
 ========================================================= */
 
@@ -347,6 +373,30 @@ function BracketCard({
 
 
       if (!left) {
+        return;
+      }
+
+
+      /*
+       * در موبایل هدر اسکیل نمی‌شود؛
+       * خود نوار pillها اسکرول افقی دارد.
+       */
+      const isMobile =
+        typeof window !== "undefined" &&
+        window.matchMedia(
+          "(max-width: 768px)"
+        ).matches &&
+        !root.classList.contains(
+          "is-snapshotting"
+        );
+
+
+      if (isMobile) {
+        root.style.setProperty(
+          "--hdrScale",
+          "1"
+        );
+
         return;
       }
 
@@ -537,6 +587,29 @@ function BracketCard({
           view.clientHeight;
 
 
+        /*
+         * نکته اصلی نسخه موبایل:
+         * اجازه نمی‌دهیم عرض 320/360px موبایل
+         * مبنای کوچک‌کردن کل براکت شود.
+         * براکت با عرض طراحی 827px رندر می‌شود
+         * و داخل .bd اسکرول افقی می‌خورد.
+         */
+        const isMobile =
+          typeof window !== "undefined" &&
+          window.matchMedia(
+            "(max-width: 768px)"
+          ).matches;
+
+
+        const effectiveViewWidth =
+          isMobile
+            ? Math.max(
+                viewWidth,
+                827
+              )
+            : viewWidth;
+
+
         if (
           naturalWidth <= 0 ||
           naturalHeight <= 0 ||
@@ -549,7 +622,7 @@ function BracketCard({
 
         const scale =
           Math.min(
-            viewWidth /
+            effectiveViewWidth /
               naturalWidth,
 
             viewHeight /
@@ -622,6 +695,127 @@ function BracketCard({
         }
       };
 
+    
+    const getCoachElement =
+      (
+        playerInput
+      ) => {
+        if (!playerInput) {
+          return null;
+        }
+
+
+        let box =
+          playerInput.closest(
+            ".player-box"
+          );
+
+
+        if (!box) {
+          const parent =
+            playerInput.parentNode;
+
+
+          if (!parent) {
+            return null;
+          }
+
+
+          box =
+            document.createElement(
+              "div"
+            );
+
+
+          box.className =
+            "player-box";
+
+
+          parent.insertBefore(
+            box,
+            playerInput
+          );
+
+
+          box.appendChild(
+            playerInput
+          );
+        }
+
+
+        let coachElement =
+          box.querySelector(
+            ".coach-name"
+          );
+
+
+        if (!coachElement) {
+          coachElement =
+            document.createElement(
+              "div"
+            );
+
+
+          coachElement.className =
+            "coach-name";
+
+
+          box.appendChild(
+            coachElement
+          );
+        }
+
+
+        return coachElement;
+      };
+
+
+    const setCoach =
+      (
+        playerInput,
+        coachName
+      ) => {
+        const coachElement =
+          getCoachElement(
+            playerInput
+          );
+
+        if (!coachElement) {
+          return;
+        }
+
+        const value =
+          String(
+            coachName ||
+            ""
+          ).trim();
+
+        coachElement.dataset.coachName =
+          value;
+
+        coachElement.textContent =
+          value
+            ? `مربی: ${value}`
+            : "";
+      };
+
+
+    const getCoach =
+      (
+        playerInput
+      ) => {
+        const coachElement =
+          getCoachElement(
+            playerInput
+          );
+
+        return String(
+          coachElement?.dataset
+            ?.coachName ||
+          ""
+        ).trim();
+      };
+        
 
     const getMatchNumber =
       (match) => {
@@ -859,7 +1053,14 @@ function BracketCard({
               ? playerA.value
               : playerB.value;
 
-
+          const winnerCoach =
+            hasA
+              ? getCoach(
+                  playerA
+                )
+              : getCoach(
+                  playerB
+                );
           const nextVisualRound =
             mapRound(
               round +
@@ -916,6 +1117,11 @@ function BracketCard({
             put(
               nextInput,
               winner
+            );
+
+            setCoach(
+              nextInput,
+              winnerCoach
             );
           }
         }
@@ -1164,9 +1370,28 @@ function BracketCard({
 
 
           if (nextInput) {
+            const currentPlayer =
+              playerA?.value.trim() ===
+                name
+                ? playerA
+                : playerB;
+
+
+            const currentCoach =
+              getCoach(
+                currentPlayer
+              );
+
+
             put(
               nextInput,
               name
+            );
+
+
+            setCoach(
+              nextInput,
+              currentCoach
             );
           }
 
@@ -1400,7 +1625,24 @@ function BracketCard({
                 match?.player_b ??
                 ""
               );
+            
+            const playerACoach =
+              String(
+                match
+                  ?.player_a_coach ??
+                match?.a_coach ??
+                ""
+              ).trim();
 
+
+            const playerBCoach =
+              String(
+                match
+                  ?.player_b_coach ??
+                match?.b_coach ??
+                ""
+              ).trim();
+            
 
             const hasA =
               playerAName.trim() !==
@@ -1413,36 +1655,53 @@ function BracketCard({
 
 
             if (playerA) {
-              playerA.value =
+              put(
+                playerA,
                 hasA
                   ? playerAName
-
                   : (
                       hasB &&
-                      match
-                        ?.is_bye &&
+                      match?.is_bye &&
                       isFirstRound
                     )
                   ? "استراحت"
-
-                  : playerA.value;
+                  : playerA.value
+              );
             }
 
 
             if (playerB) {
-              playerB.value =
+              put(
+                playerB,
                 hasB
                   ? playerBName
-
                   : (
                       hasA &&
-                      match
-                        ?.is_bye &&
+                      match?.is_bye &&
                       isFirstRound
                     )
                   ? "استراحت"
+                  : playerB.value
+              );
+            }
 
-                  : playerB.value;
+            if (playerA) {
+              setCoach(
+                playerA,
+                hasA
+                  ? playerACoach
+                  : ""
+              );
+            }
+
+
+            if (playerB) {
+              setCoach(
+                playerB,
+                hasB
+                  ? playerBCoach
+                  : ""
+              );
             }
 
 
@@ -1667,6 +1926,20 @@ function BracketCard({
                 cacheBust:
                   true,
 
+                /*
+                 * خروجی دانلود همیشه با عرض استاندارد دسکتاپ
+                 * ساخته می‌شود؛ حتی اگر کاربر روی موبایل باشد.
+                 */
+                width:
+                  860,
+
+                style: {
+                  width:
+                    "860px",
+                  maxWidth:
+                    "none",
+                },
+
                 filter:
                   (
                     element
@@ -1717,6 +1990,9 @@ function BracketCard({
           node.classList.remove(
             "is-snapshotting"
           );
+
+
+          fitHeader();
 
 
           setRendering(
@@ -1855,10 +2131,6 @@ function BracketCard({
     <div
       className={
         `card ${
-          showSnapshot
-            ? "is-snap"
-            : ""
-        } ${
           rendering
             ? "is-rendering"
             : ""
@@ -1957,6 +2229,10 @@ function BracketCard({
 
         <div className="bd">
 
+          <div className="mobile-scroll-hint">
+            برای مشاهده ادامه جدول، به چپ و راست بکشید
+          </div>
+
           <div
             className="bracket-wrap"
             data-size={
@@ -1982,71 +2258,38 @@ function BracketCard({
                 ======================================= */}
 
                 <div className="col r1">
-
                   <div className="stack">
+                    {Array.from({ length: 16 }).map((_, index) => (
+                      <React.Fragment key={`r1-${index}`}>
 
-                    {Array.from({
-                      length:
-                        16,
-                    }).map(
-                      (
-                        _,
-                        index
-                      ) => (
-                        <React.Fragment
-                          key={`r1-${index}`}
-                        >
+                        <div className="item">
+                          <PlayerSlot
+                            round={1}
+                            index={index}
+                            position="a"
+                          />
+                        </div>
 
-                          <div className="item">
+                        <div className="item">
+                          <PlayerSlot
+                            round={1}
+                            index={index}
+                            position="b"
+                          />
 
-                            <input
-                              className="player-input"
-                              data-r="1"
-                              data-i={
-                                index
-                              }
-                              data-pos="a"
-                              readOnly
-                            />
+                          <input
+                            className="bubble"
+                            data-r="1"
+                            data-i={index}
+                            data-num
+                            readOnly
+                            style={{ right: "-28px" }}
+                          />
+                        </div>
 
-                          </div>
-
-
-                          <div className="item">
-
-                            <input
-                              className="player-input"
-                              data-r="1"
-                              data-i={
-                                index
-                              }
-                              data-pos="b"
-                              readOnly
-                            />
-
-
-                            <input
-                              className="bubble"
-                              data-r="1"
-                              data-i={
-                                index
-                              }
-                              data-num
-                              readOnly
-                              style={{
-                                right:
-                                  "-28px",
-                              }}
-                            />
-
-                          </div>
-
-                        </React.Fragment>
-                      )
-                    )}
-
+                      </React.Fragment>
+                    ))}
                   </div>
-
                 </div>
 
 
@@ -2055,71 +2298,38 @@ function BracketCard({
                 ======================================= */}
 
                 <div className="col r2">
-
                   <div className="stack">
+                    {Array.from({ length: 8 }).map((_, index) => (
+                      <React.Fragment key={`r2-${index}`}>
 
-                    {Array.from({
-                      length:
-                        8,
-                    }).map(
-                      (
-                        _,
-                        index
-                      ) => (
-                        <React.Fragment
-                          key={`r2-${index}`}
-                        >
+                        <div className="item">
+                          <PlayerSlot
+                            round={2}
+                            index={index}
+                            position="a"
+                          />
+                        </div>
 
-                          <div className="item">
+                        <div className="item">
+                          <PlayerSlot
+                            round={2}
+                            index={index}
+                            position="b"
+                          />
 
-                            <input
-                              className="player-input"
-                              data-r="2"
-                              data-i={
-                                index
-                              }
-                              data-pos="a"
-                              readOnly
-                            />
+                          <input
+                            className="bubble"
+                            data-r="2"
+                            data-i={index}
+                            data-num
+                            readOnly
+                            style={{ right: "-28px" }}
+                          />
+                        </div>
 
-                          </div>
-
-
-                          <div className="item">
-
-                            <input
-                              className="player-input"
-                              data-r="2"
-                              data-i={
-                                index
-                              }
-                              data-pos="b"
-                              readOnly
-                            />
-
-
-                            <input
-                              className="bubble"
-                              data-r="2"
-                              data-i={
-                                index
-                              }
-                              data-num
-                              readOnly
-                              style={{
-                                right:
-                                  "-28px",
-                              }}
-                            />
-
-                          </div>
-
-                        </React.Fragment>
-                      )
-                    )}
-
+                      </React.Fragment>
+                    ))}
                   </div>
-
                 </div>
 
 
@@ -2128,71 +2338,38 @@ function BracketCard({
                 ======================================= */}
 
                 <div className="col r3">
-
                   <div className="stack">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <React.Fragment key={`r3-${index}`}>
 
-                    {Array.from({
-                      length:
-                        4,
-                    }).map(
-                      (
-                        _,
-                        index
-                      ) => (
-                        <React.Fragment
-                          key={`r3-${index}`}
-                        >
+                        <div className="item">
+                          <PlayerSlot
+                            round={3}
+                            index={index}
+                            position="a"
+                          />
+                        </div>
 
-                          <div className="item">
+                        <div className="item">
+                          <PlayerSlot
+                            round={3}
+                            index={index}
+                            position="b"
+                          />
 
-                            <input
-                              className="player-input"
-                              data-r="3"
-                              data-i={
-                                index
-                              }
-                              data-pos="a"
-                              readOnly
-                            />
+                          <input
+                            className="bubble"
+                            data-r="3"
+                            data-i={index}
+                            data-num
+                            readOnly
+                            style={{ right: "-28px" }}
+                          />
+                        </div>
 
-                          </div>
-
-
-                          <div className="item">
-
-                            <input
-                              className="player-input"
-                              data-r="3"
-                              data-i={
-                                index
-                              }
-                              data-pos="b"
-                              readOnly
-                            />
-
-
-                            <input
-                              className="bubble"
-                              data-r="3"
-                              data-i={
-                                index
-                              }
-                              data-num
-                              readOnly
-                              style={{
-                                right:
-                                  "-28px",
-                              }}
-                            />
-
-                          </div>
-
-                        </React.Fragment>
-                      )
-                    )}
-
+                      </React.Fragment>
+                    ))}
                   </div>
-
                 </div>
 
 
@@ -2201,71 +2378,38 @@ function BracketCard({
                 ======================================= */}
 
                 <div className="col r4">
-
                   <div className="stack">
+                    {Array.from({ length: 2 }).map((_, index) => (
+                      <React.Fragment key={`r4-${index}`}>
 
-                    {Array.from({
-                      length:
-                        2,
-                    }).map(
-                      (
-                        _,
-                        index
-                      ) => (
-                        <React.Fragment
-                          key={`r4-${index}`}
-                        >
+                        <div className="item">
+                          <PlayerSlot
+                            round={4}
+                            index={index}
+                            position="a"
+                          />
+                        </div>
 
-                          <div className="item">
+                        <div className="item">
+                          <PlayerSlot
+                            round={4}
+                            index={index}
+                            position="b"
+                          />
 
-                            <input
-                              className="player-input"
-                              data-r="4"
-                              data-i={
-                                index
-                              }
-                              data-pos="a"
-                              readOnly
-                            />
+                          <input
+                            className="bubble"
+                            data-r="4"
+                            data-i={index}
+                            data-num
+                            readOnly
+                            style={{ right: "-28px" }}
+                          />
+                        </div>
 
-                          </div>
-
-
-                          <div className="item">
-
-                            <input
-                              className="player-input"
-                              data-r="4"
-                              data-i={
-                                index
-                              }
-                              data-pos="b"
-                              readOnly
-                            />
-
-
-                            <input
-                              className="bubble"
-                              data-r="4"
-                              data-i={
-                                index
-                              }
-                              data-num
-                              readOnly
-                              style={{
-                                right:
-                                  "-28px",
-                              }}
-                            />
-
-                          </div>
-
-                        </React.Fragment>
-                      )
-                    )}
-
+                      </React.Fragment>
+                    ))}
                   </div>
-
                 </div>
 
 
@@ -2274,32 +2418,22 @@ function BracketCard({
                 ======================================= */}
 
                 <div className="col r5">
-
                   <div className="stack">
 
                     <div className="item">
-
-                      <input
-                        className="player-input"
-                        data-r="5"
-                        data-i="0"
-                        data-pos="a"
-                        readOnly
+                      <PlayerSlot
+                        round={5}
+                        index={0}
+                        position="a"
                       />
-
                     </div>
 
-
                     <div className="item">
-
-                      <input
-                        className="player-input"
-                        data-r="5"
-                        data-i="0"
-                        data-pos="b"
-                        readOnly
+                      <PlayerSlot
+                        round={5}
+                        index={0}
+                        position="b"
                       />
-
 
                       <input
                         className="bubble"
@@ -2307,16 +2441,11 @@ function BracketCard({
                         data-i="0"
                         data-num
                         readOnly
-                        style={{
-                          right:
-                            "-18px",
-                        }}
+                        style={{ right: "-18px" }}
                       />
-
                     </div>
 
                   </div>
-
                 </div>
 
 

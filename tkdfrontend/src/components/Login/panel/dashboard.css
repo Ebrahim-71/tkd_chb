@@ -23,30 +23,36 @@
 /* =========================================================
    Sidebar
 ========================================================= */
-
 .sidebar {
-  position: sticky;
+  position: fixed;
+
   top: 0;
+  right: 0;
+  bottom: 0;
 
   width: 240px;
   min-width: 240px;
+
   height: 100vh;
+  height: 100dvh;
 
   padding: 20px;
 
   background-color: #ffffff;
 
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
 
-  z-index: 100;
+  z-index: 1000;
 
   overflow-y: auto;
+  overflow-x: hidden;
+
+  overscroll-behavior: contain;
 
   transition: all 0.3s ease-in-out;
 
   box-sizing: border-box;
 }
-
 
 .sidebar.show {
   max-height: 1000px;
@@ -56,17 +62,19 @@
 /* =========================================================
    Main Dashboard Content
 ========================================================= */
-
 .dashboard-main {
   flex: 1;
 
+  width: calc(100% - 240px);
   min-width: 0;
+
+  margin-right: 240px;
 
   padding: 30px 15px;
 
   background-color: #f3f4f6;
 
-  overflow-y: auto;
+  overflow: visible;
 
   box-sizing: border-box;
 }
@@ -111,16 +119,24 @@
    Sidebar Header / Profile
 ========================================================= */
 
-.sidebar-header {
+.sidebar-profile {
+  width: 100%;
+
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+
+  text-align: center;
 
   margin-bottom: 20px;
+
+  box-sizing: border-box;
 }
 
-
 .profile-image {
+  display: block;
+
   width: 80px;
   height: 80px;
 
@@ -128,7 +144,9 @@
 
   border-radius: 50%;
 
-  margin-bottom: 10px;
+  margin: 0 auto 10px auto;
+
+  flex-shrink: 0;
 }
 
 
@@ -733,57 +751,124 @@
   font-weight: bold;
 }
 
-
 /* =========================================================
-   Mobile
+   Mobile Responsive Final
 ========================================================= */
 
-@media (max-width: 768px) {
+@media (max-width:760px){
 
-  .dashboard-container {
-    flex-direction: column;
+  /* =========================================================
+    جلوگیری از تداخل CSS پنل کاربری
+  ========================================================= */
 
-    min-height: 100vh;
+  .dashboard-main .res-container{
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+
+    margin:0 !important;
+
+    box-sizing:border-box;
   }
 
 
-  .sidebar {
-    position: relative;
+  .dashboard-main .res-table-wrap{
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
 
-    top: auto;
-
-    width: 100%;
-    min-width: 100%;
-
-    height: auto;
-
-    max-height: 0;
-
-    padding: 0 20px;
-
-    overflow: hidden;
-
-    border-bottom: 1px solid #dddddd;
-
-    box-shadow: none;
-
-    box-sizing: border-box;
+    overflow:visible !important;
   }
 
 
-  .sidebar.show {
-    max-height: 1000px;
+  .dashboard-main .res-table{
+    display:block !important;
 
-    padding: 20px;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
 
-    overflow-y: auto;
+    table-layout:auto !important;
   }
+
+
+  .dashboard-main .res-table tbody{
+    display:block !important;
+
+    width:100% !important;
+    min-width:0 !important;
+  }
+
+
+  .dashboard-main .res-table tbody tr{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+  }
+
+
+  .dashboard-main .res-table tbody td{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+  }
+
+
+
+  .dashboard-container{
+
+    flex-direction:column;
+
+    width:100%;
+
+    min-height:100vh;
+
+    overflow-x:hidden;
+
+  }
+
+
+
+  .sidebar{
+
+    position:relative;
+
+    width:100%;
+
+    min-width:100%;
+
+    height:auto;
+
+    max-height:0;
+
+    padding:0 16px;
+
+    overflow:hidden;
+
+    box-shadow:none;
+
+  }
+
+
+
+  .sidebar.show{
+
+    max-height:1000px;
+
+    padding:16px;
+
+    overflow-y:auto;
+
+  }
+
 
 
   .dashboard-main {
     width: 100%;
 
-    padding: 20px 12px;
+    margin-right: 0;
+
+    padding: 16px 10px;
 
     overflow: visible;
 
@@ -791,153 +876,273 @@
   }
 
 
-  .toggle-sidebar-btn {
-    position: relative;
 
-    top: auto;
-    right: auto;
+  .toggle-sidebar-btn{
 
-    width: calc(100% - 24px);
+    position:relative;
 
-    margin: 12px;
+    top:auto;
 
-    box-sizing: border-box;
+    right:auto;
+
+    width:calc(100% - 20px);
+
+    margin:10px;
+
+    box-sizing:border-box;
+
   }
 
 
-  .stats-section {
-    padding: 15px 20px;
 
-    border-radius: 20px;
+  /* پروفایل */
+
+  .profile-image{
+
+    width:70px;
+
+    height:70px;
+
   }
 
 
-  .stats-carousel {
-    gap: 12px;
+
+  .profile-name{
+
+    font-size:15px;
+
   }
 
 
-  .carousel-card {
-    min-width: 150px;
 
-    padding: 12px;
+  .profile-role-logout{
+
+    flex-direction:column;
+
+    gap:8px;
+
   }
 
 
-  .scroll-btn {
-    display: none;
+
+  .sidebar-menu li{
+
+    padding:9px 10px;
+
+    font-size:14px;
+
   }
 
 
-  .profile-role-logout {
-    flex-direction: column;
 
-    gap: 6px;
+  /* آمار */
+
+  .stats-section{
+
+    padding:12px;
+
+    min-height:auto;
+
+    border-radius:16px;
+
+    margin-bottom:20px;
+
   }
 
 
-  .sidebar-menu li {
-    padding: 8px 12px;
 
-    font-size: 14px;
+  .stats-carousel{
+
+    gap:10px;
+
+    overflow-x:auto;
+
   }
 
 
-  .profile-name {
-    font-size: 16px;
+
+  .carousel-card{
+
+    flex:0 0 140px;
+
+    min-width:140px;
+
+    min-height:110px;
+
+    padding:10px;
+
   }
 
 
-  .role-label {
-    padding: 3px 8px;
 
-    font-size: 12px;
+  .emoji{
+
+    font-size:24px;
+
   }
 
 
-  .logout-btn {
-    padding: 6px 12px;
 
-    font-size: 12px;
+  .title{
+
+    font-size:13px;
+
   }
 
+
+
+  .value{
+
+    font-size:15px;
+
+  }
+
+
+
+  .scroll-btn{
+
+    display:none;
+
+  }
+
+
+
+  /* محتوای اصلی */
 
   .dashboard-main .maincontent,
-  .dashboard-main .main-content {
-    padding: 16px;
+  .dashboard-main .main-content{
+
+    padding:12px;
+
+    margin-top:12px;
+
+    border-radius:10px;
+
   }
 
 
-  .item-card {
-    padding: 16px;
 
-    margin-top: 12px;
+  .item-card{
+
+    padding:14px;
+
+    margin-top:12px;
+
+    border-radius:10px;
+
   }
 
 
-  .item-card h2 {
-    font-size: 19px;
+
+  .item-card h2{
+
+    font-size:19px;
+
   }
 
 
-  .item-card h3 {
-    font-size: 18px;
+
+  .item-card h3{
+
+    font-size:17px;
+
   }
 
 
-  .dashboard-main table {
-    min-width: 650px;
+
+  .item-card input,
+  .item-card select,
+  .item-card textarea{
+
+    font-size:16px;
+
   }
 
 
-  .dashboard-main {
-    overflow-x: auto;
+
+  /* فقط جدول اسکرول شود */
+
+    /* جدول‌های عمومی پنل می‌توانند عرض بیشتر داشته باشند،
+    اما جدول نتایج مسابقه Responsive خودش را دارد. */
+
+  .dashboard-main table:not(.res-table){
+    min-width:650px;
   }
+
+  .dashboard-main .res-table{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+  }
+
+
+
+  .dashboard-main{
+
+    overflow-x:hidden;
+
+  }
+
+
 }
 
 
+
 /* =========================================================
-   Very Small Screens
+   Small Mobile
 ========================================================= */
 
-@media (max-width: 480px) {
+@media(max-width:480px){
 
-  .dashboard-main {
-    padding: 14px 8px;
+  .dashboard-main{
+
+    padding:12px 8px;
+
   }
 
 
-  .sidebar.show {
-    padding: 15px;
+
+  .sidebar.show{
+
+    padding:12px;
+
   }
 
 
-  .stats-section {
-    padding: 12px;
+
+  .stats-section{
+
+    padding:10px;
+
   }
 
 
-  .carousel-card {
-    min-width: 135px;
+
+  .carousel-card{
+
+    flex:0 0 125px;
+
+    min-width:125px;
+
   }
 
 
-  .emoji {
-    font-size: 28px;
+
+  .item-card{
+
+    padding:12px;
+
   }
 
 
-  .title {
-    font-size: 13px;
+
+  .success-msg,
+  .error-msg{
+
+    font-size:13px;
+
+    line-height:1.8;
+
   }
 
-
-  .value {
-    font-size: 16px;
-  }
-
-
-  .item-card {
-    padding: 14px;
-  }
 }

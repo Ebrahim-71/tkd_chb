@@ -1,16 +1,22 @@
+/* MultiStepForm.css */
+
 .multi-step-form {
   display: flex;
   min-height: calc(100vh - 100px);
   direction: rtl;
 }
 
+
+/* تصویر سمت چپ */
 .form-image-side {
   flex: 1;
-  background-image: url('/assets/img/form-bg.jpg'); /* عکس دلخواهت اینجا */
+  background-image: url('/assets/img/form-bg.jpg');
   background-size: cover;
   background-position: center;
 }
 
+
+/* بخش فرم */
 .form-content-side {
   flex: 1;
   background-color: #fff;
@@ -18,38 +24,249 @@
   overflow-y: auto;
 }
 
+
 .step-form {
   max-width: 600px;
   margin: auto;
 }
 
+
 .step-form h2 {
   margin-bottom: 2rem;
   font-size: 1.8rem;
+  text-align: center;
 }
+
 
 .step-form label {
   display: block;
   margin-bottom: 1rem;
 }
 
+
 .step-form input,
 .step-form select,
 .step-form textarea {
+
   width: 100%;
+
   padding: 0.8rem;
+
   font-size: 1rem;
+
   margin-top: 0.5rem;
+
+  box-sizing: border-box;
+
+  border-radius: 8px;
+
+  border: 1px solid #ccc;
+
 }
+
+
+/* دکمه‌ها */
 
 .step-form .buttons {
+
   display: flex;
+
   justify-content: space-between;
+
+  gap: 12px;
+
   margin-top: 2rem;
+
 }
 
+
 .step-form .buttons button {
+
+  flex: 1;
+
   padding: 0.8rem 2rem;
+
   font-size: 1rem;
+
   cursor: pointer;
+
+  border-radius: 8px;
+
+}
+
+/* =========================
+   Mobile Responsive Final
+========================= */
+
+@media (max-width:768px){
+
+    .multi-step-form{
+
+        flex-direction:column;
+
+        width:100%;
+
+        min-height:auto;
+
+    }
+
+
+
+    .form-image-side{
+
+        display:none;
+
+    }
+
+
+
+    .form-content-side{
+
+        width:100%;
+
+        padding:16px 12px;
+
+        box-sizing:border-box;
+
+        overflow:visible;
+
+    }
+
+
+
+    .step-form{
+
+        width:100%;
+
+        max-width:100%;
+
+    }
+
+
+
+    .step-form h2{
+
+        font-size:1.3rem;
+
+        line-height:1.8;
+
+        margin-bottom:1.2rem;
+
+    }
+
+
+
+    .step-form label{
+
+        font-size:14px;
+
+        line-height:1.8;
+
+        margin-bottom:10px;
+
+    }
+
+
+
+    .step-form input,
+    .step-form select,
+    .step-form textarea{
+
+        width:100%;
+
+        min-height:42px;
+
+        font-size:16px;
+
+        padding:10px;
+
+        box-sizing:border-box;
+
+    }
+
+
+
+    .step-form textarea{
+
+        min-height:120px;
+
+    }
+
+
+
+    .step-form .buttons{
+
+        flex-direction:column;
+
+        gap:10px;
+
+        margin-top:20px;
+
+    }
+
+
+
+    .step-form .buttons button{
+
+        width:100%;
+
+        min-height:44px;
+
+        padding:10px;
+
+        font-size:15px;
+
+    }
+
+}
+
+
+
+/* =========================
+   Small Mobile
+========================= */
+
+@media(max-width:400px){
+
+
+    .form-content-side{
+
+        padding:12px 8px;
+
+    }
+
+
+
+    .step-form h2{
+
+        font-size:1.15rem;
+
+    }
+
+
+
+    .step-form label{
+
+        font-size:13px;
+
+    }
+
+
+
+    .step-form input,
+    .step-form select,
+    .step-form textarea{
+
+        font-size:14px;
+
+    }
+
+
+
+    .step-form .buttons button{
+
+        font-size:14px;
+
+    }
+
 }

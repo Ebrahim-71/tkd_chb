@@ -1,139 +1,193 @@
-.footer {
-  background-color: #1b1e23;
-  color: #f0f0f0;
-  padding: 20px;
-  font-family: 'IRANSansWeb', sans-serif;
+.tkd-footer {
   direction: rtl;
-  border-top: 4px solid #e67e22;
+  margin-top: 42px;
+  padding: 0;
+  overflow: hidden;
+  border-top: 4px solid #d81f32;
+  background:
+    radial-gradient(
+      circle at 12% 0%,
+      rgba(34, 84, 143, .28),
+      transparent 28%
+    ),
+    #071a34;
+  color: #eef4fb;
+  font-family: "IRANSansWeb", sans-serif;
 }
 
-
-.footer-container {
-  max-width: 1100px;
+.tkd-footer-inner {
+  width: min(1180px, calc(100% - 40px));
   margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.15fr 1.4fr .75fr;
+  gap: 42px;
+  padding: 42px 0 32px;
+  box-sizing: border-box;
+}
+
+.tkd-footer-block {
+  min-width: 0;
+}
+
+.tkd-footer-block h4 {
+  position: relative;
+  display: inline-block;
+  margin: 0 0 16px;
+  padding-bottom: 9px;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.tkd-footer-block h4::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 36px;
+  height: 2px;
+  border-radius: 999px;
+  background: #d81f32;
+}
+
+.tkd-footer-about > p {
+  max-width: 360px;
+  margin: 0;
+  color: #bac6d6;
+  font-size: 12px;
+  line-height: 2;
+}
+
+.tkd-footer-block > p {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 8px 0;
+  color: #bac6d6;
+  font-size: 12px;
+  line-height: 1.95;
+}
+
+.tkd-footer-block > p svg {
+  flex: 0 0 auto;
+  margin-top: 5px;
+  color: #8fb5e5;
+}
+
+.tkd-footer-socials {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-direction: row-reverse;
-  gap: 25px;
+  gap: 10px;
+  margin-top: 18px;
 }
 
+.tkd-footer-socials a {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 11px;
+  background: rgba(255,255,255,.06);
+  transition:
+    transform .2s ease,
+    background .2s ease;
+}
 
-.footer-section {
-  flex: 1;
-  min-width: 250px;
-  margin-bottom: 20px;
+.tkd-footer-socials a:hover {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,.12);
+}
+
+.tkd-footer-socials img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.tkd-footer-trust {
   display: flex;
   flex-direction: column;
   align-items: center;
+  text-align: center;
 }
 
-
-/* بخش اینماد */
-.enamad-section {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+.tkd-footer-trust h4::after {
+  right: 50%;
+  transform: translateX(50%);
 }
 
-
-.enamad-logo {
-  width: 120px;
+.tkd-enamad-logo {
+  width: 105px;
   height: auto;
   cursor: pointer;
-  transition: all 0.3s ease;
+  filter: drop-shadow(0 7px 14px rgba(0,0,0,.16));
+  transition: transform .2s ease;
 }
 
-
-.enamad-logo:hover {
-  transform: scale(1.05);
+.tkd-enamad-logo:hover {
+  transform: scale(1.04);
 }
 
-
-/* عنوان‌ها */
-.footer-section h4 {
-  font-size: 1.2rem;
-  margin-bottom: 15px;
-  border-right: 3px solid #fff;
-  padding-right: 10px;
-}
-
-
-/* متن اطلاعات */
-.footer-section p {
-  margin: 6px 0;
-  font-size: 0.95rem;
-  color: #ccc;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-
-/* شبکه اجتماعی */
-.social-icons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
-  margin-top: 10px;
-}
-
-
-.social-icons img {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  transition: transform 0.3s ease;
-}
-
-
-.social-icons img:hover {
-  transform: scale(1.1);
-  filter: brightness(1.2);
-}
-
-
-/* پایین فوتر */
-.footer-bottom {
+.tkd-footer-bottom {
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 16px 0 20px;
+  border-top: 1px solid rgba(255,255,255,.10);
+  color: #8e9aac;
   text-align: center;
-  margin-top: 30px;
-  font-size: 0.85rem;
-  color: #aaa;
-  border-top: 1px solid #444;
-  padding-top: 10px;
+  font-size: 11px;
+  line-height: 1.9;
 }
 
-
-/* موبایل */
-@media (max-width: 768px) {
-
-  .footer-container {
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
+@media (max-width: 850px) {
+  .tkd-footer-inner {
+    grid-template-columns: 1fr 1fr;
   }
 
+  .tkd-footer-trust {
+    grid-column: 1 / -1;
+  }
+}
 
-  .footer-section {
-    width: 100%;
+@media (max-width: 620px) {
+  .tkd-footer {
+    margin-top: 30px;
+  }
+
+  .tkd-footer-inner {
+    width: calc(100% - 28px);
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 30px 0 24px;
+  }
+
+  .tkd-footer-block,
+  .tkd-footer-about,
+  .tkd-footer-trust {
     align-items: center;
     text-align: center;
   }
 
+  .tkd-footer-block h4::after {
+    right: 50%;
+    transform: translateX(50%);
+  }
 
-  .footer-section p {
+  .tkd-footer-about > p {
+    margin-inline: auto;
+  }
+
+  .tkd-footer-block > p {
     justify-content: center;
   }
 
-
-  .enamad-logo {
-    width: 100px;
-  }
-
-
-  .social-icons {
+  .tkd-footer-socials {
     justify-content: center;
   }
 
+  .tkd-footer-bottom {
+    width: calc(100% - 28px);
+    font-size: 10px;
+  }
 }

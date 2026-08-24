@@ -149,19 +149,27 @@ function getEntryName(entry) {
 }
 
 
-function getEntryClub(entry) {
-  if (!entry || typeof entry === "string") {
+function getEntryCoach(entry) {
+  if (
+    !entry ||
+    typeof entry === "string"
+  ) {
     return "";
   }
 
   return (
-    entry.club_name ||
-    entry.club_title ||
-    entry.club?.club_name ||
-    entry.club?.name ||
+    entry.coach_name ||
+    entry.coach_full_name ||
+    entry.coachName ||
+    entry.coach?.full_name ||
+    entry.coach?.name ||
     (
-      typeof entry.club === "string"
-        ? entry.club
+      `${entry.coach?.first_name || ""} ` +
+      `${entry.coach?.last_name || ""}`
+    ).trim() ||
+    (
+      typeof entry.coach === "string"
+        ? entry.coach
         : ""
     ) ||
     ""
@@ -170,18 +178,28 @@ function getEntryClub(entry) {
 
 
 function getEntryLabel(entry) {
-  if (!entry) return "—";
+  if (!entry) {
+    return "—";
+  }
 
-  if (typeof entry === "string") {
+  if (
+    typeof entry === "string"
+  ) {
     return entry;
   }
 
-  const name = getEntryName(entry);
-  const club = getEntryClub(entry);
+  const name =
+    getEntryName(entry);
+
+  const coach =
+    getEntryCoach(entry);
 
   return (
     entry.label ||
-    [name, club]
+    [
+      name,
+      coach,
+    ]
       .filter(Boolean)
       .join(" — ") ||
     "—"
@@ -211,8 +229,11 @@ function EntryCell({
     );
   }
 
-  const name = getEntryName(entry);
-  const club = getEntryClub(entry);
+  const name =
+    getEntryName(entry);
+
+  const coach =
+    getEntryCoach(entry);
 
   const score =
     entry.final_score ??
@@ -226,9 +247,9 @@ function EntryCell({
         {name || getEntryLabel(entry)}
       </strong>
 
-      {club && (
-        <span className="res-entry-club">
-          {club}
+      {coach && (
+        <span className="res-entry-coach">
+          مربی: {coach}
         </span>
       )}
 
@@ -595,11 +616,29 @@ export default function CompetitionResults() {
     window.print();
 
 
-  const goBack = () =>
+  const detailsPath =
+    role
+      ? (
+          `/dashboard/${encodeURIComponent(
+            role
+          )}/competitions/${encodeURIComponent(
+            slug
+          )}`
+        )
+      : (
+          `/competitions/${encodeURIComponent(
+            slug
+          )}`
+        );
+
+
+  const goBack = () => {
+
     navigate(
-      `/dashboard/${encodeURIComponent(role)}` +
-      `/competitions/${encodeURIComponent(slug)}`
+      detailsPath
     );
+
+  };
 
 
   return (
@@ -632,10 +671,7 @@ export default function CompetitionResults() {
 
             <Link
               className="res-link"
-              to={
-                `/dashboard/${encodeURIComponent(role)}` +
-                `/competitions/${encodeURIComponent(slug)}`
-              }
+              to={detailsPath}
             >
               {competitionTitle}
             </Link>
@@ -693,8 +729,8 @@ export default function CompetitionResults() {
           className="res-search"
           placeholder={
             isPoomsae
-              ? "جستجو در نام، باشگاه، رده سنی یا کمربند…"
-              : "جستجو در اسامی، باشگاه یا وزن…"
+              ? "جستجو در نام، مربی، رده سنی یا کمربند…"
+              : "جستجو در اسامی، مربی یا وزن…"
           }
           value={query}
           onChange={(event) =>

@@ -1,64 +1,295 @@
 :root{
-  --line-w:2px; --stroke:#444; --col-gap:88px;
+  --line-w:2px;
+  --stroke:#444;
+  --col-gap:88px;
   --brand:#4f46e5;
-  --hdrScale: 1;
+  --hdrScale:1;
+  --bracket-view-w:827px;
+  --card-w:860px;
 }
 
 /* صفحه */
-.cb-wrap{ direction: rtl; margin:14px; color:#1f2937; }
-.cb-toolbar{ display:flex; gap:10px; justify-content:center; margin-bottom:14px; }
+.cb-wrap{
+  direction:rtl;
+  margin:14px;
+  color:#1f2937;
+  min-width:0;
+}
+
+.cb-toolbar{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  justify-content:center;
+  margin-bottom:14px;
+}
+
 .cb-error{ color:#b91c1c; }
-.cb-empty{ text-align:center; padding:20px 12px; color:#6b7280; border:1px dashed #e5e7eb; border-radius:12px; }
+
+.cb-empty{
+  text-align:center;
+  padding:20px 12px;
+  color:#6b7280;
+  border:1px dashed #e5e7eb;
+  border-radius:12px;
+}
 
 /* کارت */
-.cards{ display:flex; flex-direction:column; gap:24px; margin-top:18px; }
+.cards{
+  display:flex;
+  flex-direction:column;
+  gap:24px;
+  margin-top:18px;
+  width:100%;
+  min-width:0;
+}
+
 .card{
   position:relative;
-  border:1px solid #e6e6ef; border-radius:14px; background:#fff;
-  width:860px; margin:0 auto; box-sizing:border-box; break-inside:avoid; overflow:hidden;
+  border:1px solid #e6e6ef;
+  border-radius:14px;
+  background:#fff;
+  width:var(--card-w);
+  max-width:100%;
+  margin:0 auto;
+  box-sizing:border-box;
+  break-inside:avoid;
+  overflow:hidden;
 }
-.card .hd{
-  display:flex; align-items:center; justify-content:space-between;
-  gap:12px; padding:10px 12px; background:#f7f8ff; border-bottom:1px solid #ececf4;
-}
-.card .hd .left{
-  display:flex; flex-wrap:nowrap; /* دیگه نمی‌شکنه */
-  gap:8px; align-items:center;
-  transform: scale(var(--hdrScale)); transform-origin: right center; /* فیت خودکار یک‌خطی */
-}
-.pill{ background:#eef2ff; border:1px solid #dbe1ff; padding:4px 10px; border-radius:999px; font-size:12px; color:#4338ca; white-space:nowrap; }
-.card .bd{ padding:0; }
-.card .hd .brand-logo{ height:56px; width:auto; object-fit:contain; flex-shrink:0; }
 
-/* سوییچ بین محتوای زنده و اسنپ‌شات */
-.card-content{ display:block; }
-.card-snapshot{ display:none; width:100%; height:auto; }
-.card.is-snap .card-content{ display:none; }
-.card.is-snap .card-snapshot{ display:block; }
+.card .hd{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 12px;
+  background:#f7f8ff;
+  border-bottom:1px solid #ececf4;
+  min-width:0;
+}
+
+.card .hd .left{
+  display:flex;
+  flex-wrap:nowrap;
+  gap:8px;
+  align-items:center;
+  min-width:0;
+  transform:scale(var(--hdrScale));
+  transform-origin:right center;
+}
+
+.pill{
+  background:#eef2ff;
+  border:1px solid #dbe1ff;
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:12px;
+  color:#4338ca;
+  white-space:nowrap;
+}
+
+.card .hd .brand-logo{
+  height:56px;
+  width:auto;
+  object-fit:contain;
+  flex-shrink:0;
+}
+
+/*
+ * مهم: محتوای زنده همیشه نمایش داده می‌شود.
+ * PNG فقط برای دانلود ساخته می‌شود و جای جدول زنده را نمی‌گیرد.
+ */
+.card-content{
+  display:block;
+  width:100%;
+}
+
+.card-snapshot{
+  display:none !important;
+}
+
+/* حالت ساخت PNG: همیشه عرض استاندارد دسکتاپ */
+.card-content.is-snapshotting{
+  width:var(--card-w) !important;
+  max-width:none !important;
+  background:#fff;
+}
+
+.card-content.is-snapshotting .bd{
+  overflow:visible !important;
+}
+
+.card-content.is-snapshotting .mobile-scroll-hint{
+  display:none !important;
+}
+
+/* بدنه و اسکرول براکت */
+.card .bd{
+  padding:0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  direction:ltr;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-x:contain;
+  touch-action:pan-x pan-y pinch-zoom;
+  scrollbar-width:thin;
+  scrollbar-color:#c7c9d9 transparent;
+}
+
+.card .bd::-webkit-scrollbar{
+  height:8px;
+}
+
+.card .bd::-webkit-scrollbar-thumb{
+  background:#c7c9d9;
+  border-radius:999px;
+}
+
+.card .bd::-webkit-scrollbar-track{
+  background:transparent;
+}
+
+.mobile-scroll-hint{
+  display:none;
+}
 
 /* براکت زنده */
+.bracket-wrap{
+  width:var(--bracket-view-w);
+  min-width:var(--bracket-view-w);
+  margin:0 auto;
+  direction:ltr;
+}
+
 .bracket-wrap .view{
-  direction:ltr; width:827px; height:1130px; overflow:hidden; position:relative;
-  box-sizing:border-box; background:#fff; display:block;
+  direction:ltr;
+  width:var(--bracket-view-w);
+  min-width:var(--bracket-view-w);
+  height:1130px;
+  overflow:hidden;
+  position:relative;
+  box-sizing:border-box;
+  background:#fff;
+  display:block;
 }
+
 .bracket-wrap .board{
-  position:absolute; top:0; left:50%; transform: translateX(-50%) scale(var(--scale,0.45));
-  transform-origin: top center; width:max-content; display:flex; gap:var(--col-gap);
-  justify-content:flex-start; align-items:flex-start; padding:0 14px 32px; margin:0; will-change:transform;
+  position:absolute;
+  top:0;
+  left:50%;
+  transform:translateX(-50%) scale(var(--scale,0.45));
+  transform-origin:top center;
+  width:max-content;
+  display:flex;
+  gap:var(--col-gap);
+  justify-content:flex-start;
+  align-items:flex-start;
+  padding:0 14px 32px;
+  margin:0;
+  will-change:transform;
 }
+
 .player-input{
-  background:#fff; border:2px solid var(--stroke); border-radius:8px; padding:9px 12px;
-  text-align:center; font-size:21px; font-weight:800; height:70px; color:#111;
-  width:190px; max-width:250px; direction:rtl; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none;
+  background:#fff;
+  border:2px solid var(--stroke);
+  border-radius:8px;
+  padding:7px 10px 23px;
+  text-align:center;
+  font-size:21px;
+  font-weight:800;
+  height:70px;
+  color:#111;
+  width:190px;
+  max-width:190px;
+  direction:rtl;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  pointer-events:none;
+  box-sizing:border-box;
 }
-.player-input[readonly]{ -webkit-text-fill-color:#000; }
-.bye{ opacity:.7; font-style:italic; }
+
+.player-input[readonly]{
+  -webkit-text-fill-color:#000;
+  opacity:1;
+}
+
+.bye{
+  opacity:.7;
+  font-style:italic;
+}
+
 .bubble{
-  position:absolute; top:-25px; width:35px; height:36px; border-radius:50%; border:2px solid var(--stroke);
-  background:#fff; color:#000; text-align:center; font-size:33px; line-height:36px; transform:translateY(-50%); z-index:3; pointer-events:none;
+  position:absolute;
+  top:-25px;
+  width:42px;
+  height:42px;
+  border-radius:50%;
+  border:2px solid var(--stroke);
+  background:#fff;
+  color:#000;
+  text-align:center;
+  font-size:28px;
+  font-weight:700;
+  line-height:36px;
+  transform:translateY(-50%);
+  z-index:3;
+  pointer-events:none;
+  box-sizing:border-box;
 }
-.bubble.bye-mark{ background:linear-gradient(var(--stroke),var(--stroke)) center/70% 2px no-repeat,#fff !important; }
-.col{ display:flex; flex-direction:column; position:relative; }
+
+.bubble.bye-mark{
+  background:linear-gradient(var(--stroke),var(--stroke)) center/70% 2px no-repeat,#fff !important;
+}
+
+.col{
+  display:flex;
+  flex-direction:column;
+  position:relative;
+}
+
+/* =========================================================
+   Player + Coach
+========================================================= */
+.player-box{
+  position:relative;
+  display:inline-block;
+  width:190px;
+  min-width:190px;
+  vertical-align:top;
+}
+
+.player-box .player-input{
+  width:190px;
+  max-width:190px;
+}
+
+.coach-name{
+  position:absolute;
+  left:7px;
+  right:7px;
+  bottom:7px;
+  height:13px;
+  line-height:13px;
+  text-align:center;
+  direction:rtl;
+  font-size:10px;
+  font-weight:500;
+  color:#64748b;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  pointer-events:none;
+  z-index:4;
+}
+
+.coach-name:empty{
+  display:none;
+}
+
+.player-box .player-input.bye + .coach-name{
+  display:none;
+}
 
 /* راندها (تا ۳۲) */
 .r1{ --box-h:46px; --gap-y:24px; --stub-len:35px; --stub-ext:60px; }
@@ -67,50 +298,261 @@
 .r1 .item::before{ content:""; position:absolute; top:50%; transform:translateY(-50%); right:-35px; width:35px; height:0; border-top:var(--line-w) solid var(--stroke); }
 .r1 .item:nth-child(2n)::after{ content:""; position:absolute; top:-47px; height:calc(var(--box-h) + var(--gap-y)); right:-94px; width:calc(var(--line-w) + var(--stub-ext)); background:linear-gradient(var(--stroke),var(--stroke)) left 0/var(--line-w) 100% no-repeat, linear-gradient(var(--stroke),var(--stroke)) left 50%/calc(100% - var(--line-w)) var(--line-w) no-repeat; z-index:2; }
 .r1 .bubble{ top:-25%; }
+
 .r2{ --box-h:46px; --gap-y:calc(2 * 24px + 46px); --stub-len:35px; --stub-ext:72px; margin-top:calc((46px + 24px)/2); }
 .r2 .item{ position:relative; height:var(--box-h); }
 .r2 .stack{ display:flex; flex-direction:column; gap:var(--gap-y); }
 .r2 .item::before{ content:""; position:absolute; top:105%; right:-35px; width:var(--stub-len); height:var(--line-w); background:var(--stroke); transform:translateY(-50%); z-index:2; }
 .r2 .item:nth-child(2n)::after{ content:""; position:absolute; top:-93px; height:calc(var(--box-h) + var(--gap-y)); right:-95px; width:62px; background:linear-gradient(var(--stroke),var(--stroke)) left 0/var(--line-w) 100% no-repeat, linear-gradient(var(--stroke),var(--stroke)) left 50%/calc(100% - var(--line-w)) var(--line-w) no-repeat; z-index:2; }
 .r2 .bubble{ top:-52%; right:-28px; }
+
 .r3{ --box-h:46px; --gap-y:calc(2*(46px + 24px) + 24px); --stub-len:35px; --stub-ext:84px; margin-top:calc((46px + 24px) + (46px + 24px)/2); }
 .r3 .item{ position:relative; height:var(--box-h); }
 .r3 .stack{ display:flex; flex-direction:column; gap:233px; }
 .r3 .item::before{ content:""; position:absolute; top:100%; right:-35px; width:var(--stub-len); height:var(--line-w); background:var(--stroke); transform:translateY(-50%); z-index:2; }
 .r3 .item:nth-child(2n)::after{ content:""; position:absolute; top:-235px; height:282px; right:-94px; width:59px; background:linear-gradient(var(--stroke),var(--stroke)) left 0/var(--line-w) 100% no-repeat, linear-gradient(var(--stroke),var(--stroke)) left 50%/calc(100% - var(--line-w)) var(--line-w) no-repeat; z-index:2; }
-.r3 .bubble{ top:-205% }
+.r3 .bubble{ top:-205%; }
+
 .r4{ --box-h:46px; --gap-y:calc(2*((46px + 24px)*2 + 24px)); --stub-len:35px; --stub-ext:96px; margin-top:243px; }
 .r4 .item{ position:relative; height:var(--box-h); }
 .r4 .stack{ display:flex; flex-direction:column; gap:512px; }
 .r4 .item::before{ content:""; position:absolute; top:100%; right:-35px; width:var(--stub-len); height:var(--line-w); background:var(--stroke); transform:translateY(-50%); z-index:2; }
 .r4 .item:nth-child(2n)::after{ content:""; position:absolute; top:-513px; height:558px; right:-95px; width:62px; background:linear-gradient(var(--stroke),var(--stroke)) left 0/var(--line-w) 100% no-repeat, linear-gradient(var(--stroke),var(--stroke)) left 50%/calc(100% - var(--line-w)) var(--line-w) no-repeat; z-index:2; }
 .r4 .bubble{ top:-508%; }
+
 .r5{ --box-h:46px; --stub-len:35px; --stub-ext:110px; margin-top:520px; }
 .r5 .item{ position:relative; height:var(--box-h); }
 .r5 .stack{ display:flex; flex-direction:column; gap:1070px; }
 .r5 .item::before{ content:""; position:absolute; top:100%; right:-35px; width:var(--stub-len); height:var(--line-w); background:var(--stroke); transform:translateY(-50%); z-index:2; }
 .r5 .item:nth-child(2n)::after{ content:""; position:absolute; top:-1070px; height:1117px; right:-95px; width:62px; background:linear-gradient(var(--stroke),var(--stroke)) left 0/var(--line-w) 100% no-repeat, linear-gradient(var(--stroke),var(--stroke)) left 50%/calc(100% - var(--line-w)) var(--line-w) no-repeat; z-index:2; }
 .r5 .bubble{ top:-1114%; }
+
 .r6{ margin-top:1077px; }
 .r6 .champ{ position:relative; }
-.champ .player-input{ width:240px; font-weight:bold; }
+.champ .player-input{ width:240px; max-width:240px; font-weight:bold; }
+.champ .player-box{ width:240px; min-width:240px; }
+.champ .player-box .player-input{ width:240px; max-width:240px; }
 
-/* کنترل‌ها (فقط دانلود) */
-.card-controls{ display:flex; gap:8px; justify-content:flex-end; align-items:center; padding:10px 12px; border-top:1px solid #f0f0f7; }
-.card-controls .err{ color:#b91c1c; font-size:12px; }
+/* کنترل‌ها */
+.card-controls{
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+  align-items:center;
+  padding:10px 12px;
+  border-top:1px solid #f0f0f7;
+  direction:rtl;
+}
+
+.card-controls .err{
+  color:#b91c1c;
+  font-size:12px;
+}
 
 /* اوورلی ساخت تصویر */
 .snapshot-overlay{
-  position:absolute; inset:0; background:rgba(0,0,0,.18);
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  position:absolute;
+  inset:0;
+  background:rgba(255,255,255,.72);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
   z-index:50;
+  backdrop-filter:blur(1px);
 }
-.snapshot-overlay .wait-label{ margin-top:10px; color:#111; font-weight:700; background:#fff; padding:6px 10px; border-radius:10px; border:1px solid #ececec; }
-.spinner{ width:38px; height:38px; border-radius:50%; border:4px solid #ddd; border-top-color:#4f46e5; animation: spin 1s linear infinite; }
-@keyframes spin{ to{ transform: rotate(360deg);} }
+
+.snapshot-overlay .wait-label{
+  margin-top:10px;
+  color:#111;
+  font-weight:700;
+  background:#fff;
+  padding:6px 10px;
+  border-radius:10px;
+  border:1px solid #ececec;
+}
+
+.spinner{
+  width:38px;
+  height:38px;
+  border-radius:50%;
+  border:4px solid #ddd;
+  border-top-color:#4f46e5;
+  animation:spin 1s linear infinite;
+}
+
+@keyframes spin{
+  to{ transform:rotate(360deg); }
+}
 
 /* دکمه‌ها */
-.btn{ cursor:pointer; border-radius:10px; padding:8px 14px; font-weight:600; border:1px solid transparent; }
+.btn{
+  cursor:pointer;
+  border-radius:10px;
+  padding:8px 14px;
+  font-weight:600;
+  border:1px solid transparent;
+}
+
+.btn:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
+
 .btn-primary{ background:#4f46e5; color:#fff; border-color:#4f46e5; }
 .btn-secondary{ background:#e5e7eb; color:#111827; border-color:#e5e7eb; }
 .btn-outline{ background:#fff; color:#4f46e5; border-color:#4f46e5; }
+
+/* =========================================================
+   Tablet / Mobile
+========================================================= */
+@media (max-width:768px){
+  :root{
+    --col-gap:88px;
+  }
+
+  .cb-wrap{
+    margin:8px;
+  }
+
+  .cards{
+    gap:18px;
+    margin-top:12px;
+  }
+
+  .card{
+    width:100%;
+    max-width:100%;
+    border-radius:12px;
+  }
+
+  .card .hd{
+    padding:8px;
+    gap:8px;
+    align-items:center;
+  }
+
+  .card .hd .left{
+    flex:1 1 auto;
+    min-width:0;
+    overflow-x:auto;
+    overflow-y:hidden;
+    transform:none !important;
+    padding-bottom:3px;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+
+  .card .hd .left::-webkit-scrollbar{
+    display:none;
+  }
+
+  .pill{
+    font-size:11px;
+    padding:4px 8px;
+    flex:0 0 auto;
+  }
+
+  .card .hd .brand-logo{
+    height:40px;
+    max-width:54px;
+  }
+
+  .mobile-scroll-hint{
+    display:block;
+    position:sticky;
+    left:0;
+    width:100vw;
+    max-width:100%;
+    box-sizing:border-box;
+    direction:rtl;
+    text-align:center;
+    color:#64748b;
+    background:#fafbff;
+    border-bottom:1px solid #eef0f6;
+    font-size:11px;
+    padding:6px 8px;
+  }
+
+  /*
+   * اصل اصلاح موبایل:
+   * براکت کوچک نمی‌شود؛ عرض 827px را نگه می‌دارد
+   * و کاربر داخل .bd افقی اسکرول می‌کند.
+   */
+  .bracket-wrap,
+  .bracket-wrap .view{
+    width:var(--bracket-view-w) !important;
+    min-width:var(--bracket-view-w) !important;
+    max-width:none !important;
+  }
+
+  .card .bd{
+    width:100%;
+    max-width:100%;
+    overflow-x:auto;
+    overflow-y:hidden;
+  }
+
+  .card-controls{
+    justify-content:center;
+    padding:10px 8px;
+  }
+
+  .card-controls .btn{
+    width:100%;
+    max-width:260px;
+  }
+}
+
+@media (max-width:420px){
+  .cb-wrap{
+    margin:6px;
+  }
+
+  .cb-toolbar{
+    gap:8px;
+    margin-bottom:10px;
+  }
+
+  .cb-toolbar .btn{
+    flex:1 1 140px;
+  }
+
+  .card .hd .brand-logo{
+    height:36px;
+    max-width:48px;
+  }
+
+  .pill{
+    font-size:10.5px;
+  }
+}
+
+
+/* =========================================================
+   Snapshot normalization
+   حتی اگر دانلود از موبایل انجام شود، PNG با چیدمان کامل دسکتاپ ساخته می‌شود.
+========================================================= */
+.card-content.is-snapshotting .hd{
+  width:var(--card-w) !important;
+  min-width:var(--card-w) !important;
+  overflow:hidden !important;
+}
+
+.card-content.is-snapshotting .hd .left{
+  flex-wrap:nowrap !important;
+  overflow:visible !important;
+  transform:scale(var(--hdrScale)) !important;
+}
+
+.card-content.is-snapshotting .hd .brand-logo{
+  height:56px !important;
+  max-width:none !important;
+}
+
+.card-content.is-snapshotting .bracket-wrap,
+.card-content.is-snapshotting .bracket-wrap .view{
+  width:var(--bracket-view-w) !important;
+  min-width:var(--bracket-view-w) !important;
+  max-width:none !important;
+}

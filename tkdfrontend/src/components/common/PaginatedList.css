@@ -1,27 +1,276 @@
 .pagination-controls {
   margin-top: 1rem;
+
   display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+
+  gap: 0.45rem;
+
+  width: 100%;
+
+  flex-wrap: nowrap;
 }
+
+
+/* =========================
+   دکمه شماره صفحات
+========================= */
 
 .pagination-button {
-  padding: 0.4rem 0.8rem;
+  min-width: 42px;
+  height: 42px;
+
+  padding: 0 10px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
   border: 1px solid #ccc;
-  background-color: white;
+  background-color: #fff;
+
   cursor: pointer;
-  border-radius: 6px;
-  font-weight: bold;
-  color: #555;
-  transition: all 0.2s ease;
+
+  border-radius: 7px;
+
+  font-weight: 700;
+  font-size: 14px;
+
+  color: #444;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease;
 }
 
-.pagination-button:hover {
-  background-color: #eee;
+
+.pagination-button:hover:not(:disabled) {
+  background-color: #f2f2f2;
+  border-color: #aaa;
+
+  transform: translateY(-1px);
 }
+
+
+/* =========================
+   صفحه فعال
+========================= */
 
 .pagination-button.active {
-  background-color: red;
-  color: white;
-  border-color: red;
+  background-color: #e60000;
+  color: #fff;
+
+  border-color: #b80000;
+}
+
+
+.pagination-button.active:hover {
+  background-color: #d50000;
+}
+
+
+/* =========================
+   فلش قبلی / بعدی
+========================= */
+
+.pagination-arrow {
+  min-width: 42px;
+
+  font-size: 26px;
+  font-weight: 700;
+
+  line-height: 1;
+
+  padding-bottom: 3px;
+}
+
+
+/* دکمه غیرفعال */
+.pagination-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+
+  background-color: #f3f3f3;
+  color: #999;
+
+  transform: none;
+}
+
+.paginated-list {
+  width: 100%;
+  min-width: 0;
+}
+
+
+.paginated-list-items {
+  width: 100%;
+}
+
+
+/* =========================================
+   Pagination
+========================================= */
+
+.pagination-controls {
+  width: 100%;
+
+  margin-top: 20px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 7px;
+
+  direction: rtl;
+}
+
+
+.pagination-button {
+  min-width: 38px;
+  height: 38px;
+
+  padding: 0 9px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #ffffff;
+  color: #374151;
+
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+
+.pagination-button:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+
+.pagination-button.active {
+  color: #ffffff;
+  background: #2563eb;
+
+  border-color: #2563eb;
+}
+
+
+.pagination-arrow {
+  font-size: 24px;
+  line-height: 1;
+
+  font-weight: 800;
+}
+
+
+.pagination-button:disabled {
+  opacity: 0.35;
+
+  cursor: default;
+
+  background: #f3f4f6;
+}
+
+
+/* =========================================
+   Mobile
+========================================= */
+
+@media (max-width: 768px) {
+
+  .pagination-controls {
+    margin-top: 16px;
+
+    gap: 5px;
+  }
+
+
+  .pagination-button {
+    min-width: 34px;
+    height: 36px;
+
+    padding: 0 6px;
+
+    font-size: 12px;
+  }
+
+
+  .pagination-arrow {
+    font-size: 21px;
+  }
+
+}
+/* =========================
+   Mobile
+========================= */
+
+@media (max-width: 768px) {
+
+  .pagination-controls {
+    gap: 5px;
+    margin-top: 12px;
+  }
+
+
+  .pagination-button {
+    min-width: 38px;
+    height: 38px;
+
+    padding: 0 7px;
+
+    font-size: 13px;
+  }
+
+
+  .pagination-arrow {
+    min-width: 38px;
+
+    font-size: 23px;
+  }
+}
+
+
+/* =========================
+   گوشی خیلی کوچک
+========================= */
+
+@media (max-width: 400px) {
+
+  .pagination-controls {
+    gap: 4px;
+  }
+
+
+  .pagination-button {
+    min-width: 34px;
+    height: 36px;
+
+    padding: 0 5px;
+
+    font-size: 12px;
+  }
+
+
+  .pagination-arrow {
+    min-width: 34px;
+
+    font-size: 21px;
+  }
 }

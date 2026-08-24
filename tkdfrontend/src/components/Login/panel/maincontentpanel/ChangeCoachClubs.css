@@ -64,3 +64,146 @@
   text-align: center;
   margin-top: 24px;
 }
+
+
+/* =========================
+   Mobile Responsive
+========================= */
+
+@media (max-width:768px){
+
+  .change-clubs{
+
+    width:calc(100% - 20px);
+
+    margin:20px auto;
+
+    padding:16px;
+
+    box-sizing:border-box;
+
+    border-radius:12px;
+
+  }
+
+
+
+  .change-clubs h2{
+
+    font-size:20px;
+
+    margin-bottom:18px;
+
+  }
+
+
+
+  /* مخفی کردن هدر جدول */
+
+  .clubs-header{
+
+    display:none;
+
+  }
+
+
+
+  /* تبدیل هر ردیف به کارت */
+
+  .club-row{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:8px;
+
+    padding:14px;
+
+    margin-bottom:12px;
+
+    border:1px solid #ddd;
+
+    border-radius:12px;
+
+    background:#fff !important;
+
+  }
+
+
+
+  .club-row div{
+
+    width:100%;
+
+    padding:6px 4px;
+
+    box-sizing:border-box;
+
+    text-align:right;
+
+    font-size:14px;
+
+  }
+
+
+
+  .club-row div:first-child{
+
+    font-weight:bold;
+
+    color:#1d72b8;
+
+  }
+
+
+
+  .confirm-btn{
+
+    width:100%;
+
+    min-height:44px;
+
+    font-size:15px;
+
+    margin-top:10px;
+
+  }
+
+
+
+  .submit-wrapper{
+
+    margin-top:18px;
+
+  }
+
+}
+
+
+
+/* موبایل کوچک */
+
+@media(max-width:400px){
+
+  .change-clubs{
+
+    padding:12px;
+
+  }
+
+
+  .change-clubs h2{
+
+    font-size:18px;
+
+  }
+
+
+  .club-row div{
+
+    font-size:13px;
+
+  }
+
+}

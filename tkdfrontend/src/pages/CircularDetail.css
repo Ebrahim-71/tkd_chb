@@ -117,62 +117,214 @@
   background-color: #cf0d0d;
 }
 
-@media (max-width: 768px) {
-  .news-detail-page,
-  .circular-detail-page {
-    padding: 1rem;
-    width: 100%;
-  }
 
-  .news-detail-page h1,
-  .circular-detail-page h1 {
-    font-size: 1.5rem;
-    text-align: center;
-  }
+/* =========================
+   Mobile Responsive Final
+========================= */
 
-  .circular-detail-page img.thumbnail {
-    width: 100%;
-    height: auto;
-  }
+@media (max-width:768px){
 
-  .zoomable-image,
-  .circular-detail-page .images-gallery img {
-    width: 90%;
-    height: auto;
-  }
+    .circular-detail-page{
 
-  .zoom-wrapper {
-    width: 100%;
-    margin: 5px 0;
-  }
+        width:100%;
 
-  .circular-detail-page .images-gallery {
-    gap: 10px;
-    justify-content: center;
-    display: flex;
-    flex-wrap: nowrap;
-  }
+        max-width:100%;
 
-  .circular-detail-page .pdf-attachments {
-    gap: 10px;
-    justify-content: center;
-  }
+        padding:14px 10px;
 
-  .circular-detail-page .pdf-attachments img {
-    width: 40px;
-    height: 40px;
-  }
+        box-sizing:border-box;
 
-  .back-button {
-    font-size: 0.9rem;
-    padding: 6px 12px;
-    justify-content: center;
-    margin: 15px auto;
-    width: fit-content;
-  }
+        margin:0;
 
-  .circular-detail-page .meta-info {
-    font-size: 0.85rem;
-    text-align: center;
-  }
+    }
+
+
+
+    .circular-detail-page h1{
+
+        font-size:1.3rem;
+
+        text-align:center;
+
+        line-height:1.8;
+
+    }
+
+
+
+    .circular-detail-page img.thumbnail{
+
+        width:100%;
+
+        height:auto;
+
+        max-height:420px;
+
+        object-fit:contain;
+
+        border-radius:10px;
+
+    }
+
+
+
+    .content,
+    .content-text{
+
+        font-size:.9rem;
+
+        line-height:2;
+
+        text-align:right;
+
+    }
+
+
+
+    /* Gallery */
+
+    .circular-detail-page .images-gallery{
+
+        display:grid;
+
+        grid-template-columns:repeat(2,1fr);
+
+        gap:8px;
+
+        width:100%;
+
+    }
+
+
+
+    .zoom-wrapper{
+
+        width:100%;
+
+        margin:0;
+
+    }
+
+
+
+    .zoomable-image,
+    .circular-detail-page .images-gallery img{
+
+        width:100%;
+
+        height:auto;
+
+        max-height:220px;
+
+        object-fit:cover;
+
+        border-radius:8px;
+
+    }
+
+
+
+    /* PDF */
+
+    .circular-detail-page .pdf-attachments{
+
+        justify-content:center;
+
+        gap:10px;
+
+    }
+
+
+
+    .circular-detail-page .pdf-attachments img{
+
+        width:38px;
+
+        height:38px;
+
+    }
+
+
+
+    /* Back Button */
+
+    .back-button{
+
+        width:100%;
+
+        justify-content:center;
+
+        text-align:center;
+
+        min-height:44px;
+
+        padding:10px;
+
+        margin:15px 0;
+
+        box-sizing:border-box;
+
+    }
+
+
+
+    .circular-detail-page .meta-info{
+
+        text-align:center;
+
+        font-size:.8rem;
+
+        line-height:1.8;
+
+    }
+
+}
+
+
+
+/* گوشی کوچک */
+
+@media(max-width:420px){
+
+
+    .circular-detail-page{
+
+        padding:10px 8px;
+
+    }
+
+
+
+    .circular-detail-page h1{
+
+        font-size:1.1rem;
+
+    }
+
+
+
+    .circular-detail-page .images-gallery{
+
+        grid-template-columns:1fr;
+
+    }
+
+
+
+    .zoomable-image,
+    .circular-detail-page .images-gallery img{
+
+        max-height:200px;
+
+    }
+
+
+
+    .content,
+    .content-text{
+
+        font-size:.85rem;
+
+    }
+
 }

@@ -39,37 +39,135 @@
 
 .back-to-home a:hover {
   background-color: #cf5f0d;
-}@media (max-width: 768px) {
-  .news-detail-page,
-  .circular-detail-page {
-    padding: 1rem;
-    width: 100%;
-  }
+}
 
-  .news-detail-page h1,
-  .circular-detail-page h1 {
-    font-size: 1.5rem;
-    text-align: center;
-  }
 
-  .news-detail-page img {
-    width: 100%;
-    height: auto;
-  }
+/* =========================
+   Mobile Responsive Final
+========================= */
 
-  .news-detail-page p {
-    font-size: 0.95rem;
-    line-height: 1.6;
-  }
+@media (max-width:768px){
 
-  .back-to-home {
-    text-align: center;
-    margin: 1.5rem 0;
-  }
+    .news-detail-page{
 
-  .back-to-home a {
-    font-size: 0.9rem;
-    padding: 6px 12px;
-    display: inline-block;
-  }
+        width:100%;
+
+        max-width:100%;
+
+        padding:14px 10px;
+
+        box-sizing:border-box;
+
+        margin:0;
+
+    }
+
+
+
+    .news-detail-page h1{
+
+        font-size:1.35rem;
+
+        text-align:center;
+
+        line-height:1.8;
+
+        margin-bottom:15px;
+
+    }
+
+
+
+    .news-detail-page img{
+
+        width:100%;
+
+        height:auto;
+
+        max-height:420px;
+
+        object-fit:contain;
+
+        border-radius:10px;
+
+        display:block;
+
+        margin:0 auto 15px;
+
+    }
+
+
+
+    .news-detail-page p{
+
+        font-size:.9rem;
+
+        line-height:2;
+
+        text-align:right;
+
+    }
+
+
+
+    .back-to-home{
+
+        text-align:center;
+
+        margin:20px 0;
+
+    }
+
+
+
+    .back-to-home a{
+
+        display:flex;
+
+        justify-content:center;
+
+        align-items:center;
+
+        width:100%;
+
+        min-height:44px;
+
+        box-sizing:border-box;
+
+        font-size:.9rem;
+
+        padding:10px;
+
+    }
+
+}
+
+
+
+/* گوشی کوچک */
+
+@media(max-width:420px){
+
+    .news-detail-page{
+
+        padding:10px 8px;
+
+    }
+
+
+    .news-detail-page h1{
+
+        font-size:1.15rem;
+
+    }
+
+
+    .news-detail-page p{
+
+        font-size:.85rem;
+
+        line-height:1.9;
+
+    }
+
 }

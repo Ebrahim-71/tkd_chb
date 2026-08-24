@@ -67,45 +67,152 @@
 .news-button:hover {
   background-color: #f0f0f0;
 }
+/* =========================
+   Mobile Responsive Final
+========================= */
 
-@media (max-width: 768px) {
-  .news-card {
-    width: 90%;
-    margin: 10px auto;
-    padding: 12px;
+@media (max-width:768px){
+
+  .news-card{
+
+    width:calc(100% - 20px);
+
+    margin:12px auto;
+
+    padding:12px;
+
+    box-sizing:border-box;
+
+    border-radius:14px;
+
   }
 
-  .news-image {
-    width: 100%;
-        height: auto;
-        max-height: 390px;
-        object-fit: cover;
-        margin: 0 auto 10px auto;
-    }
- 
 
-  .news-title {
-    font-size: 16px;
-    text-align: center;
-    word-wrap: break-word;
+
+  .news-image{
+
+    width:100%;
+
+    height:auto;
+
+    max-height:360px;
+
+    object-fit:cover;
+
+    border-radius:10px;
+
+    margin:0 auto 8px;
+
   }
 
-  .news-snippet {
-    font-size: 13px;
-    word-break: break-word;
-    overflow: hidden;
-    text-overflow: ellipsis;
+
+
+  .news-title{
+
+    font-size:16px;
+
+    line-height:1.8;
+
+    word-break:break-word;
+
   }
 
-  .news-meta {
-    flex-direction: column;
-    gap: 5px;
-    text-align: center;
+
+
+  .news-snippet{
+
+    font-size:13px;
+
+    line-height:1.8;
+
+    min-height:auto;
+
+    max-height:120px;
+
+    overflow:hidden;
+
+    text-overflow:ellipsis;
+
+    padding:8px;
+
+    text-align:right;
+
   }
 
-  .news-button {
-    margin-top: 10px;
-    font-size: 14px;
-    padding: 6px 12px;
+
+
+  .news-meta{
+
+    flex-direction:column;
+
+    align-items:stretch;
+
+    gap:8px;
+
+    padding:10px;
+
+    font-size:13px;
+
+    text-align:right;
+
   }
+
+
+
+  .news-button{
+
+    width:100%;
+
+    min-height:44px;
+
+    margin-top:8px;
+
+    padding:10px;
+
+    box-sizing:border-box;
+
+    font-size:14px;
+
+  }
+
+}
+
+
+
+/* موبایل کوچک */
+
+@media(max-width:400px){
+
+  .news-card{
+
+    width:calc(100% - 14px);
+
+    padding:10px;
+
+  }
+
+
+
+  .news-title{
+
+    font-size:15px;
+
+  }
+
+
+
+  .news-snippet{
+
+    font-size:12px;
+
+  }
+
+
+
+  .news-meta{
+
+    font-size:12px;
+
+  }
+
 }

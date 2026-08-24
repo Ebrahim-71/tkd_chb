@@ -529,191 +529,282 @@
   }
 }
 
-
 /* =========================================================
-   Mobile
-   ========================================================= */
+   Mobile Responsive - Final
+========================================================= */
 
-@media (max-width: 620px) {
+@media (max-width:620px){
+
   html,
   body,
-  #root {
-    max-width: 100%;
-    overflow-x: hidden;
+  #root{
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;
   }
 
-  .cd-container {
-    width: 100%;
-    max-width: 100% !important;
 
-    margin: 0;
-    padding: 10px;
+  .cd-container{
 
-    overflow-x: hidden;
+    width:100%;
+    max-width:100% !important;
+
+    margin:0;
+    padding:8px;
+
   }
 
-  .enroll-card {
-    width: 100%;
-    max-width: 100%;
 
-    margin-bottom: 18px;
-    padding: 23px 12px 15px;
+  .enroll-card{
 
-    border-radius: 15px;
+    width:100%;
+    max-width:100%;
+
+    padding:20px 10px 14px;
+
+    margin-bottom:15px;
+
+    border-radius:14px;
+
   }
 
-  .enroll-card::before {
-    height: 7px;
+
+  .enroll-card::before{
+    height:6px;
   }
 
-  .enroll-card__head {
-    margin-bottom: 13px;
-    padding: 11px 12px;
 
-    border-radius: 11px;
+
+  /* عنوان کارت */
+
+  .enroll-card__head{
+
+    padding:10px;
+
+    margin-bottom:12px;
+
+    border-radius:10px;
+
   }
 
-  .enroll-card__title {
-    font-size: 20px;
+
+  .enroll-card__title{
+
+    font-size:18px;
+
+    line-height:1.5;
+
   }
 
-  .enroll-card__grid {
-    grid-template-columns:
-      minmax(0, 1fr);
 
-    gap: 10px;
+
+  /* تمام گریدها تک ستونه */
+
+  .enroll-card__grid,
+  .enroll-card__grid--photo{
+
+    grid-template-columns:1fr;
+
+    gap:10px;
+
   }
 
-  .enroll-card__grid--photo {
-    grid-template-columns:
-      minmax(0, 1fr);
 
-    gap: 12px;
+
+  /* عکس */
+
+  .enroll-card__photo-wrap{
+
+    width:120px;
+
+    max-width:120px;
+
+    margin:0 auto;
+
   }
 
-  .enroll-card__grid--photo
-  > .enroll-card__info-cols:last-child {
-    grid-column: auto;
 
-    display: flex;
-    flex-direction: column;
 
-    gap: 10px;
+  .enroll-card__info-cols{
+
+    width:100%;
+
+    gap:8px;
+
   }
 
-  .enroll-card__photo-wrap {
-    width: 130px;
-    max-width: 130px;
 
-    margin: 0 auto;
+
+  /*
+     اطلاعات بازیکن
+     در موبایل:
+     عنوان بالا
+     مقدار پایین
+  */
+
+  .cd-row{
+
+    display:flex;
+
+    flex-direction:column;
+
+    align-items:stretch;
+
+    gap:4px;
+
+    min-height:auto;
+
+    padding:9px 10px;
+
+    border-right-width:3px;
+
+    border-radius:9px;
+
   }
 
-  .enroll-card__info-cols {
-    width: 100%;
-    gap: 10px;
+
+
+  .cd-label{
+
+    width:100%;
+
+    font-size:11px;
+
+    text-align:right;
+
   }
 
-  .cd-row {
-    grid-template-columns:
-      minmax(105px, 38%)
-      minmax(0, 1fr);
 
-    gap: 9px;
 
-    min-height: 54px;
+  .cd-value{
 
-    padding: 10px 11px;
+    width:100%;
 
-    border-right-width: 3px;
-    border-radius: 10px;
+    font-size:13px;
+
+    line-height:1.7;
+
+    text-align:right;
+
   }
 
-  .cd-label {
-    font-size: 12px;
+
+
+  .enroll-card__divider{
+
+    margin:12px 0;
+
   }
 
-  .cd-value {
-    font-size: 13px;
-    line-height: 1.8;
+
+
+  /* پایین کارت */
+
+  .enroll-card__footer{
+
+    flex-direction:column;
+
+    align-items:stretch;
+
+    gap:10px;
+
   }
 
-  .enroll-card__divider {
-    margin: 14px 0;
+
+
+  .enroll-card__notice{
+
+    min-width:0;
+
+    width:100%;
+
+    font-size:12px;
+
   }
 
-  .enroll-card__footer {
-    align-items: stretch;
-    flex-direction: column;
 
-    margin-top: 14px;
-  }
 
-  .enroll-card__notice {
-    width: 100%;
-    min-width: 0;
-  }
+  /* دکمه ها */
 
   .cd-actions,
-  .enroll-card__actions {
-    width: 100%;
+  .enroll-card__actions{
+
+    width:100%;
+
+    flex-direction:column;
+
+    gap:8px;
+
   }
 
-  .cd-container .btn {
-    flex: 1;
-    min-width: 125px;
+
+
+  .cd-container .btn{
+
+    width:100%;
+
+    min-width:0;
+
+    flex:none;
+
+    min-height:44px;
+
   }
+
 }
 
 
-/* =========================================================
-   Very small mobile
-   ========================================================= */
 
-@media (max-width: 400px) {
-  .cd-container {
-    padding: 7px;
+
+/* گوشی کوچک */
+
+@media(max-width:400px){
+
+
+  .cd-container{
+
+    padding:5px;
+
   }
 
-  .enroll-card {
-    padding-right: 9px;
-    padding-left: 9px;
+
+  .enroll-card{
+
+    padding:18px 8px 12px;
+
   }
 
-  .enroll-card__title {
-    font-size: 18px;
+
+  .enroll-card__title{
+
+    font-size:16px;
+
   }
 
-  .enroll-card__photo-wrap {
-    width: 115px;
-    max-width: 115px;
+
+  .enroll-card__photo-wrap{
+
+    width:105px;
+
+    max-width:105px;
+
   }
 
-  .cd-row {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
 
-    min-height: 0;
+  .cd-label{
 
-    padding: 10px;
+    font-size:10.5px;
+
   }
 
-  .cd-label,
-  .cd-value {
-    width: 100%;
+
+  .cd-value{
+
+    font-size:12px;
+
   }
 
-  .cd-label {
-    font-size: 11px;
-  }
-
-  .cd-value {
-    font-size: 13px;
-  }
 }
-
-
 /* =========================================================
    Print
    ========================================================= */
@@ -1247,4 +1338,286 @@
   .cd-row {
     min-height: 12.5mm !important;
   }
+}
+/* ==========================================
+   Final Mobile Responsive Fix - Enrollment Card
+========================================== */
+
+@media(max-width:620px){
+
+  html,
+  body,
+  #root{
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;
+  }
+
+
+  .cd-container{
+
+    width:100%;
+    max-width:100% !important;
+
+    padding:8px;
+
+    margin:0;
+
+  }
+
+
+  .enroll-card{
+
+    width:100%;
+
+    padding:18px 10px 14px;
+
+    margin-bottom:14px;
+
+    border-radius:14px;
+
+  }
+
+
+  .enroll-card::before{
+
+    height:6px;
+
+  }
+
+
+
+  /* عنوان */
+
+  .enroll-card__head{
+
+    padding:10px;
+
+    margin-bottom:12px;
+
+    border-radius:10px;
+
+    overflow:hidden;
+
+  }
+
+
+  .enroll-card__title{
+
+    width:100%;
+
+    font-size:18px;
+
+    line-height:1.6;
+
+    white-space:normal;
+
+    word-break:break-word;
+
+  }
+
+
+
+  /* همه گریدها تک ستونه */
+
+  .enroll-card__grid,
+  .enroll-card__grid--photo{
+
+    grid-template-columns:1fr;
+
+    gap:10px;
+
+  }
+
+
+
+  /* عکس */
+
+  .enroll-card__photo-wrap{
+
+    width:115px;
+
+    max-width:115px;
+
+    margin:0 auto;
+
+  }
+
+
+
+  .enroll-card__info-cols{
+
+    width:100%;
+
+    gap:8px;
+
+  }
+
+
+
+  /* اطلاعات */
+
+  .cd-row{
+
+    display:flex;
+
+    flex-direction:column;
+
+    align-items:stretch;
+
+    gap:3px;
+
+    min-height:auto;
+
+    padding:8px 9px;
+
+    border-right-width:3px;
+
+    border-radius:9px;
+
+  }
+
+
+  .cd-label{
+
+    width:100%;
+
+    font-size:11px;
+
+    line-height:1.5;
+
+    text-align:right;
+
+  }
+
+
+  .cd-value{
+
+    width:100%;
+
+    font-size:13px;
+
+    line-height:1.7;
+
+    text-align:right;
+
+    overflow-wrap:anywhere;
+
+  }
+
+
+
+  /* پایین کارت */
+
+  .enroll-card__footer{
+
+    flex-direction:column;
+
+    align-items:stretch;
+
+    gap:10px;
+
+  }
+
+
+  .enroll-card__notice{
+
+    width:100%;
+
+    min-width:0;
+
+    font-size:12px;
+
+    line-height:1.8;
+
+  }
+
+
+
+  /* دکمه ها */
+
+  .cd-actions,
+  .enroll-card__actions{
+
+    width:100%;
+
+    flex-direction:column;
+
+    gap:8px;
+
+  }
+
+
+  .cd-container .btn{
+
+    width:100%;
+
+    min-height:42px;
+
+    font-size:13px;
+
+  }
+
+}
+
+
+
+/* گوشی کوچک */
+
+@media(max-width:400px){
+
+  .cd-container{
+
+    padding:5px;
+
+  }
+
+
+  .enroll-card{
+
+    padding:16px 8px 12px;
+
+    border-radius:12px;
+
+  }
+
+
+  .enroll-card__title{
+
+    font-size:16px;
+
+  }
+
+
+  .enroll-card__photo-wrap{
+
+    width:105px;
+
+    max-width:105px;
+
+  }
+
+
+  .cd-label{
+
+    font-size:10.5px;
+
+  }
+
+
+  .cd-value{
+
+    font-size:12px;
+
+  }
+
+
+  .cd-container .btn{
+
+    min-height:40px;
+
+    font-size:12px;
+
+  }
+
 }

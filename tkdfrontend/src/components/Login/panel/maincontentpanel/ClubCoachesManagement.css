@@ -91,25 +91,160 @@
   border-radius: 8px;
   margin-right: 6px;
 }
+/* =========================
+   Mobile Responsive Final
+========================= */
 
-/* موبایل */
-@media (max-width: 768px) {
-  .coach-header,
-  .coach-row {
-    grid-template-columns: 2fr 2fr 1fr;
-    font-size: 0.85rem;
-    padding: 0.75rem;
+@media (max-width:768px){
+
+  .coach-management{
+
+    padding:14px;
+
+    border-radius:14px;
+
+    overflow-x:hidden;
+
   }
 
-  .coach-header div:nth-child(2),
-  .coach-header div:nth-child(3),
-  .coach-row div:nth-child(2),
-  .coach-row div:nth-child(3) {
-    display: none;
+
+
+  .coach-management h2{
+
+    font-size:1.4rem;
+
+    margin-bottom:1.2rem;
+
   }
 
-  .confirm-btn {
-    width: 100%;
-    font-size: 1rem;
+
+
+  /* حذف هدر جدول در موبایل */
+
+  .coach-header{
+
+    display:none;
+
   }
+
+
+
+  /* تبدیل ردیف به کارت */
+
+  .coach-row{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:8px;
+
+    padding:14px;
+
+    margin-bottom:12px;
+
+    border-radius:12px;
+
+    background:#f9fbfd;
+
+    box-sizing:border-box;
+
+  }
+
+
+
+  .coach-row div{
+
+    width:100%;
+
+    font-size:.9rem;
+
+    text-align:right;
+
+    line-height:1.8;
+
+  }
+
+
+
+  /* نمایش اطلاعات مهم */
+
+  .coach-row div:first-child{
+
+    font-weight:800;
+
+    color:#0b5394;
+
+  }
+
+
+
+  .coach-row input[type="checkbox"]{
+
+    width:20px;
+
+    height:20px;
+
+  }
+
+
+
+  .pending-badge{
+
+    display:inline-block;
+
+    margin-right:0;
+
+    margin-top:4px;
+
+  }
+
+
+
+  .submit-wrapper{
+
+    margin-top:1.2rem;
+
+  }
+
+
+
+  .confirm-btn{
+
+    width:100%;
+
+    min-height:44px;
+
+    font-size:15px;
+
+  }
+
+}
+
+
+
+/* موبایل کوچک */
+
+@media(max-width:400px){
+
+  .coach-management{
+
+    padding:10px;
+
+  }
+
+
+  .coach-management h2{
+
+    font-size:1.2rem;
+
+  }
+
+
+  .coach-row div{
+
+    font-size:.82rem;
+
+  }
+
 }

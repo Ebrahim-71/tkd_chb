@@ -166,29 +166,285 @@
   gap: 10px;
 }
 
+/* ==========================================
+   Poomsae Team Register - Mobile Final Fix
+========================================== */
 
-/* موبایل */
-@media (max-width: 768px) {
-  .ptr-header,
-  .cd-hero.small {
-    flex-direction: column;
-    align-items: stretch;
+@media (max-width:768px){
+
+  .ptr-container{
+
+    width:100%;
+
+    padding:16px 10px 30px;
+
+    box-sizing:border-box;
+
+    overflow-x:hidden;
+
   }
+
+
+
+  .ptr-header,
+  .cd-hero.small{
+
+    flex-direction:column;
+
+    align-items:stretch;
+
+    padding:14px;
+
+    border-radius:16px;
+
+    gap:12px;
+
+  }
+
+
+
+  .ptr-title,
+  .cd-hero.small .cd-title{
+
+    font-size:1.15rem;
+
+    text-align:center;
+
+    line-height:1.7;
+
+  }
+
+
+
+  .ptr-chips,
+  .cd-hero.small .cd-chips{
+
+    justify-content:center;
+
+    flex-wrap:wrap;
+
+  }
+
+
+
+  .ptr-chip,
+  .cd-chip{
+
+    font-size:12px;
+
+  }
+
+
+
+  .ptr-warning,
+  .cd-note.cd-note--poomsae{
+
+    margin-bottom:16px;
+
+    padding:10px;
+
+    font-size:.85rem;
+
+    line-height:1.8;
+
+  }
+
+
+
+  .ptr-section-title,
+  .cd-section-title{
+
+    font-size:1rem;
+
+  }
+
+
+
+  /* کارت تیم */
+
+  .cd-card{
+
+    width:100%;
+
+    padding:12px;
+
+    border-radius:14px;
+
+    box-sizing:border-box;
+
+  }
+
+
+
+  .ptr-team-row,
+  .cd-card .cd-row{
+
+    display:flex;
+
+    flex-direction:column;
+
+    align-items:stretch;
+
+    gap:10px;
+
+  }
+
+
+
+  .ptr-field,
+  .cd-row .cd-value{
+
+    width:100%;
+
+    flex:none;
+
+  }
+
+
+
+  .ptr-field input,
+  .ptr-field select,
+  .cd-input{
+
+    width:100%;
+
+    min-height:42px;
+
+    box-sizing:border-box;
+
+    font-size:16px;
+
+  }
+
+
+
+  /* اعضای تیم */
+
+  .poomsae-member-card{
+
+    width:100%;
+
+    padding:10px;
+
+    margin-bottom:10px;
+
+    border-radius:10px;
+
+    box-sizing:border-box;
+
+  }
+
+
+
+  /* بیمه */
+
+  .insurance-grid{
+
+    grid-template-columns:1fr;
+
+    gap:8px;
+
+  }
+
+
+
+  /* خلاصه مبلغ */
+
+  .ptr-summary,
+  .cd-discount-summary{
+
+    width:100%;
+
+    flex-direction:column;
+
+    gap:8px;
+
+    margin:20px 0;
+
+    padding:12px;
+
+    line-height:1.8;
+
+    box-sizing:border-box;
+
+  }
+
+
+
+  /* دکمه ها */
 
   .ptr-actions,
-  .cd-actions {
-    flex-direction: column-reverse;
-    gap: 8px;
-  }
-  .insurance-grid {
-    grid-template-columns: 1fr;
-  }
-  .ptr-team-row,
-  .cd-card .cd-row {
-    align-items: stretch;
+  .cd-actions{
+
+    flex-direction:column;
+
+    width:100%;
+
+    gap:10px;
+
   }
 
-  .ptr-team-delete-btn {
-    align-self: flex-start;
+
+
+  .ptr-actions button,
+  .ptr-actions a,
+  .cd-actions button,
+  .cd-actions a{
+
+    width:100%;
+
+    min-height:44px;
+
   }
+
+
+
+  .ptr-team-delete-btn{
+
+    width:100%;
+
+    align-self:stretch;
+
+  }
+
+}
+
+
+
+/* گوشی کوچک */
+
+@media(max-width:400px){
+
+
+  .ptr-container{
+
+    padding:12px 8px;
+
+  }
+
+
+
+  .ptr-title,
+  .cd-hero.small .cd-title{
+
+    font-size:1rem;
+
+  }
+
+
+
+  .ptr-warning{
+
+    font-size:.8rem;
+
+  }
+
+
+
+  .cd-input{
+
+    font-size:15px;
+
+  }
+
 }

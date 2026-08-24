@@ -1,0 +1,738 @@
+/* =========================================================
+   COMPETITIONS
+========================================================= */
+
+.home-competitions {
+  width: 100%;
+
+  padding:
+    60px 0 44px;
+
+  direction: rtl;
+
+  background: #f7f9fc;
+}
+
+
+.home-competitions-inner {
+  width: min(
+    1240px,
+    calc(100% - 40px)
+  );
+
+  margin: 0 auto;
+}
+
+
+/* =========================================================
+   HEADING
+========================================================= */
+
+.home-comp-heading {
+  display: flex;
+
+  align-items: flex-end;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  margin-bottom: 27px;
+}
+
+
+.home-comp-heading > div > span {
+  color: #c69213;
+
+  font-size: 9px;
+  font-weight: 900;
+}
+
+
+.home-comp-heading h2 {
+  margin:
+    4px 0 0;
+
+  color: #07192b;
+
+  font-size: 29px;
+  font-weight: 1000;
+}
+
+
+.home-comp-heading p {
+  margin:
+    6px 0 0;
+
+  color: #929dab;
+
+  font-size: 9px;
+}
+
+
+.home-comp-heading >
+strong {
+  padding:
+    8px 14px;
+
+  border:
+    1px solid
+    #e5e9ef;
+
+  border-radius: 9px;
+
+  background: #fff;
+
+  color: #627083;
+
+  font-size: 9px;
+}
+
+
+/* =========================================================
+   GRID
+========================================================= */
+
+.home-comp-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    );
+
+  gap: 17px;
+}
+
+
+/* =========================================================
+   CARD
+========================================================= */
+
+.home-comp-card {
+  overflow: hidden;
+
+  border:
+    1px solid
+    #e4e9ef;
+
+  border-radius: 15px;
+
+  background: #fff;
+
+  box-shadow:
+    0 9px 28px
+    rgba(
+      26,
+      44,
+      66,
+      .07
+    );
+
+  transition:
+    transform .25s ease,
+    box-shadow .25s ease;
+}
+
+
+.home-comp-card:hover {
+  transform:
+    translateY(-5px);
+
+  box-shadow:
+    0 17px 37px
+    rgba(
+      26,
+      44,
+      66,
+      .13
+    );
+}
+
+
+/* =========================================================
+   IMAGE
+========================================================= */
+
+.home-comp-card-image {
+  position: relative;
+
+  height: 155px;
+
+  overflow: hidden;
+
+  background: #081625;
+}
+
+
+.home-comp-card-image img {
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  object-fit: cover;
+
+  transition:
+    transform .4s ease;
+}
+
+
+.home-comp-card:hover
+.home-comp-card-image img {
+  transform:
+    scale(1.04);
+}
+
+
+.home-comp-card-noimage {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  font-size: 40px;
+}
+
+
+/* مسابقه برگزارشده */
+
+.home-comp-card.is-finished
+.home-comp-card-image img {
+  filter:
+    saturate(.65)
+    brightness(.82);
+}
+
+
+/* =========================================================
+   BADGES
+========================================================= */
+
+.home-comp-badge,
+.home-comp-kind {
+  position: absolute;
+
+  top: 11px;
+
+  z-index: 2;
+
+  padding:
+    5px 9px;
+
+  border-radius:
+    999px;
+
+  font-size: 7px;
+  font-weight: 1000;
+}
+
+
+.home-comp-badge {
+  right: 10px;
+}
+
+
+.home-comp-kind {
+  left: 10px;
+
+  background:
+    rgba(
+      10,
+      24,
+      40,
+      .8
+    );
+
+  color: #fff;
+}
+
+
+/* registration */
+
+.status-registration_open {
+  background: #e7f8ee;
+
+  color: #16884a;
+}
+
+
+/* ongoing */
+
+.status-ongoing {
+  background: #fff1d2;
+
+  color: #a57200;
+}
+
+
+/* upcoming */
+
+.status-upcoming {
+  background: #eaf1ff;
+
+  color: #2861c7;
+}
+
+
+/* finished */
+
+.status-finished {
+  background:
+    rgba(
+      31,
+      42,
+      55,
+      .88
+    );
+
+  color: #fff;
+}
+
+
+/* =========================================================
+   BODY
+========================================================= */
+
+.home-comp-card-body {
+  padding:
+    13px 14px 14px;
+}
+
+
+.home-comp-card-body h3 {
+  min-height: 40px;
+
+  margin:
+    0 0 11px;
+
+  color: #162437;
+
+  font-size: 11px;
+  font-weight: 950;
+
+  line-height: 1.8;
+}
+
+
+/* =========================================================
+   META
+========================================================= */
+
+.home-comp-meta {
+  display: flex;
+
+  align-items: center;
+  justify-content:
+    space-between;
+
+  gap: 10px;
+
+  padding:
+    7px 0;
+
+  border-bottom:
+    1px solid
+    #eef1f4;
+}
+
+
+.home-comp-meta span {
+  color: #9ba5b2;
+
+  font-size: 7px;
+}
+
+
+.home-comp-meta strong {
+  overflow: hidden;
+
+  color: #435064;
+
+  font-size: 8px;
+
+  white-space: nowrap;
+
+  text-overflow:
+    ellipsis;
+}
+
+
+/* =========================================================
+   CARD FOOTER
+========================================================= */
+
+.home-comp-card-footer {
+  display: flex;
+
+  align-items: center;
+  justify-content:
+    space-between;
+
+  gap: 10px;
+
+  margin-top: 12px;
+}
+
+
+.home-comp-card-footer >
+div {
+  display: flex;
+
+  align-items: baseline;
+
+  gap: 4px;
+}
+
+
+.home-comp-card-footer
+div strong {
+  color: #d09812;
+
+  font-size: 14px;
+  font-weight: 1000;
+}
+
+
+.home-comp-card-footer
+div span {
+  color: #929dac;
+
+  font-size: 7px;
+}
+
+
+.home-comp-card-footer
+.finished-label {
+  color: #6d7784 !important;
+
+  font-size: 9px !important;
+}
+
+
+.home-comp-card-footer
+button {
+  display: inline-flex;
+
+  align-items: center;
+
+  gap: 5px;
+
+  padding:
+    7px 11px;
+
+  border: 0;
+
+  border-radius: 7px;
+
+  background: #071929;
+
+  color: #fff;
+
+  font-family: inherit;
+
+  font-size: 7px;
+  font-weight: 900;
+
+  cursor: pointer;
+}
+
+
+.home-comp-card-footer
+button b {
+  color: #f2b51d;
+}
+
+
+/* =========================================================
+   STATE
+========================================================= */
+
+.home-comp-state {
+  padding: 35px;
+
+  border:
+    1px dashed
+    #dbe1e8;
+
+  border-radius: 14px;
+
+  background: #fff;
+
+  color: #7e8998;
+
+  text-align: center;
+
+  font-size: 11px;
+}
+
+
+.home-comp-state.is-error {
+  color: #b42318;
+}
+
+
+/* =========================================================
+   STATS
+========================================================= */
+
+.home-comp-stats {
+  width: min(
+    1240px,
+    calc(100% - 40px)
+  );
+
+  min-height: 108px;
+
+  margin:
+    42px auto 0;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      4,
+      1fr
+    );
+
+  overflow: hidden;
+
+  border-radius: 15px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #03101d,
+      #082238
+    );
+
+  box-shadow:
+    0 18px 44px
+    rgba(
+      3,
+      15,
+      28,
+      .20
+    );
+}
+
+
+.home-comp-stat {
+  position: relative;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 13px;
+
+  padding: 18px;
+}
+
+
+.home-comp-stat:not(
+  :last-child
+)::after {
+  content: "";
+
+  position: absolute;
+
+  top: 28%;
+  left: 0;
+
+  width: 1px;
+  height: 44%;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      .1
+    );
+}
+
+
+.home-comp-stat-icon {
+  width: 39px;
+  height: 39px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  border:
+    1px solid
+    rgba(
+      242,
+      181,
+      29,
+      .22
+    );
+
+  border-radius: 10px;
+
+  background:
+    rgba(
+      242,
+      181,
+      29,
+      .08
+    );
+}
+
+
+.home-comp-stat-icon
+svg {
+  width: 20px;
+  height: 20px;
+
+  fill: none;
+
+  stroke: #eeb225;
+
+  stroke-width: 1.7;
+
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+
+.home-comp-stat >
+div:last-child {
+  display: flex;
+
+  flex-direction: column;
+}
+
+
+.home-comp-stat strong {
+  color: #fff;
+
+  font-size: 21px;
+  font-weight: 1000;
+}
+
+
+.home-comp-stat span {
+  margin-top: 2px;
+
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      .55
+    );
+
+  font-size: 8px;
+  font-weight: 800;
+}
+
+
+/* =========================================================
+   TABLET
+========================================================= */
+
+@media (
+  max-width: 900px
+) {
+
+  .home-comp-grid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+
+
+  .home-comp-stats {
+    grid-template-columns:
+      repeat(
+        2,
+        1fr
+      );
+  }
+
+
+  .home-comp-stat:nth-child(2)::after {
+    display: none;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (
+  max-width: 680px
+) {
+
+  .home-competitions {
+    padding-top: 45px;
+  }
+
+
+  .home-competitions-inner,
+  .home-comp-stats {
+    width:
+      calc(
+        100% - 20px
+      );
+  }
+
+
+  .home-comp-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .home-comp-card-image {
+    height: 175px;
+  }
+
+
+  .home-comp-heading h2 {
+    font-size: 24px;
+  }
+
+
+  .home-comp-heading > strong {
+    display: none;
+  }
+
+
+  .home-comp-stats {
+    margin-top: 30px;
+
+    border-radius: 13px;
+  }
+
+
+  .home-comp-stat {
+    min-height: 82px;
+
+    padding: 11px 5px;
+  }
+
+
+  .home-comp-stat-icon {
+    width: 33px;
+    height: 33px;
+  }
+
+
+  .home-comp-stat strong {
+    font-size: 17px;
+  }
+
+}

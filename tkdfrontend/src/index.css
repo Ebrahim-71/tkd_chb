@@ -1,3 +1,58 @@
+/* Global Base */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+
+html,
 body {
-  font-family: 'IRANSansWeb', sans-serif;
+    width: 100%;
+    min-height: 100%;
+}
+
+
+body {
+    font-family: 'IRANSansWeb', sans-serif;
+    margin: 0;
+    direction: rtl;
+    overflow-x: hidden;
+    background: #ffffff;
+}
+
+
+/* جلوگیری از بیرون زدن تصاویر و عناصر */
+img,
+svg,
+video {
+    max-width: 100%;
+    height: auto;
+}
+
+
+/* تبلت و موبایل */
+
+@media (max-width:768px){
+
+    body {
+
+        font-size:14px;
+
+    }
+
+}
+
+
+/* موبایل کوچک */
+
+@media (max-width:480px){
+
+    body {
+
+        font-size:13px;
+
+    }
+
 }

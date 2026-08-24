@@ -59,10 +59,132 @@
   background-color: #f0f0f0;
 }
 
-@media (max-width: 768px) {
-  .seminar-card { width: 90%; padding: 12px; }
-  .seminar-image { height: auto; max-height: 390px; }
-  .seminar-title { font-size: 16px; }
-  .seminar-details { font-size: 13px; }
-  .seminar-button { font-size: 14px; padding: 8px; }
+/* =========================
+   Mobile Responsive Final
+========================= */
+
+@media (max-width:768px){
+
+  .seminar-card{
+
+    width:calc(100% - 20px);
+
+    margin:12px auto;
+
+    padding:12px;
+
+    box-sizing:border-box;
+
+    border-radius:14px;
+
+  }
+
+
+
+  .seminar-image{
+
+    width:100%;
+
+    height:auto;
+
+    max-height:320px;
+
+    object-fit:cover;
+
+    border-radius:10px;
+
+  }
+
+
+
+  .seminar-title{
+
+    font-size:16px;
+
+    line-height:1.8;
+
+  }
+
+
+
+  .seminar-details{
+
+    flex-direction:column;
+
+    align-items:flex-start;
+
+    gap:6px;
+
+    padding:0;
+
+    font-size:13px;
+
+    line-height:1.8;
+
+  }
+
+
+
+  .seminar-button{
+
+    width:100%;
+
+    min-height:44px;
+
+    padding:10px;
+
+    box-sizing:border-box;
+
+    font-size:14px;
+
+  }
+
+}
+
+
+
+/* گوشی کوچک */
+
+@media(max-width:400px){
+
+  .seminar-card{
+
+    width:calc(100% - 14px);
+
+    padding:10px;
+
+  }
+
+
+
+  .seminar-image{
+
+    max-height:250px;
+
+  }
+
+
+
+  .seminar-title{
+
+    font-size:15px;
+
+  }
+
+
+
+  .seminar-details{
+
+    font-size:12px;
+
+  }
+
+
+
+  .seminar-button{
+
+    font-size:13px;
+
+  }
+
 }

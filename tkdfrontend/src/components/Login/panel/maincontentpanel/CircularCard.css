@@ -69,47 +69,158 @@
   background-color: #f0f0f0;
 }
 
-@media (max-width: 768px) {
-  .circular-card {
-    width: 90%;
-    max-width: 100%;
-    margin: 10px auto;
-    padding: 12px;
+
+
+
+/* =========================
+   Mobile Responsive Final
+========================= */
+
+@media (max-width:768px){
+
+  .circular-card{
+
+    width:calc(100% - 20px);
+
+    max-width:100%;
+
+    margin:12px auto;
+
+    padding:12px;
+
+    box-sizing:border-box;
+
+    border-radius:14px;
+
+    gap:10px;
+
   }
 
-  .circularimage {
-    width: 100%;
-    height: auto;
-    max-height: 390px;
-    object-fit: cover;
-    margin: 0 auto 10px auto;
+
+
+  .circularimage{
+
+    width:100%;
+
+    height:auto;
+
+    max-height:360px;
+
+    object-fit:cover;
+
+    border-radius:10px;
+
   }
 
-  .circular-card h3 {
-    font-size: 16px;
-    text-align: center;
-    word-wrap: break-word;
+
+
+  .circular-card h3{
+
+    font-size:16px;
+
+    line-height:1.8;
+
+    word-break:break-word;
+
   }
 
-  .circular-card p {
-    font-size: 13px;
-    text-align: justify;
-    word-break: break-word;
-    overflow: hidden;
-    text-overflow: ellipsis;
+
+
+  .circular-card p{
+
+    font-size:13px;
+
+    line-height:1.8;
+
+    min-height:auto;
+
+    max-height:120px;
+
+    overflow:hidden;
+
+    text-overflow:ellipsis;
+
+    padding:8px;
+
+    text-align:right;
+
   }
 
-  .circular-meta {
-    flex-direction: column;
-    gap: 5px;
-    text-align: center;
+
+
+  .circular-meta{
+
+    flex-direction:column;
+
+    align-items:stretch;
+
+    gap:8px;
+
+    padding:10px;
+
+    font-size:13px;
+
+    text-align:right;
+
   }
 
-  .details-button {
-    margin: 10px auto 0 auto;
-    display: block;
-    text-align: center;
-    font-size: 14px;
-    padding: 6px 12px;
+
+
+  .details-button{
+
+    width:100%;
+
+    min-height:44px;
+
+    margin-top:8px;
+
+    padding:10px;
+
+    box-sizing:border-box;
+
+    font-size:14px;
+
   }
+
+}
+
+
+
+/* موبایل کوچک */
+
+@media(max-width:400px){
+
+
+  .circular-card{
+
+    width:calc(100% - 16px);
+
+    padding:10px;
+
+  }
+
+
+
+  .circular-card h3{
+
+    font-size:15px;
+
+  }
+
+
+
+  .circular-card p{
+
+    font-size:12px;
+
+  }
+
+
+
+  .circular-meta{
+
+    font-size:12px;
+
+  }
+
 }

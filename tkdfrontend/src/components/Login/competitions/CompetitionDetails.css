@@ -564,219 +564,7 @@ body {
 }
 .btn-light:hover:not(:disabled){ background: rgba(17,24,39,.02); }
 
-/* ---- Mobile ---- */
-@media (max-width: 768px) {
-  .cd-container {
-    margin: 14px auto 78px;
-    padding: 0 12px;
-  }
 
-  .cd-hero {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    padding: 12px;
-    text-align: center;
-    justify-items: center;
-    border-radius: 20px;
-    box-shadow: 0 16px 36px rgba(0,0,0,.08);
-  }
-
-  .cd-hero-body { align-items: center; }
-  .cd-poster {
-    height: 190px;
-    max-width: 460px;
-    width: 100%;
-    border-radius: 18px;
-  }
-
-  .cd-title { font-size: 18px; }
-
-  /* chips scroll */
-  .cd-chips {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 4px 2px 8px;
-    scrollbar-width: none;
-  }
-  .cd-chips::-webkit-scrollbar { display: none; }
-  .cd-chip { flex: 0 0 auto; font-size: 12.5px; }
-
-  .cd-grid {
-    grid-template-columns: 1fr;
-    padding: 10px;
-    border-radius: 20px;
-  }
-
-  .cd-row {
-    grid-template-columns: 1fr;
-    gap: 6px;
-    padding: 11px 12px;
-    border-radius: 16px;
-  }
-
-  .cd-attachments {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .cd-attachment.img { height: 210px; }
-  .cd-thumb { height: 150px; }
-  .cd-file-name { max-width: 210px; }
-
-  /* sticky action bar */
-  .cd-actions {
-    position: sticky;
-    bottom: 10px;
-    z-index: 50;
-
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-
-    padding: 10px;
-    border-radius: 20px;
-    background: rgba(255,255,255,.88);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(17,24,39,.08);
-    box-shadow: 0 18px 40px rgba(0,0,0,.10);
-  }
-  .cd-actions-right,
-  .cd-actions-left { width: 100%; }
-
-  .btn { width: 100%; }
-}
-
-/* ---- Mobile (final) ---- */
-@media (max-width: 768px) {
-  /* prevent horizontal overflow globally in this page */
-  .cd-container { 
-    margin: 14px auto 90px;
-    padding: 0 12px 130px; /* space for fixed action bar */
-    max-width: 100%;
-    overflow-x: hidden;
-  }
-
-  /* HERO */
-  .cd-hero {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    padding: 12px;
-    text-align: center;
-    justify-items: center;
-    border-radius: 20px;
-  }
-
-  .cd-hero::before,
-  .cd-hero::after {
-    /* optional: reduce glows on small screens */
-    opacity: .65;
-  }
-
-  .cd-hero-body { 
-    align-items: center; 
-    width: 100%;
-  }
-
-  .cd-title {
-    font-size: 18px;
-    line-height: 1.5;
-  }
-
-  .cd-poster {
-    height: 190px;
-    width: 54%;
-    max-width: 460px;
-    border-radius: 18px;
-  }
-
-  /* CHIPS: horizontal scroll without breaking layout */
-  .cd-chips {
-    width: 100%;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    padding: 6px 2px 10px;
-    scrollbar-width: none;
-  }
-  .cd-chips::-webkit-scrollbar { display: none; }
-
-  .cd-chip {
-    flex: 0 0 auto;
-    font-size: 12.5px;
-    white-space: nowrap;
-  }
-
-  /* GRID -> single column */
-  .cd-grid {
-    grid-template-columns: 1fr;
-    padding: 10px;
-    border-radius: 20px;
-  }
-
-  .cd-row {
-    grid-template-columns: 1fr;
-    gap: 6px;
-    padding: 12px;
-    border-radius: 16px;
-  }
-
-  .cd-label { font-size: 12.5px; }
-  .cd-value { font-size: 14px; }
-
-  /* Attachments: 2 columns, but keep cards flexible */
-  .cd-attachments {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .cd-attachment.img {
-    height: auto;            /* IMPORTANT: no fixed height */
-    padding: 10px;
-  }
-  .cd-thumb {
-    height: 140px;           /* consistent thumbnail size */
-    border-radius: 14px;
-  }
-  .cd-attachment.img span {
-    padding-bottom: 2px;
-  }
-
-  .cd-file-name { 
-    max-width: 170px;        /* tighter for mobile */
-  }
-
-  /* ACTION BAR: fixed stable bottom bar */
-  .cd-actions {
-    position: sticky;
-    left: 12px;
-    right: 12px;
-    bottom: 10px;
-    z-index: 999;
-
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-
-    padding: 10px;
-    border-radius: 20px;
-
-    background: rgba(255,255,255,.92);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(17,24,39,.10);
-    box-shadow: 0 18px 40px rgba(0,0,0,.10);
-  }
-
-  .cd-actions-right,
-  .cd-actions-left {
-    width: 100%;
-  }
-
-  .btn {
-    width: 100%;
-    border-radius: 16px;
-  }
-}
 /* ==================================================
    Main competition actions
    مرتب‌سازی دکمه‌های اصلی صفحه مسابقه
@@ -846,57 +634,229 @@ body {
   border-color: rgba(17, 24, 39, 0.14);
 }
 
-/* نمایش سه‌ستونه در لپ‌تاپ و تبلت افقی */
-@media (max-width: 1050px) {
-  .cd-main-actions .cd-actions-right {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+
+/* ================================
+   Final Mobile Responsive Fix
+================================ */
+
+@media (max-width:768px){
+
+  .cd-container{
+    margin:14px auto 40px;
+    padding:0 10px;
+    overflow-x:hidden;
   }
+
+
+  /* Hero */
+
+  .cd-hero{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    padding:14px;
+    border-radius:18px;
+    text-align:center;
+  }
+
+
+  .cd-poster{
+    width:100%;
+    max-width:320px;
+    height:190px;
+    margin:auto;
+    object-fit:cover;
+  }
+
+
+  .cd-hero-body{
+    width:100%;
+    align-items:center;
+  }
+
+
+  .cd-title{
+    font-size:18px;
+    line-height:1.8;
+  }
+
+
+  .cd-chips{
+    justify-content:center;
+    width:100%;
+  }
+
+
+
+  /* اطلاعات مسابقه */
+
+  .cd-grid{
+    grid-template-columns:1fr;
+    padding:10px;
+    gap:8px;
+  }
+
+
+  .cd-row{
+    grid-template-columns:1fr;
+    padding:10px;
+    gap:6px;
+  }
+
+
+  .cd-label{
+    font-size:12px;
+  }
+
+
+  .cd-value{
+    font-size:13px;
+  }
+
+
+
+  /* فایل ها */
+
+  .cd-attachments{
+    grid-template-columns:1fr;
+  }
+
+
+  .cd-attachment.img{
+    height:auto;
+  }
+
+
+  .cd-thumb{
+    height:160px;
+  }
+
+
+  .cd-file-name{
+    max-width:180px;
+  }
+
+
+
+  /* دکمه های اصلی */
+
+  .cd-main-actions{
+
+    width:100%;
+
+    padding:10px;
+
+    gap:10px;
+
+    border-radius:16px;
+
+  }
+
+
+  .cd-main-actions .cd-actions-right{
+
+    grid-template-columns:1fr 1fr;
+
+    gap:8px;
+
+  }
+
+
+  .cd-main-actions .btn{
+
+    min-height:46px;
+
+    font-size:13px;
+
+    padding:8px;
+
+  }
+
+
+  .cd-main-actions .cd-back-btn{
+
+    width:100%;
+
+    min-width:0;
+
+  }
+
+
+
+  /* اکشن های پایین */
+
+  .cd-actions{
+
+    flex-direction:column;
+
+    width:100%;
+
+    gap:10px;
+
+    padding:10px 0;
+
+  }
+
+
+  .cd-actions-right,
+  .cd-actions-left{
+
+    width:100%;
+
+    flex-direction:column;
+
+  }
+
+
+  .btn{
+
+    width:100%;
+
+  }
+
 }
 
-/* نمایش دوستونه در موبایل و تبلت */
-@media (max-width: 768px) {
-  .cd-main-actions {
-    position: static;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    z-index: auto;
 
-    padding: 10px;
-    gap: 10px;
 
-    background: #ffffff;
-    backdrop-filter: none;
+/* گوشی کوچک */
+
+@media(max-width:480px){
+
+
+  .cd-container{
+    padding:0 8px;
   }
 
-  .cd-main-actions .cd-actions-right {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+
+  .cd-title{
+    font-size:16px;
   }
 
-  .cd-main-actions .btn {
-    min-height: 46px;
-    padding: 8px 10px;
-    font-size: 13px;
-    border-radius: 14px;
+
+  .cd-chip{
+    font-size:11px;
+    padding:6px 8px;
   }
 
-  .cd-main-actions .cd-back-btn {
-    align-self: stretch;
-    width: 100%;
-    min-width: 0;
-  }
-}
 
-/* نمایش تک‌ستونه در گوشی‌های کوچک */
-@media (max-width: 480px) {
-  .cd-main-actions .cd-actions-right {
-    grid-template-columns: 1fr;
+  .cd-main-actions .cd-actions-right{
+
+    grid-template-columns:1fr;
+
   }
-}
-/* fallback if backdrop-filter unsupported */
-@supports not (backdrop-filter: blur(10px)) {
-  @media (max-width: 768px) {
-    .cd-actions { background: #fff; }
+
+
+  .cd-thumb{
+
+    height:140px;
+
   }
+
+
+  .cd-file-name{
+
+    max-width:140px;
+
+  }
+
 }

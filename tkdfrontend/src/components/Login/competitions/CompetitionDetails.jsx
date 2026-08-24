@@ -22,7 +22,6 @@ import {
   getPoomsaeCoachApprovalStatus,
   approvePoomsaeCompetition,
   getMyPoomsaeEnrollments,
-  getBracket,
   buildPoomsaePrefill,
   registerSelfPoomsae,
   startPaymentIntent,
@@ -2157,29 +2156,6 @@ export default function CompetitionDetails() {
     "poomsae";
 
 
-  const kyorugiBracketReady =
-    Boolean(
-      competition
-        ?.bracket_ready
-    );
-
-
-  const poomsaeDrawReady =
-    Boolean(
-      competition
-        ?.poomsae_draw_published ??
-      competition
-        ?.poomsae_draw_ready ??
-      competition
-        ?.draw_published ??
-      false
-    );
-
-
-  const bracketReady =
-    isPoomsae
-      ? poomsaeDrawReady
-      : kyorugiBracketReady;
 
 
   /* ====================================================
@@ -3042,33 +3018,106 @@ export default function CompetitionDetails() {
       );
 
 
-  const goBracket =
-    () =>
-      navigateRole(
-        `/competitions/${encodeURIComponent(
-          slug
-        )}/bracket`
-      );
+ /* ====================================================
+   Competition Navigation
+==================================================== */
+
+const competitionKey =
+  competition?.public_id ||
+  competition?.slug ||
+  slug;
 
 
-  const goPoomsaeDraw =
-    () =>
-      navigateRole(
-        `/competitions/${encodeURIComponent(
-          slug
-        )}/poomsae-draw`
-      );
+/*
+ * نکته:
+ * role برای دسترسی‌های کاربری استفاده می‌شود،
+ * اما برای تشخیص اینکه صفحه از Dashboard آمده یا Home
+ * فقط roleFromRoute معتبر است.
+ */
+
+const isDashboardCompetition =
+  Boolean(roleFromRoute);
 
 
-  const goResults =
-    () =>
-      navigateRole(
-        `/competitions/${encodeURIComponent(
-          slug
-        )}/results`
-      );
+const competitionBasePath =
+  isDashboardCompetition
+    ? `/dashboard/${encodeURIComponent(
+        roleFromRoute
+      )}/competitions/${encodeURIComponent(
+        competitionKey
+      )}`
+    : `/competitions/${encodeURIComponent(
+        competitionKey
+      )}`;
 
 
+/* ====================================================
+   Kyorugi bracket
+==================================================== */
+
+const goBracket = () => {
+
+  if (!competitionKey) {
+    return;
+  }
+
+  navigate(
+    `${competitionBasePath}/bracket`
+  );
+};
+
+
+/* ====================================================
+   Poomsae draw
+==================================================== */
+
+const goPoomsaeDraw = () => {
+
+  if (!competitionKey) {
+    return;
+  }
+
+  navigate(
+    `${competitionBasePath}/poomsae-draw`
+  );
+};
+
+
+/* ====================================================
+   Table button
+==================================================== */
+
+const onBracketClick = () => {
+
+  if (!competitionKey) {
+    return;
+  }
+
+  if (isPoomsae) {
+
+    goPoomsaeDraw();
+
+    return;
+  }
+
+  goBracket();
+};
+
+
+/* ====================================================
+   Results
+==================================================== */
+
+const goResults = () => {
+
+  if (!competitionKey) {
+    return;
+  }
+
+  navigate(
+    `${competitionBasePath}/results`
+  );
+};
   /* ====================================================
      Coach code modal
   ==================================================== */
@@ -3266,84 +3315,6 @@ export default function CompetitionDetails() {
     };
 
 
-  /* ====================================================
-     Bracket / draw
-  ==================================================== */
-
-  const onBracketClick =
-    async () => {
-      if (isKyorugi) {
-        try {
-          const data =
-            await getBracket(
-              slug
-            );
-
-          if (
-            data?.ready
-          ) {
-            goBracket();
-          } else {
-            showGlobalWarning(
-              "هنوز جدول مسابقه منتشر نشده است.",
-              "جدول منتشر نشده است"
-            );
-          }
-
-        } catch (error) {
-          console.error(
-            "COMPETITION_BRACKET_CHECK_ERROR",
-            error
-          );
-
-          const status =
-            getErrorStatus(
-              error
-            );
-
-          if (
-            status === 401
-          ) {
-            handleUnauthorized();
-            return;
-          }
-
-          if (
-            status === 404
-          ) {
-            showGlobalWarning(
-              "هنوز جدول مسابقه منتشر نشده است.",
-              "جدول منتشر نشده است"
-            );
-
-            return;
-          }
-
-          showRequestError(
-            error,
-            "خطا در دریافت جدول مسابقه",
-            "وضعیت جدول مسابقه دریافت نشد."
-          );
-        }
-
-        return;
-      }
-
-      if (isPoomsae) {
-        if (
-          !poomsaeDrawReady
-        ) {
-          showGlobalWarning(
-            "هنوز قرعه پومسه منتشر نشده است.",
-            "قرعه منتشر نشده است"
-          );
-
-          return;
-        }
-
-        goPoomsaeDraw();
-      }
-    };
 
 
   /* ====================================================
@@ -6085,38 +6056,30 @@ export default function CompetitionDetails() {
 
 
           {showBracketBtn && (
+
             <button
               type="button"
               className="btn btn-ghost"
-              onClick={
-                onBracketClick
-              }
-              disabled={
-                !bracketReady
-              }
+              onClick={onBracketClick}
               title={
-                bracketReady
-                  ? isPoomsae
-                    ? "مشاهده قرعه منتشرشده پومسه"
-                    : "مشاهده جدول مسابقات"
-                  : isPoomsae
-                  ? "هنوز قرعه پومسه منتشر نشده است"
-                  : "هنوز جدول منتشر نشده است"
+                isPoomsae
+                  ? "مشاهده جدول پومسه"
+                  : "مشاهده جدول مسابقه"
               }
             >
               مشاهده جدول
             </button>
+
           )}
+
 
 
           {showResultsBtn && (
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={
-                goResults
-              }
-              title="مشاهده نتایج ثبت‌شده مسابقه"
+              onClick={goResults}
+              title="مشاهده نتایج این مسابقه"
             >
               نتایج مسابقه
             </button>

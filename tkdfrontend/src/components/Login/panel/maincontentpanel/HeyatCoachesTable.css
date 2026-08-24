@@ -101,55 +101,179 @@
   text-align: center;
   overflow-wrap: anywhere;
 }
-@media (max-width: 768px) {
-  .heyat-coaches-table-header {
-    display: none;
+
+/* =========================
+   Mobile Responsive Final
+========================= */
+
+@media (max-width:768px){
+
+  .heyat-coaches-table{
+
+    padding:14px;
+
+    border-radius:12px;
+
   }
 
-  .heyat-coaches-table-row {
-    display: block;
-    background-color: #f9fbff;
-    margin-bottom: 1.5rem;
-    padding: 1rem;
-    border-radius: 10px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+
+
+  .heyat-coaches-title{
+
+    font-size:1.35rem;
+
+    margin-bottom:1rem;
+
   }
 
-  .heyat-coaches-table-row div {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.4rem 25px;
-    font-size: 0.95rem;
-    border-bottom: 1px solid #eee;
+
+
+  .heyat-coaches-table-container{
+
+    overflow:visible !important;
+
   }
 
-  .heyat-coaches-table-row div:last-child {
-    border-bottom: none;
+
+
+  /* حذف هدر جدول */
+
+  .heyat-coaches-table-header{
+
+    display:none;
+
   }
 
-  .heyat-coaches-table-row div::before {
-    content: attr(data-label);
-    font-weight: bold;
-    color: #444;
+
+
+  /* تبدیل ردیف مربی به کارت */
+
+  .heyat-coaches-table-row{
+
+    display:block;
+
+    min-width:unset;
+
+    margin-bottom:14px;
+
+    padding:14px;
+
+    border-radius:12px;
+
+    background:#f9fbff;
+
+    box-shadow:0 2px 8px rgba(0,0,0,.06);
+
+    box-sizing:border-box;
+
+    height:auto !important;
+
   }
 
-  .heyat-coaches-table-row.columns-7 {
-    grid-template-columns: none !important;
-    min-width: unset !important;
+
+
+  .heyat-coaches-table-row div{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:flex-start;
+
+    gap:10px;
+
+    padding:8px 0;
+
+    font-size:.9rem;
+
+    line-height:1.8;
+
+    text-align:right;
+
+    border-bottom:1px solid #eee;
+
+    overflow-wrap:anywhere;
+
   }
 
-  .heyat-coaches-filters {
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
+
+
+  .heyat-coaches-table-row div:last-child{
+
+    border-bottom:none;
+
   }
+
+
+
+  .heyat-coaches-table-row div::before{
+
+    flex-shrink:0;
+
+    font-weight:700;
+
+    color:#444;
+
+  }
+
+
+
+  /* فیلترها */
+
+  .heyat-coaches-filters{
+
+    flex-direction:column;
+
+    align-items:stretch;
+
+    width:100%;
+
+    gap:10px;
+
+  }
+
+
 
   .heyat-coaches-filters select,
   .heyat-coaches-filters .date-input,
-  .heyat-coaches-filters .search-input {
-    width: 100% !important;
-    min-width: unset !important;
-    font-size: 1rem;
-    box-sizing: border-box;
+  .heyat-coaches-filters .search-input{
+
+    width:100% !important;
+
+    min-width:0 !important;
+
+    box-sizing:border-box;
+
+    font-size:16px;
+
   }
+
+}
+
+
+
+/* موبایل کوچک */
+
+@media(max-width:400px){
+
+  .heyat-coaches-table{
+
+    padding:10px;
+
+  }
+
+
+  .heyat-coaches-title{
+
+    font-size:1.15rem;
+
+  }
+
+
+  .heyat-coaches-table-row div{
+
+    font-size:.82rem;
+
+  }
+
 }

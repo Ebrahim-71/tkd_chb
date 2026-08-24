@@ -88,53 +88,175 @@
   overflow-wrap: anywhere;
   padding: 0.3rem;
 }
+/* =========================
+   Mobile Responsive Final
+========================= */
 
-/* حالت موبایل */
-@media (max-width: 768px) {
-  .heyat-clubs-table-header {
-    display: none;
+@media (max-width:768px){
+
+  .heyat-clubs-table{
+
+    padding:14px;
+
+    border-radius:12px;
+
   }
 
-  .heyat-clubs-table-row {
-    display: block;
-    background-color: #f9fbff;
-    margin-bottom: 1.5rem;
-    padding: 1rem;
-    border-radius: 10px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+
+
+  .heyat-clubs-title{
+
+    font-size:1.35rem;
+
+    margin-bottom:1rem;
+
   }
 
-  .heyat-clubs-table-row div {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.4rem 0;
-    font-size: 0.95rem;
-    border-bottom: 1px solid #eee;
-    flex-wrap: wrap;
+
+
+  .heyat-clubs-table-container{
+
+    overflow:visible !important;
+
   }
 
-  .heyat-clubs-table-row div:last-child {
-    border-bottom: none;
+
+
+  /* حذف هدر */
+
+  .heyat-clubs-table-header{
+
+    display:none;
+
   }
 
-  .heyat-clubs-table-row div::before {
-    content: attr(data-label);
-    font-weight: bold;
-    color: #444;
+
+
+  /* تبدیل ردیف به کارت */
+
+  .heyat-clubs-table-row{
+
+    display:block;
+
+    min-width:unset;
+
+    margin-bottom:14px;
+
+    padding:14px;
+
+    border-radius:12px;
+
+    background:#f9fbff;
+
+    box-shadow:0 2px 8px rgba(0,0,0,.06);
+
+    box-sizing:border-box;
+
   }
 
-  .heyat-clubs-table-row.columns-6 {
-    grid-template-columns: none !important;
-    min-width: unset !important;
+
+
+  .heyat-clubs-table-row div{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:flex-start;
+
+    gap:10px;
+
+    padding:8px 0;
+
+    font-size:.9rem;
+
+    line-height:1.8;
+
+    text-align:right;
+
+    border-bottom:1px solid #eee;
+
+    overflow-wrap:anywhere;
+
   }
 
-  .heyat-clubs-filters {
-    flex-direction: column;
-    align-items: center;
+
+
+  .heyat-clubs-table-row div:last-child{
+
+    border-bottom:none;
+
   }
 
-  .heyat-clubs-filters .search-input {
-    min-width: 100%;
-    font-size: 1rem;
+
+
+  .heyat-clubs-table-row div::before{
+
+    flex-shrink:0;
+
+    font-weight:700;
+
+    color:#444;
+
   }
+
+
+
+  /* فیلترها */
+
+  .heyat-clubs-filters{
+
+    flex-direction:column;
+
+    gap:10px;
+
+    margin-bottom:1.2rem;
+
+  }
+
+
+
+  .heyat-clubs-filters .search-input{
+
+    width:100%;
+
+    min-width:0;
+
+    box-sizing:border-box;
+
+    font-size:16px;
+
+  }
+
+}
+
+
+
+/* موبایل کوچک */
+
+@media(max-width:400px){
+
+
+  .heyat-clubs-table{
+
+    padding:10px;
+
+  }
+
+
+
+  .heyat-clubs-title{
+
+    font-size:1.15rem;
+
+  }
+
+
+
+  .heyat-clubs-table-row div{
+
+    font-size:.82rem;
+
+  }
+
 }

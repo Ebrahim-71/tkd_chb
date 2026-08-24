@@ -1,97 +1,299 @@
-body {
-  font-family: 'IRANSansWeb', sans-serif;
-  text-align: center;
-  overflow-x: hidden;
+/* =========================================================
+   GLOBAL
+========================================================= */
+
+html,
+body,
+#root {
+  width: 100%;
+
+  min-height: 100%;
+
   margin: 0;
-  direction: rtl;
+
+  padding: 0;
 }
+
+
+html {
+  scroll-behavior: smooth;
+}
+
+
+body {
+  margin: 0;
+
+  overflow-x: hidden;
+
+  direction: rtl;
+
+  background: #ffffff;
+
+  color: #111827;
+
+  font-family:
+    "IRANSansWeb",
+    sans-serif;
+
+  text-align: initial;
+}
+
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+
+button,
+input,
+textarea,
+select {
+  font-family:
+    inherit;
+}
+
+
+button {
+  -webkit-tap-highlight-color:
+    transparent;
+}
+
+
+img {
+  max-width: 100%;
+}
+
+
+/* =========================================================
+   APP
+========================================================= */
+
+.App {
+  width: 100%;
+
+  min-height: 100vh;
+
+  display: flex;
+
+  flex-direction: column;
+
+  overflow-x: hidden;
+
+  background: #ffffff;
+}
+
+
+/* =========================================================
+   MAIN
+========================================================= */
 
 .main-content {
-  display: flex;
-  flex-wrap: nowrap;
-  justify-content: center;
+  width: 100%;
+
+  min-width: 0;
+
+  flex: 1;
+
+  display: block;
+
+  margin: 0;
+
+  padding: 0;
+
+  overflow: visible;
 }
 
-.slider {
-  width: 23%;
+
+/* =========================================================
+   HOME
+========================================================= */
+
+.App.is-home-page {
+  width: 100%;
+
+  background: #ffffff;
 }
 
-.slider-section {
-  max-width: 465px;
-  margin-top: 10px;
+
+.App.is-home-page
+.main-content {
+  width: 100%;
+
+  max-width: none;
+
+  margin: 0;
+
+  padding: 0;
+
+  display: block;
 }
 
-.news-section,
-.announcements-section,
-.letters-section {
-  margin-bottom: 2rem;
+
+.home-page-shell {
+  width: 100%;
+
+  max-width: none;
+
+  min-width: 0;
+
+  margin: 0;
+
+  padding: 0;
+
+  display: block;
+
+  overflow: hidden;
 }
 
-/* ✅ دکمه نمایش اسلایدر در موبایل */
-.slider-toggle-btn {
-  display: none;
+
+/* =========================================================
+   REMOVE OLD HOME LAYOUT
+========================================================= */
+
+/*
+ * چیدمان قدیمی صفحه اصلی دیگر استفاده نمی‌شود.
+ * اگر CSS یا DOM قدیمی در Cache مرورگر باقی مانده باشد،
+ * اجازه نمی‌دهیم دوباره ستون اسلایدر بسازد.
+ */
+
+.App.is-home-page
+.slider,
+
+.App.is-home-page
+.slider-section,
+
+.App.is-home-page
+.slider-toggle-btn,
+
+.App.is-home-page
+.home-information-section,
+
+.App.is-home-page
+.home-gallery-section {
+  display: none !important;
 }
 
-/* ✅ حالت موبایل */
-@media (max-width: 768px) {
+
+/* =========================================================
+   INNER PAGES
+========================================================= */
+
+.App.is-inner-page
+.main-content {
+  width: 100%;
+
+  min-height: 450px;
+}
+
+
+/*
+ * Header صفحات داخلی ممکن است کوتاه‌تر باشد،
+ * اما خود Header این حالت را کنترل می‌کند.
+ */
+
+
+/* =========================================================
+   FOOTER
+========================================================= */
+
+#site-footer {
+  width: 100%;
+
+  margin: 0;
+
+  padding: 0;
+}
+
+
+#site-footer footer {
+  margin-top: 0;
+}
+
+
+/* =========================================================
+   TABLET
+========================================================= */
+
+@media (
+  max-width: 900px
+) {
+
   body {
     font-size: 14px;
   }
 
-  .main-content {
-    flex-direction: column;
-    align-items: center;
-    padding: 0 10px;
-  }
 
-  .slider {
-   
-    display: none;
-    flex-direction: column;
-    gap: 1rem;
-    margin-top: 1rem;
-    animation: slideDown 0.5s ease forwards;
+  .App,
+  .main-content,
+  .home-page-shell {
     width: 100%;
-  }
 
-  /* ✅ وقتی نمایش اسلایدر فعال شد */
-  .slider.show-mobile {
-    display: flex !important;
-  }
-
-  .slider-toggle-btn {
-    display: block;
-    background-color: #2185d0;
-    color: white;
-    padding: 10px 16px;
-    margin: 10px auto;
-    border: none;
-    border-radius: 6px;
-    font-size: 1rem;
-    cursor: pointer;
-  }
-
-  .slider-section {
     max-width: 100%;
-    padding: 0;
-    margin-top: 5px;
   }
 
-  .news-section,
-  .announcements-section,
-  .letters-section {
-    margin-bottom: 1.5rem;
-  }
 }
 
 
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (
+  max-width: 768px
+) {
+
+  html,
+  body,
+  #root {
+    width: 100%;
+
+    max-width: 100%;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+
+  body {
+    font-size: 14px;
+
+    overflow-x: hidden;
   }
+
+
+  .main-content {
+    width: 100%;
+
+    max-width: 100%;
+
+    margin: 0;
+
+    padding: 0;
+  }
+
+
+  .home-page-shell {
+    width: 100%;
+
+    max-width: 100%;
+
+    margin: 0;
+
+    padding: 0;
+  }
+
+}
+
+
+/* =========================================================
+   SMALL MOBILE
+========================================================= */
+
+@media (
+  max-width: 480px
+) {
+
+  body {
+    font-size: 13px;
+  }
+
 }

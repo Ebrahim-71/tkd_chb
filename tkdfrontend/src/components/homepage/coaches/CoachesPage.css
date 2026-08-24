@@ -1,0 +1,1589 @@
+/* =========================================================
+   COACHES PAGE
+========================================================= */
+
+.coaches-page,
+.coaches-page * {
+  box-sizing: border-box;
+}
+
+
+.coaches-page {
+  width: 100%;
+  min-height: 75vh;
+
+  padding: 32px 0 70px;
+
+  direction: rtl;
+
+  background:
+    linear-gradient(
+      180deg,
+      #f6f8fb 0%,
+      #ffffff 100%
+    );
+
+  color: #17263a;
+}
+
+
+.coaches-page-inner {
+  width:
+    min(
+      1420px,
+      calc(100% - 42px)
+    );
+
+  margin: 0 auto;
+}
+
+
+/* =========================================================
+   TOP
+========================================================= */
+
+.coaches-page-top {
+  width: 100%;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 14px;
+
+  margin-bottom: 14px;
+}
+
+
+/* =========================================================
+   BACK BUTTON
+========================================================= */
+
+.coaches-back-btn {
+  min-height: 42px;
+
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 8px;
+
+  padding: 0 16px;
+
+  border:
+    1px solid #dce3ea;
+
+  border-radius: 11px;
+
+  background: #ffffff;
+
+  color: #33455a;
+
+  font-family: inherit;
+
+  font-size: 9px;
+
+  font-weight: 900;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 5px 16px
+    rgba(30, 47, 67, .05);
+
+  transition:
+    transform .2s ease,
+    background .2s ease,
+    color .2s ease,
+    border-color .2s ease;
+}
+
+
+.coaches-back-btn:hover {
+  transform: translateY(-2px);
+
+  border-color: #dda313;
+
+  background: #071827;
+
+  color: #ffffff;
+}
+
+
+.coaches-back-icon {
+  color: #dda313;
+
+  font-size: 16px;
+
+  font-weight: 900;
+
+  line-height: 1;
+}
+
+
+.coaches-back-btn:hover
+.coaches-back-icon {
+  color: #f0b628;
+}
+
+
+/* =========================================================
+   TOTAL
+========================================================= */
+
+.coaches-page-count {
+  min-height: 40px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  padding: 0 13px;
+
+  border:
+    1px solid #e0e6ed;
+
+  border-radius: 10px;
+
+  background: #ffffff;
+}
+
+
+.coaches-page-count span {
+  color: #8793a2;
+
+  font-size: 8px;
+}
+
+
+.coaches-page-count strong {
+  color: #c78b0b;
+
+  font-size: 12px;
+
+  font-weight: 1000;
+}
+
+
+/* =========================================================
+   TOOLBAR
+========================================================= */
+
+.coaches-toolbar {
+  position: relative !important;
+
+  isolation: isolate;
+
+  width: 100%;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 14px;
+
+  overflow: hidden;
+
+  margin: 0 0 14px;
+
+  padding: 13px;
+
+  border:
+    1px solid #dfe6ee;
+
+  border-radius: 17px;
+
+  background:
+    #ffffff !important;
+
+  box-shadow:
+    0 8px 28px
+    rgba(28, 45, 65, .055);
+
+  filter: none !important;
+}
+
+
+/* =========================================================
+   REMOVE BLACK DECORATION
+========================================================= */
+
+.coaches-toolbar::before,
+.coaches-toolbar::after,
+.coaches-search::before,
+.coaches-search::after,
+.coaches-gender-filter::before,
+.coaches-gender-filter::after {
+  content: none !important;
+
+  display: none !important;
+
+  width: 0 !important;
+
+  height: 0 !important;
+
+  background: none !important;
+
+  border: 0 !important;
+
+  box-shadow: none !important;
+
+  filter: none !important;
+}
+
+
+/* =========================================================
+   SEARCH
+========================================================= */
+
+.coaches-search {
+  position: relative !important;
+
+  width:
+    min(
+      720px,
+      100%
+    );
+
+  height: 48px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 10px;
+
+  overflow: hidden;
+
+  padding: 0 14px;
+
+  border:
+    1px solid #d8e1eb;
+
+  border-radius: 12px;
+
+  background:
+    #f8fafc !important;
+
+  box-shadow: none !important;
+
+  filter: none !important;
+
+  text-shadow: none !important;
+}
+
+
+.coaches-search-icon {
+  position: static !important;
+
+  flex: 0 0 auto;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  color: #c18a10 !important;
+
+  font-size: 20px;
+
+  line-height: 1;
+
+  transform: none !important;
+
+  filter: none !important;
+
+  text-shadow: none !important;
+}
+
+
+.coaches-search input {
+  position: static !important;
+
+  width: 100%;
+
+  height: 100%;
+
+  flex: 1;
+
+  margin: 0;
+
+  padding: 0;
+
+  border: 0 !important;
+
+  outline: 0 !important;
+
+  background:
+    transparent !important;
+
+  box-shadow:
+    none !important;
+
+  filter:
+    none !important;
+
+  color:
+    #26374b !important;
+
+  font-family:
+    inherit;
+
+  font-size:
+    10px;
+
+  font-weight:
+    600;
+
+  text-align:
+    right;
+
+  text-shadow:
+    none !important;
+
+  appearance:
+    none;
+
+  -webkit-appearance:
+    none;
+}
+
+
+.coaches-search input::placeholder {
+  color: #98a4b2;
+
+  opacity: 1;
+}
+
+
+.coaches-search input:focus {
+  outline: 0 !important;
+
+  border: 0 !important;
+
+  box-shadow: none !important;
+}
+
+
+.coaches-search
+input[type="search"]::-webkit-search-decoration,
+.coaches-search
+input[type="search"]::-webkit-search-cancel-button,
+.coaches-search
+input[type="search"]::-webkit-search-results-button,
+.coaches-search
+input[type="search"]::-webkit-search-results-decoration {
+  display: none;
+}
+
+
+/* =========================================================
+   CLEAR SEARCH
+========================================================= */
+
+.coaches-search-clear {
+  width: 25px;
+
+  height: 25px;
+
+  flex: 0 0 25px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 0;
+
+  border-radius: 50%;
+
+  background: #e8edf2;
+
+  color: #6b7786;
+
+  font-family: inherit;
+
+  font-size: 14px;
+
+  cursor: pointer;
+}
+
+
+.coaches-search-clear:hover {
+  background: #071827;
+
+  color: #ffffff;
+}
+
+
+/* =========================================================
+   GENDER FILTER
+========================================================= */
+
+.coaches-gender-filter {
+  position: static !important;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 4px;
+
+  flex: 0 0 auto;
+
+  padding: 4px;
+
+  border-radius: 11px;
+
+  background:
+    #f1f4f7 !important;
+
+  box-shadow:
+    none !important;
+
+  filter:
+    none !important;
+}
+
+
+.coaches-gender-filter button {
+  min-width: 76px;
+
+  height: 37px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 0 14px;
+
+  border: 0;
+
+  border-radius: 8px;
+
+  background: transparent;
+
+  color: #697789;
+
+  font-family: inherit;
+
+  font-size: 9px;
+
+  font-weight: 900;
+
+  cursor: pointer;
+
+  transition:
+    background .2s ease,
+    color .2s ease,
+    transform .2s ease;
+}
+
+
+.coaches-gender-filter
+button:hover:not(.is-active) {
+  background: #ffffff;
+
+  color: #17283b;
+}
+
+
+.coaches-gender-filter
+button.is-active {
+  background:
+    linear-gradient(
+      135deg,
+      #d7960d,
+      #efb627
+    );
+
+  color: #142237;
+
+  box-shadow:
+    0 5px 12px
+    rgba(216, 152, 13, .23);
+}
+
+
+/* =========================================================
+   RESULTS COUNT
+========================================================= */
+
+.coaches-result-count {
+  display: flex;
+
+  align-items: center;
+
+  gap: 6px;
+
+  margin: 0 4px 14px;
+
+  color: #909caa;
+
+  font-size: 8px;
+}
+
+
+.coaches-result-count strong {
+  color: #c78908;
+
+  font-size: 10px;
+
+  font-weight: 1000;
+}
+
+
+/* =========================================================
+   GRID
+========================================================= */
+
+.coaches-grid {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    );
+
+  gap: 18px;
+}
+
+
+/* =========================================================
+   CARD
+========================================================= */
+
+.coaches-card {
+  position: relative !important;
+
+  min-width: 0;
+
+  display: flex;
+
+  flex-direction: column;
+
+  overflow: hidden;
+
+  padding: 20px;
+
+  border:
+    1px solid #dfe5ec;
+
+  border-radius: 19px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 12px 34px
+    rgba(27, 44, 65, .065);
+
+  transition:
+    transform .22s ease,
+    border-color .22s ease,
+    box-shadow .22s ease;
+}
+
+
+.coaches-card:hover {
+  transform: translateY(-4px);
+
+  border-color:
+    rgba(
+      221,
+      160,
+      20,
+      .68
+    );
+
+  box-shadow:
+    0 18px 38px
+    rgba(27, 44, 65, .11);
+}
+
+
+/* =========================================================
+   DISABLE POSSIBLE OLD PSEUDO ELEMENTS
+========================================================= */
+
+.coaches-card::before,
+.coaches-card::after,
+.coaches-card-profile::before,
+.coaches-card-profile::after,
+.coaches-card-info::before,
+.coaches-card-info::after,
+.coaches-card-fullname::before,
+.coaches-card-fullname::after {
+  content: none !important;
+
+  display: none !important;
+}
+
+
+/* =========================================================
+   PROFILE
+========================================================= */
+
+.coaches-card-profile {
+  position: relative !important;
+
+  width: 100%;
+
+  min-height: 82px;
+
+  display: flex !important;
+
+  flex-direction: row !important;
+
+  align-items: center !important;
+
+  justify-content: flex-start !important;
+
+  gap: 15px;
+
+  margin: 0 0 18px;
+
+  padding: 0;
+
+  direction: rtl;
+
+  opacity: 1 !important;
+
+  visibility: visible !important;
+
+  transform: none !important;
+}
+
+
+/* =========================================================
+   AVATAR
+========================================================= */
+
+.coaches-card-avatar {
+  position: relative !important;
+
+  width: 72px !important;
+
+  height: 72px !important;
+
+  min-width: 72px !important;
+
+  flex: 0 0 72px !important;
+
+  display: flex !important;
+
+  align-items: center;
+
+  justify-content: center;
+
+  overflow: hidden;
+
+  margin: 0 !important;
+
+  padding: 0 !important;
+
+  border:
+    2px solid #dfa415;
+
+  border-radius: 50%;
+
+  background:
+    linear-gradient(
+      145deg,
+      #071827,
+      #0d2b45
+    );
+
+  color: #efb72c;
+
+  font-size: 19px;
+
+  font-weight: 1000;
+
+  opacity: 1 !important;
+
+  visibility: visible !important;
+
+  transform: none !important;
+}
+
+
+.coaches-card-avatar img {
+  width: 100% !important;
+
+  height: 100% !important;
+
+  display: block;
+
+  object-fit: cover;
+
+  object-position: center;
+
+  border-radius: 50%;
+}
+
+
+/* =========================================================
+   INFORMATION BESIDE PHOTO
+========================================================= */
+
+.coaches-card-info {
+  position: relative !important;
+
+  min-width: 0;
+
+  flex: 1;
+
+  display: flex !important;
+
+  flex-direction: column !important;
+
+  align-items: flex-start !important;
+
+  justify-content: center !important;
+
+  gap: 7px;
+
+  margin: 0 !important;
+
+  padding: 0 !important;
+
+  text-align: right !important;
+
+  opacity: 1 !important;
+
+  visibility: visible !important;
+
+  transform: none !important;
+
+  z-index: 10;
+}
+
+
+/* =========================================================
+   COACH FULL NAME
+========================================================= */
+
+.coaches-card-fullname {
+  position: relative !important;
+
+  inset: auto !important;
+
+  display: block !important;
+
+  width: 100% !important;
+
+  max-width: 100%;
+
+  height: auto !important;
+
+  min-height: 28px;
+
+  overflow: hidden;
+
+  margin: 0 !important;
+
+  padding: 0 !important;
+
+  border: 0 !important;
+
+  background:
+    transparent !important;
+
+  color:
+    #11243a !important;
+
+  font-family:
+    inherit !important;
+
+  font-size:
+    16px !important;
+
+  font-weight:
+    1000 !important;
+
+  line-height:
+    1.7 !important;
+
+  text-align:
+    right !important;
+
+  white-space: nowrap;
+
+  text-overflow: ellipsis;
+
+  opacity: 1 !important;
+
+  visibility: visible !important;
+
+  transform: none !important;
+
+  filter: none !important;
+
+  text-shadow: none !important;
+
+  z-index: 20 !important;
+
+  pointer-events: auto !important;
+}
+
+
+/* =========================================================
+   ALWAYS SHOW NAME EVEN ON HOVER
+========================================================= */
+
+.coaches-card:hover
+.coaches-card-profile,
+.coaches-card:hover
+.coaches-card-info,
+.coaches-card:hover
+.coaches-card-fullname {
+  opacity: 1 !important;
+
+  visibility: visible !important;
+
+  transform: none !important;
+
+  color: #11243a !important;
+}
+
+
+/* =========================================================
+   META
+========================================================= */
+
+.coaches-card-meta {
+  position: static !important;
+
+  width: 100%;
+
+  display: flex !important;
+
+  flex-wrap: wrap;
+
+  align-items: center;
+
+  justify-content: flex-start;
+
+  gap: 5px;
+
+  margin: 0;
+
+  padding: 0;
+
+  opacity: 1 !important;
+
+  visibility: visible !important;
+
+  transform: none !important;
+}
+
+
+.coaches-card-meta > span {
+  min-height: 23px;
+
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 3px 9px;
+
+  border-radius: 999px;
+
+  background: #f2f5f8;
+
+  color: #748296;
+
+  font-size: 7px;
+
+  font-weight: 850;
+}
+
+
+.coaches-card-gender.is-male {
+  background:
+    #edf4ff !important;
+
+  color:
+    #376bac !important;
+}
+
+
+.coaches-card-gender.is-female {
+  background:
+    #fff0f6 !important;
+
+  color:
+    #b34e78 !important;
+}
+
+
+.coaches-card-level {
+  background:
+    #f3f6f9 !important;
+
+  color:
+    #65758a !important;
+}
+
+
+/* =========================================================
+   LOCATION
+========================================================= */
+
+.coaches-location {
+  width: 100%;
+
+  min-height: 58px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 10px;
+
+  margin-bottom: 17px;
+
+  padding: 9px 12px;
+
+  border-radius: 12px;
+
+  background: #f6f8fa;
+}
+
+
+.coaches-location-icon {
+  width: 28px;
+
+  height: 28px;
+
+  flex: 0 0 28px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  color: #d39814;
+
+  font-size: 17px;
+}
+
+
+.coaches-location-content {
+  min-width: 0;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+
+.coaches-location-content small {
+  color: #99a4b1;
+
+  font-size: 7px;
+}
+
+
+.coaches-location-content strong {
+  color: #344357;
+
+  font-size: 9px;
+
+  font-weight: 900;
+}
+
+
+/* =========================================================
+   CLUBS
+========================================================= */
+
+.coaches-clubs {
+  width: 100%;
+
+  min-height: 78px;
+
+  margin-bottom: 17px;
+}
+
+
+.coaches-section-label {
+  margin-bottom: 8px;
+
+  color: #8895a5;
+
+  font-size: 8px;
+
+  font-weight: 850;
+}
+
+
+.coaches-club-list {
+  display: flex;
+
+  flex-wrap: wrap;
+
+  gap: 6px;
+}
+
+
+.coaches-club-item {
+  max-width: 100%;
+
+  min-height: 29px;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  padding: 5px 9px;
+
+  border:
+    1px solid #e0e6ec;
+
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #4c5c70;
+
+  font-size: 7px;
+
+  font-weight: 850;
+}
+
+
+.coaches-club-item small {
+  color: #997724;
+
+  font-size: inherit;
+}
+
+
+.coaches-no-club {
+  min-height: 30px;
+
+  display: flex;
+
+  align-items: center;
+
+  color: #a1aab6;
+
+  font-size: 8px;
+}
+
+
+/* =========================================================
+   MAIN STATS
+========================================================= */
+
+.coaches-card-stats {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    );
+
+  overflow: hidden;
+
+  margin-top: auto;
+
+  margin-bottom: 14px;
+
+  border-radius: 13px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #03111f,
+      #071d30
+    );
+}
+
+
+.coaches-card-stat {
+  position: relative;
+
+  min-width: 0;
+
+  min-height: 84px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 3px;
+
+  padding: 9px 5px;
+
+  text-align: center;
+}
+
+
+.coaches-card-stat:not(:last-child)::after {
+  content: "";
+
+  position: absolute;
+
+  top: 24%;
+
+  left: 0;
+
+  width: 1px;
+
+  height: 52%;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      .09
+    );
+}
+
+
+.coaches-card-stat span {
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      .62
+    );
+
+  font-size: 7px;
+
+  font-weight: 800;
+}
+
+
+.coaches-card-stat strong {
+  color: #ffffff;
+
+  font-size: 21px;
+
+  font-weight: 1000;
+
+  line-height: 1.2;
+}
+
+
+.coaches-card-stat small {
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      .42
+    );
+
+  font-size: 6px;
+}
+
+
+.coaches-card-stat.is-highlight {
+  background:
+    linear-gradient(
+      145deg,
+      #bd830b,
+      #e4a91f
+    );
+}
+
+
+.coaches-card-stat.is-highlight
+span,
+.coaches-card-stat.is-highlight
+small {
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      .87
+    );
+}
+
+
+/* =========================================================
+   MEDALS
+========================================================= */
+
+.coaches-medals-grid {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(0, 1fr)
+    );
+
+  gap: 9px;
+}
+
+
+.coaches-medal-box {
+  min-width: 0;
+
+  padding: 11px;
+
+  border:
+    1px solid #e2e7ed;
+
+  border-radius: 11px;
+
+  background: #fafbfd;
+}
+
+
+.coaches-medal-title {
+  display: block;
+
+  margin-bottom: 9px;
+
+  color: #8491a1;
+
+  font-size: 7px;
+
+  font-weight: 850;
+}
+
+
+.coaches-medal-row {
+  width: 100%;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 5px;
+}
+
+
+.coaches-medal-item {
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 3px;
+
+  color: #334256;
+
+  font-size: 8px;
+}
+
+
+.coaches-medal-icon {
+  font-size: 12px;
+
+  line-height: 1;
+}
+
+
+.coaches-medal-item strong {
+  font-size: 8px;
+
+  font-weight: 1000;
+}
+
+
+/* =========================================================
+   STATES
+========================================================= */
+
+.coaches-state {
+  width: 100%;
+
+  min-height: 180px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 12px;
+
+  padding: 30px;
+
+  border:
+    1px dashed #d7dfe7;
+
+  border-radius: 16px;
+
+  background: #ffffff;
+
+  color: #84909f;
+
+  font-size: 10px;
+
+  text-align: center;
+}
+
+
+.coaches-state-error {
+  border-color: #efc2c2;
+
+  background: #fffafa;
+
+  color: #b94b4b;
+}
+
+
+/* =========================================================
+   LOADER
+========================================================= */
+
+.coaches-loading-spinner {
+  width: 30px;
+
+  height: 30px;
+
+  border:
+    3px solid #e7ebef;
+
+  border-top-color:
+    #dfa314;
+
+  border-radius: 50%;
+
+  animation:
+    coaches-spin
+    .8s linear
+    infinite;
+}
+
+
+@keyframes coaches-spin {
+
+  to {
+    transform: rotate(360deg);
+  }
+
+}
+
+
+/* =========================================================
+   TABLET
+========================================================= */
+
+@media (
+  max-width: 1000px
+) {
+
+  .coaches-grid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+
+
+  .coaches-toolbar {
+    flex-direction: column;
+
+    align-items: stretch;
+  }
+
+
+  .coaches-search {
+    width: 100%;
+  }
+
+
+  .coaches-gender-filter {
+    width: 100%;
+  }
+
+
+  .coaches-gender-filter button {
+    flex: 1;
+
+    min-width: 0;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (
+  max-width: 680px
+) {
+
+  .coaches-page {
+    padding:
+      22px 0 45px;
+  }
+
+
+  .coaches-page-inner {
+    width:
+      calc(100% - 20px);
+  }
+
+
+  .coaches-page-top {
+    gap: 8px;
+  }
+
+
+  .coaches-back-btn {
+    min-height: 40px;
+
+    padding: 0 11px;
+
+    font-size: 8px;
+  }
+
+
+  .coaches-toolbar {
+    padding: 10px;
+
+    border-radius: 14px;
+  }
+
+
+  .coaches-search {
+    height: 44px;
+  }
+
+
+  .coaches-search input {
+    font-size: 9px;
+  }
+
+
+  .coaches-gender-filter button {
+    height: 36px;
+
+    padding: 0 5px;
+  }
+
+
+  .coaches-grid {
+    grid-template-columns: 1fr;
+
+    gap: 13px;
+  }
+
+
+  .coaches-card {
+    padding: 15px;
+
+    border-radius: 15px;
+  }
+
+
+  /* PROFILE */
+
+  .coaches-card-profile {
+    min-height: 68px;
+
+    gap: 12px;
+  }
+
+
+  .coaches-card-avatar {
+    width: 60px !important;
+
+    height: 60px !important;
+
+    min-width: 60px !important;
+
+    flex-basis: 60px !important;
+  }
+
+
+  .coaches-card-fullname {
+    min-height: 24px;
+
+    font-size:
+      14px !important;
+  }
+
+
+  .coaches-card-stat {
+    min-height: 77px;
+  }
+
+
+  .coaches-card-stat strong {
+    font-size: 18px;
+  }
+
+}
+
+
+/* =========================================================
+   SMALL MOBILE
+========================================================= */
+
+@media (
+  max-width: 390px
+) {
+
+  .coaches-page-top {
+    flex-direction: column;
+
+    align-items: stretch;
+  }
+
+
+  .coaches-back-btn {
+    width: 100%;
+  }
+
+
+  .coaches-page-count {
+    width: fit-content;
+  }
+
+
+  .coaches-medals-grid {
+    grid-template-columns: 1fr;
+  }
+
+
+  .coaches-card-stat span {
+    font-size: 6px;
+  }
+
+
+  .coaches-card-stat strong {
+    font-size: 16px;
+  }
+
+}

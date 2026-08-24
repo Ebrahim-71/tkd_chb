@@ -1,323 +1,779 @@
 /* src/components/common/GlobalMessageModal/GlobalMessageModal.css */
 
+
+/* =========================
+OVERLAY
+========================= */
+
 .global-message-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 999999;
 
-  display: flex;
-  align-items: center;
-  justify-content: center;
+    position: fixed;
 
-  padding: 20px;
+    inset: 0;
 
-  background: rgba(15, 23, 42, 0.48);
+    z-index: 999999;
 
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+
+    padding: 20px;
+
+
+    background:
+        rgba(15, 23, 42, 0.48);
+
+
+    backdrop-filter: blur(4px);
+
+    -webkit-backdrop-filter: blur(4px);
+
 }
 
+
+
+
+/* =========================
+MODAL BOX
+========================= */
 
 .global-message-modal {
-  position: relative;
 
-  width: 100%;
-  max-width: 440px;
+    position: relative;
 
-  padding: 30px 28px 24px;
 
-  background: #ffffff;
+    width:100%;
 
-  border-radius: 20px;
+    max-width:440px;
 
-  box-shadow:
-    0 25px 70px rgba(0, 0, 0, 0.22);
 
-  text-align: center;
+    padding:
+        30px
+        28px
+        24px;
 
-  animation:
-    globalMessageShow
-    0.22s ease-out;
+
+    background:#ffffff;
+
+
+    border-radius:20px;
+
+
+    box-shadow:
+
+        0 25px 70px rgba(0,0,0,.22);
+
+
+    text-align:center;
+
+
+    direction:rtl;
+
+
+    animation:
+        globalMessageShow
+        .22s ease-out;
+
 }
+
 
 
 @keyframes globalMessageShow {
-  from {
-    opacity: 0;
-    transform:
-      translateY(14px)
-      scale(0.97);
-  }
 
-  to {
-    opacity: 1;
-    transform:
-      translateY(0)
-      scale(1);
-  }
+    from {
+
+        opacity:0;
+
+        transform:
+            translateY(14px)
+            scale(.97);
+
+    }
+
+
+    to {
+
+        opacity:1;
+
+        transform:
+            translateY(0)
+            scale(1);
+
+    }
+
 }
 
+
+
+
+/* =========================
+CLOSE BUTTON
+========================= */
 
 .global-message-close {
-  position: absolute;
 
-  top: 12px;
-  left: 15px;
+    position:absolute;
 
-  width: 34px;
-  height: 34px;
 
-  border: 0;
-  border-radius: 50%;
+    top:12px;
 
-  background: transparent;
+    left:15px;
 
-  color: #94a3b8;
 
-  font-size: 27px;
-  line-height: 1;
+    width:34px;
 
-  cursor: pointer;
+    height:34px;
 
-  transition:
-    background 0.2s ease,
-    color 0.2s ease;
+
+    border:0;
+
+    border-radius:50%;
+
+
+    background:transparent;
+
+
+    color:#94a3b8;
+
+
+    font-size:27px;
+
+
+    line-height:1;
+
+
+    cursor:pointer;
+
 }
+
 
 
 .global-message-close:hover {
-  background: #f1f5f9;
-  color: #334155;
+
+    background:#f1f5f9;
+
+    color:#334155;
+
 }
+
+
+
+
+
+/* =========================
+ICON
+========================= */
 
 
 .global-message-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
 
-  width: 62px;
-  height: 62px;
 
-  margin:
-    0 auto
-    16px;
+    display:flex;
 
-  border-radius: 50%;
 
-  font-size: 31px;
-  font-weight: 800;
+    align-items:center;
+
+
+    justify-content:center;
+
+
+    width:62px;
+
+    height:62px;
+
+
+    margin:
+
+        0 auto
+        16px;
+
+
+    border-radius:50%;
+
+
+    font-size:31px;
+
+
+    font-weight:800;
+
 }
+
+
+
+
+
+/* =========================
+TITLE
+========================= */
 
 
 .global-message-title {
-  margin:
-    0 0 14px;
 
-  color: #1f2937;
 
-  font-size: 20px;
-  font-weight: 800;
+    margin:
 
-  line-height: 1.6;
+        0
+        0
+        14px;
+
+
+    color:#1f2937;
+
+
+    font-size:20px;
+
+
+    font-weight:800;
+
+
+    line-height:1.6;
+
 }
+
+
+
+
+
+/* =========================
+CONTENT
+========================= */
 
 
 .global-message-content {
-  color: #475569;
 
-  font-size: 14px;
-  line-height: 2;
 
-  text-align: right;
+    color:#475569;
 
-  overflow-wrap: anywhere;
+
+    font-size:14px;
+
+
+    line-height:2;
+
+
+    text-align:right;
+
+
+    overflow-wrap:anywhere;
+
 }
+
 
 
 .global-message-content p {
-  margin: 0;
 
-  text-align: center;
+    margin:0;
+
+    text-align:center;
+
 }
+
 
 
 .global-message-content ul {
-  margin: 0;
 
-  padding-right: 22px;
+    margin:0;
+
+    padding-right:22px;
+
 }
+
 
 
 .global-message-content li {
-  margin-bottom: 5px;
+
+    margin-bottom:5px;
+
 }
+
+
+
+
+
+/* =========================
+NORMAL ACTION BUTTON
+========================= */
 
 
 .global-message-action {
-  width: 100%;
 
-  margin-top: 22px;
 
-  padding:
-    11px
-    18px;
+    width:100%;
 
-  border: 0;
-  border-radius: 11px;
 
-  color: #ffffff;
+    margin-top:22px;
 
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 700;
 
-  cursor: pointer;
+    padding:
 
-  transition:
-    opacity 0.2s ease,
-    transform 0.15s ease;
+        11px
+        18px;
+
+
+    border:0;
+
+
+    border-radius:11px;
+
+
+    color:#ffffff;
+
+
+    font-family:inherit;
+
+
+    font-size:14px;
+
+
+    font-weight:700;
+
+
+    cursor:pointer;
+
+
+    transition:
+
+        opacity .2s ease,
+
+        transform .15s ease;
+
 }
+
 
 
 .global-message-action:hover {
-  opacity: 0.92;
+
+    opacity:.92;
+
 }
+
 
 
 .global-message-action:active {
-  transform: scale(0.98);
+
+    transform:scale(.98);
+
 }
+
+
+
 
 
 /* =========================
-   ERROR
-   ========================= */
+CONFIRM BUTTONS
+========================= */
 
-.global-message-error {
-  border-top:
-    5px solid
-    #dc2626;
+
+.global-message-actions {
+
+
+    display:flex;
+
+
+    justify-content:center;
+
+
+    align-items:center;
+
+
+    gap:14px;
+
+
+    margin-top:22px;
+
 }
 
 
-.global-message-error
-.global-message-icon {
-  background: #fee2e2;
-  color: #dc2626;
-}
+
+.global-message-actions button {
 
 
-.global-message-error
-.global-message-action {
-  background: #dc2626;
-}
+    min-width:90px;
 
-
-/* =========================
-   SUCCESS
-   ========================= */
-
-.global-message-success {
-  border-top:
-    5px solid
-    #16a34a;
-}
-
-
-.global-message-success
-.global-message-icon {
-  background: #dcfce7;
-  color: #16a34a;
-}
-
-
-.global-message-success
-.global-message-action {
-  background: #16a34a;
-}
-
-
-/* =========================
-   WARNING
-   ========================= */
-
-.global-message-warning {
-  border-top:
-    5px solid
-    #f59e0b;
-}
-
-
-.global-message-warning
-.global-message-icon {
-  background: #fef3c7;
-  color: #d97706;
-}
-
-
-.global-message-warning
-.global-message-action {
-  background: #d97706;
-}
-
-
-/* =========================
-   INFO
-   ========================= */
-
-.global-message-info {
-  border-top:
-    5px solid
-    #2563eb;
-}
-
-
-.global-message-info
-.global-message-icon {
-  background: #dbeafe;
-  color: #2563eb;
-}
-
-
-.global-message-info
-.global-message-action {
-  background: #2563eb;
-}
-
-
-/* =========================
-   MOBILE
-   ========================= */
-
-@media (max-width: 600px) {
-  .global-message-overlay {
-    padding: 14px;
-  }
-
-  .global-message-modal {
-    max-width: 100%;
 
     padding:
-      26px
-      20px
-      20px;
 
-    border-radius: 16px;
-  }
+        10px
+        28px;
 
-  .global-message-icon {
-    width: 56px;
-    height: 56px;
 
-    font-size: 28px;
-  }
+    border-radius:10px;
 
-  .global-message-title {
-    font-size: 18px;
-  }
 
-  .global-message-content {
-    font-size: 13px;
-  }
+    font-family:inherit;
+
+
+    font-size:14px;
+
+
+    font-weight:700;
+
+
+    cursor:pointer;
+
+
+    transition:
+
+        opacity .2s ease,
+
+        transform .15s ease;
+
+}
+
+
+
+.global-message-actions button:active {
+
+    transform:scale(.97);
+
+}
+
+
+
+
+.global-message-confirm {
+
+
+    background:#dc2626;
+
+
+    color:#fff;
+
+
+    border:1px solid #b91c1c;
+
+}
+
+
+
+.global-message-confirm:hover {
+
+    opacity:.9;
+
+}
+
+
+
+
+
+.global-message-cancel {
+
+
+    background:#f1f5f9;
+
+
+    color:#334155;
+
+
+    border:1px solid #cbd5e1;
+
+}
+
+
+
+.global-message-cancel:hover {
+
+    background:#e2e8f0;
+
+}
+
+
+
+
+
+/* =========================
+ERROR
+========================= */
+
+
+.global-message-error {
+
+    border-top:
+
+        5px solid
+        #dc2626;
+
+}
+
+
+
+.global-message-error
+.global-message-icon {
+
+
+    background:#fee2e2;
+
+    color:#dc2626;
+
+}
+
+
+
+.global-message-error
+.global-message-action {
+
+
+    background:#dc2626;
+
+}
+
+
+
+
+
+/* =========================
+SUCCESS
+========================= */
+
+
+.global-message-success {
+
+
+    border-top:
+
+        5px solid
+        #16a34a;
+
+}
+
+
+
+.global-message-success
+.global-message-icon {
+
+
+    background:#dcfce7;
+
+    color:#16a34a;
+
+}
+
+
+
+.global-message-success
+.global-message-action {
+
+
+    background:#16a34a;
+
+}
+
+
+
+
+
+/* =========================
+WARNING
+========================= */
+
+
+.global-message-warning {
+
+
+    border-top:
+
+        5px solid
+        #f59e0b;
+
+}
+
+
+
+.global-message-warning
+.global-message-icon {
+
+
+    background:#fef3c7;
+
+    color:#d97706;
+
+}
+
+
+
+.global-message-warning
+.global-message-action {
+
+
+    background:#d97706;
+
+}
+
+
+
+
+
+/* =========================
+INFO
+========================= */
+
+
+.global-message-info {
+
+
+    border-top:
+
+        5px solid
+        #2563eb;
+
+}
+
+
+
+.global-message-info
+.global-message-icon {
+
+
+    background:#dbeafe;
+
+    color:#2563eb;
+
+}
+
+
+
+.global-message-info
+.global-message-action {
+
+
+    background:#2563eb;
+
+}
+
+
+
+
+
+/* =========================
+CONFIRM STYLE
+========================= */
+
+
+.global-message-confirm {
+
+
+    border-top:
+
+        5px solid
+        #dc2626;
+
+}
+
+
+
+.global-message-confirm
+.global-message-icon {
+
+
+    background:#fee2e2;
+
+    color:#dc2626;
+
+}
+
+
+
+
+
+/* =========================
+MOBILE
+========================= */
+
+
+@media(max-width:600px){
+
+
+.global-message-overlay {
+
+    padding:14px;
+
+}
+
+
+
+
+.global-message-modal {
+
+
+    max-width:100%;
+
+
+    padding:
+
+        26px
+        20px
+        20px;
+
+
+    border-radius:16px;
+
+}
+
+
+
+
+.global-message-icon {
+
+
+    width:56px;
+
+
+    height:56px;
+
+
+    font-size:28px;
+
+}
+
+
+
+
+
+.global-message-title {
+
+
+    font-size:18px;
+
+}
+
+
+
+
+
+.global-message-content {
+
+
+    font-size:13px;
+
+}
+
+
+
+
+
+.global-message-actions {
+
+
+    flex-direction:column;
+
+
+    width:100%;
+
+}
+
+
+
+
+.global-message-actions button {
+
+
+    width:100%;
+
+}
+
+
 }

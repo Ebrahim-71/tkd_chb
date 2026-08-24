@@ -1,0 +1,1468 @@
+/* =========================================================
+   HOME OVERVIEW
+   Gallery + News/Circulars + Competitions + Stats
+========================================================= */
+
+.home-overview,
+.home-overview * {
+  box-sizing: border-box;
+}
+
+.home-overview {
+  --ov-dark: #03101d;
+  --ov-dark-2: #071d31;
+  --ov-gold: #e8ad1d;
+  --ov-gold-light: #f4c23c;
+  --ov-text: #132236;
+  --ov-muted: #8793a4;
+  --ov-border: #e2e8ef;
+
+  width: 100%;
+  padding: 46px 0 52px;
+  direction: rtl;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #f7f9fc 100%
+    );
+}
+
+.home-overview button {
+  font-family: inherit;
+}
+
+.home-overview-inner {
+  width: min(1540px, calc(100% - 48px));
+  margin: 0 auto;
+}
+
+
+/* =========================================================
+   TOP THREE-COLUMN AREA
+
+   LEFT   = competitions
+   CENTER = news/circulars
+   RIGHT  = gallery
+========================================================= */
+
+.home-overview-grid {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1.62fr)
+    minmax(300px, 0.90fr)
+    minmax(250px, 0.72fr);
+
+  grid-template-areas:
+    "competitions information gallery";
+
+  gap: 18px;
+
+  align-items: stretch;
+
+  direction: ltr;
+}
+
+
+/* مسابقات سمت چپ */
+.home-overview-competitions {
+  grid-area: competitions;
+
+  direction: rtl;
+}
+
+
+/* اخبار و اطلاعیه‌ها وسط */
+.home-overview-information {
+  grid-area: information;
+
+  direction: rtl;
+}
+
+
+/* گالری سمت راست */
+.home-overview-gallery {
+  grid-area: gallery;
+
+  direction: rtl;
+}
+
+/* =========================================================
+   COMMON PANELS
+========================================================= */
+
+.home-overview-gallery,
+.home-overview-information,
+.home-overview-competitions {
+  min-width: 0;
+  height: 430px;
+
+  padding: 16px;
+
+  border: 1px solid var(--ov-border);
+  border-radius: 18px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 12px 34px
+    rgba(25, 42, 64, 0.065);
+
+  direction: rtl;
+
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   PANEL TITLES
+========================================================= */
+
+.home-overview-title {
+  width: 100%;
+  height: 48px;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: flex-start;
+  justify-content: center;
+
+  gap: 2px;
+
+  margin: 0 0 10px;
+
+  text-align: right;
+}
+
+.home-overview-title > span {
+  display: block;
+
+  margin: 0;
+
+  color: #bd8610;
+
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1.4;
+}
+
+.home-overview-title > strong {
+  display: block;
+
+  margin: 0;
+
+  color: var(--ov-text);
+
+  font-size: 15px;
+  font-weight: 1000;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   GALLERY
+========================================================= */
+
+.home-overview-gallery {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-overview-gallery-box {
+  position: relative;
+
+  width: 100%;
+  height: calc(100% - 58px);
+
+  flex: 1;
+
+  overflow: hidden;
+
+  border-radius: 14px;
+
+  background:
+    radial-gradient(
+      circle at 50% 40%,
+      rgba(34, 105, 168, 0.22),
+      transparent 45%
+    ),
+    #071d31;
+}
+
+.home-overview-gallery-slide {
+  position: absolute;
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  opacity: 0;
+
+  transition:
+    opacity 0.8s ease;
+}
+
+.home-overview-gallery-slide.is-active {
+  opacity: 1;
+}
+
+.home-overview-gallery-slide img {
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  object-fit: cover;
+  object-position: center;
+}
+
+
+/* Gallery arrows */
+
+.home-overview-gallery-arrow {
+  position: absolute;
+
+  top: 50%;
+  z-index: 8;
+
+  width: 32px;
+  height: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  transform: translateY(-50%);
+
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 50%;
+
+  background: rgba(2, 12, 23, 0.66);
+
+  color: #ffffff;
+
+  font-size: 20px;
+  line-height: 1;
+
+  cursor: pointer;
+
+  backdrop-filter: blur(7px);
+}
+
+.home-overview-gallery-arrow.is-right {
+  right: 9px;
+}
+
+.home-overview-gallery-arrow.is-left {
+  left: 9px;
+}
+
+
+/* Gallery dots */
+
+.home-overview-gallery-dots {
+  position: absolute;
+
+  right: 0;
+  bottom: 13px;
+  left: 0;
+
+  z-index: 8;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 5px;
+}
+
+.home-overview-gallery-dots button {
+  width: 6px;
+  height: 6px;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.56);
+
+  cursor: pointer;
+
+  transition:
+    width 0.25s ease,
+    background 0.25s ease;
+}
+
+.home-overview-gallery-dots button.is-active {
+  width: 22px;
+
+  background: var(--ov-gold);
+}
+
+
+/* =========================================================
+   NEWS + CIRCULARS
+========================================================= */
+
+.home-overview-information {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-information-list {
+  width: 100%;
+
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+.home-information-item {
+  width: 100%;
+  min-height: 61px;
+
+  flex: 1;
+
+  display: grid;
+
+  grid-template-columns:
+    62px minmax(0, 1fr) 18px;
+
+  align-items: center;
+
+  gap: 9px;
+
+  padding: 7px 4px;
+
+  border: 0;
+  border-bottom: 1px solid #edf1f5;
+
+  background: transparent;
+
+  color: inherit;
+
+  direction: rtl;
+
+  text-align: right;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.home-information-item:last-child {
+  border-bottom: 0;
+}
+
+.home-information-item:hover {
+  transform: translateX(-3px);
+
+  border-radius: 9px;
+
+  background: #f7f9fc;
+}
+
+.home-information-thumb {
+  width: 62px;
+  height: 48px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  overflow: hidden;
+
+  border-radius: 8px;
+
+  background: #071827;
+}
+
+.home-information-thumb img {
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  object-fit: cover;
+}
+
+.home-information-thumb span {
+  font-size: 18px;
+}
+
+.home-information-text {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: flex-start;
+
+  text-align: right;
+}
+
+.home-information-text > span {
+  display: block;
+
+  margin-bottom: 3px;
+
+  font-size: 7px;
+  font-weight: 900;
+}
+
+.home-information-text > span.is-news {
+  color: #2570ca;
+}
+
+.home-information-text > span.is-circular {
+  color: #c38a0d;
+}
+
+.home-information-text strong {
+  width: 100%;
+
+  display: -webkit-box;
+
+  overflow: hidden;
+
+  color: #26354a;
+
+  font-size: 9px;
+  font-weight: 900;
+
+  line-height: 1.8;
+
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.home-information-item > b {
+  color: #aab4c1;
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   COMPETITIONS PANEL
+========================================================= */
+
+.home-overview-competitions {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-overview-competitions > .home-overview-title {
+  flex: 0 0 48px;
+}
+
+
+/* =========================================================
+   THREE CARDS
+========================================================= */
+
+.home-overview-comp-grid {
+  width: 100%;
+
+  flex: 1;
+
+  min-height: 0;
+}
+
+
+.home-competitions-pagination {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+  flex-direction: column;
+
+  min-width: 0;
+}
+
+
+.home-competitions-pagination
+.paginated-list-items {
+  width: 100%;
+
+  flex: 1;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 11px;
+
+  align-items: stretch;
+
+  min-height: 0;
+}
+
+/* =========================================================
+   COMPETITION CARD
+========================================================= */
+
+.home-overview-comp-card {
+  min-width: 0;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  border: 1px solid #e4e9ef;
+  border-radius: 12px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 6px 18px
+    rgba(25, 43, 66, 0.055);
+
+  transition:
+    transform 0.23s ease,
+    box-shadow 0.23s ease,
+    border-color 0.23s ease;
+}
+
+.home-overview-comp-card:hover {
+  transform: translateY(-4px);
+
+  border-color: rgba(232, 173, 29, 0.55);
+
+  box-shadow:
+    0 13px 26px
+    rgba(25, 43, 66, 0.11);
+}
+
+
+/* image */
+
+.home-overview-comp-image {
+  position: relative;
+
+  width: 100%;
+  height: 145px;
+
+  flex: 0 0 145px;
+
+  overflow: hidden;
+
+  background: #071827;
+}
+
+.home-overview-comp-image img {
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  object-fit: cover;
+  object-position: center;
+}
+
+.home-overview-comp-placeholder {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 31px;
+}
+
+
+/* finished dim */
+
+.home-overview-comp-card.is-finished
+.home-overview-comp-image img {
+  filter:
+    saturate(0.55)
+    brightness(0.78);
+}
+
+
+/* =========================================================
+   STATUS BADGE
+========================================================= */
+
+.home-overview-comp-status {
+  position: absolute;
+
+  top: 8px;
+  right: 8px;
+
+  z-index: 3;
+
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  min-height: 22px;
+
+  padding: 0 8px;
+
+  border-radius: 999px;
+
+  font-size: 7px;
+  font-weight: 1000;
+
+  white-space: nowrap;
+}
+
+.home-overview-comp-status.status-registration_open {
+  background: #e2f7ea;
+  color: #16854a;
+}
+
+.home-overview-comp-status.status-upcoming {
+  background: #e5efff;
+  color: #2767c5;
+}
+
+.home-overview-comp-status.status-ongoing {
+  background: #fff0c9;
+  color: #996a00;
+}
+
+.home-overview-comp-status.status-finished {
+  background: rgba(28, 40, 52, 0.90);
+  color: #ffffff;
+}
+
+
+/* =========================================================
+   CARD BODY
+========================================================= */
+
+.home-overview-comp-body {
+  min-height: 0;
+
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+
+  padding: 10px;
+}
+
+.home-overview-comp-type {
+  display: block;
+
+  color: #c1880d;
+
+  font-size: 7px;
+  font-weight: 900;
+}
+
+.home-overview-comp-body h3 {
+  min-height: 38px;
+
+  display: -webkit-box;
+
+  overflow: hidden;
+
+  margin: 4px 0 7px;
+
+  color: #19283c;
+
+  font-size: 9px;
+  font-weight: 950;
+
+  line-height: 1.8;
+
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.home-overview-comp-meta {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 3px;
+
+  margin-bottom: 8px;
+}
+
+.home-overview-comp-meta span {
+  display: block;
+
+  overflow: hidden;
+
+  color: #8d98a8;
+
+  font-size: 7px;
+
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+
+/* detail button */
+
+.home-overview-comp-body > button {
+  width: 100%;
+  min-height: 30px;
+
+  margin-top: auto;
+
+  padding: 0 7px;
+
+  border: 1px solid #dee4eb;
+  border-radius: 7px;
+
+  background: #ffffff;
+
+  color: #243348;
+
+  font-size: 7px;
+  font-weight: 900;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.home-overview-comp-body > button:hover {
+  border-color: #071827;
+
+  background: #071827;
+
+  color: #ffffff;
+}
+
+
+/* =========================================================
+   NUMERIC PAGINATION
+========================================================= */
+
+.home-comp-pagination {
+  width: 100%;
+  height: 45px;
+
+  flex: 0 0 45px;
+
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+
+  gap: 6px;
+
+  padding-top: 11px;
+
+  direction: rtl;
+}
+
+.home-comp-pagination button {
+  width: 29px;
+  height: 29px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #dce2e9;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #6a7686;
+
+  font-size: 9px;
+  font-weight: 900;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.home-comp-pagination button:hover {
+  transform: translateY(-2px);
+
+  border-color: var(--ov-gold);
+}
+
+.home-comp-pagination button.is-active {
+  border-color: var(--ov-gold);
+
+  background:
+    linear-gradient(
+      135deg,
+      #df9e12,
+      #f4c139
+    );
+
+  color: #101c2a;
+
+  box-shadow:
+    0 5px 14px
+    rgba(223, 158, 18, 0.27);
+}
+
+
+/* =========================================================
+   EMPTY
+========================================================= */
+
+.home-overview-empty {
+  position: absolute;
+  inset: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+
+  color: rgba(255, 255, 255, 0.62);
+
+  font-size: 9px;
+  font-weight: 700;
+
+  text-align: center;
+}
+
+.home-overview-empty.small {
+  position: static;
+
+  min-height: 80px;
+
+  color: #8b96a5;
+}
+
+
+/* =========================================================
+   STATS BAR
+========================================================= */
+
+.home-overview-stats {
+  width: 100%;
+  height: 118px;
+
+  margin-top: 20px;
+
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  overflow: hidden;
+
+  border: 1px solid rgba(255, 255, 255, 0.05);
+
+  border-radius: 17px;
+
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(35, 83, 124, 0.17),
+      transparent 40%
+    ),
+    linear-gradient(
+      135deg,
+      #020d18 0%,
+      #051726 55%,
+      #071d30 100%
+    );
+
+  box-shadow:
+    0 18px 42px
+    rgba(3, 15, 28, 0.20);
+
+  direction: rtl;
+}
+
+
+/* =========================================================
+   STAT ITEM
+========================================================= */
+
+.home-overview-stat {
+  position: relative;
+
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 2px;
+
+  padding: 14px 12px;
+
+  text-align: center;
+}
+
+
+/* separators */
+
+.home-overview-stat:not(:last-child)::after {
+  content: "";
+
+  position: absolute;
+
+  top: 25%;
+  left: 0;
+
+  width: 1px;
+  height: 50%;
+
+  background:
+    rgba(255, 255, 255, 0.10);
+}
+
+
+/* =========================================================
+   FEATURED PLAYER - GOLD
+========================================================= */
+
+.home-overview-stat.is-featured {
+  z-index: 2;
+
+  margin: 0 -1px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #b77b08 0%,
+      #d69711 30%,
+      #eeb72d 66%,
+      #ca8c0d 100%
+    );
+
+  clip-path:
+    polygon(
+      10px 0,
+      calc(100% - 10px) 0,
+      100% 12px,
+      100% 100%,
+      0 100%,
+      0 12px
+    );
+
+  box-shadow:
+    inset 0 0 30px
+    rgba(255, 255, 255, 0.12);
+}
+
+.home-overview-stat.is-featured::after {
+  display: none;
+}
+
+
+/* =========================================================
+   STAT ICON
+========================================================= */
+
+.home-overview-stat-icon {
+  width: 35px;
+  height: 35px;
+
+  flex: 0 0 35px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 0;
+
+  background: transparent;
+}
+
+.home-overview-stat-icon svg {
+  width: 25px;
+  height: 25px;
+
+  fill: none;
+
+  stroke: var(--ov-gold);
+
+  stroke-width: 1.5;
+
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.home-overview-stat.is-featured
+.home-overview-stat-icon svg {
+  stroke: #fff3c7;
+}
+
+
+/* =========================================================
+   STAT TEXT
+========================================================= */
+
+.home-overview-stat-text {
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+
+  gap: 4px;
+}
+
+.home-overview-stat-text span {
+  order: 1;
+
+  color: rgba(255, 255, 255, 0.62);
+
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.home-overview-stat-text strong {
+  order: 2;
+
+  color: #ffffff;
+
+  font-size: 24px;
+  font-weight: 1000;
+
+  line-height: 1;
+}
+
+.home-overview-stat.is-featured
+.home-overview-stat-text span,
+.home-overview-stat.is-featured
+.home-overview-stat-text strong {
+  color: #ffffff;
+}
+
+
+
+
+.home-competitions-pagination
+.pagination-controls {
+  flex: 0 0 auto;
+
+  width: 100%;
+
+  margin: 14px 0 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 6px;
+
+  direction: rtl;
+}
+
+/* =========================================================
+   LAPTOP
+========================================================= */
+
+@media (max-width: 1250px) {
+
+  .home-overview-inner {
+    width: calc(100% - 32px);
+  }
+
+  .home-overview-grid {
+    grid-template-columns:
+      minmax(0, 1.45fr)
+      minmax(270px, 0.85fr)
+      minmax(225px, 0.70fr);
+  }
+
+  .home-overview-gallery,
+  .home-overview-information,
+  .home-overview-competitions {
+    height: 400px;
+  }
+
+  .home-overview-comp-image {
+    height: 125px;
+    flex-basis: 125px;
+  }
+
+}
+
+
+/* =========================================================
+   TABLET
+========================================================= */
+
+@media (max-width: 1100px) {
+
+  .home-competitions-pagination
+  .paginated-list-items {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+
+
+  .home-overview-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+
+    grid-template-areas:
+      "information gallery"
+      "competitions competitions";
+
+    gap: 14px;
+  }
+
+
+  .home-overview-gallery {
+    grid-area: gallery;
+  }
+
+
+  .home-overview-information {
+    grid-area: information;
+  }
+
+
+  .home-overview-competitions {
+    grid-area: competitions;
+
+    height: auto;
+
+    min-height: 430px;
+  }
+
+
+  .home-overview-comp-image {
+    height: 150px;
+
+    flex-basis: 150px;
+  }
+
+
+  .home-overview-stats {
+    height: auto;
+
+    min-height: 210px;
+
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+
+
+  .home-overview-stat {
+    min-height: 105px;
+  }
+
+
+  .home-overview-stat.is-featured {
+    clip-path: none;
+  }
+
+
+  .home-overview-comp-image {
+    height: 150px;
+    flex-basis: 150px;
+  }
+
+
+  .home-overview-stats {
+    height: auto;
+    min-height: 210px;
+
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+
+
+  .home-overview-stat {
+    min-height: 105px;
+  }
+
+
+  .home-overview-stat.is-featured {
+    clip-path: none;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 680px) {
+
+  .home-overview {
+    padding:
+      30px 0 36px;
+  }
+
+
+  .home-overview-inner {
+    width: calc(100% - 20px);
+  }
+
+
+  .home-overview-grid {
+    display: flex;
+    flex-direction: column;
+
+    gap: 14px;
+  }
+
+
+  /* ترتیب موبایل */
+
+  .home-overview-gallery {
+    order: 1;
+  }
+
+
+  .home-overview-information {
+    order: 2;
+  }
+
+
+  .home-overview-competitions {
+    order: 3;
+  }
+
+
+  .home-overview-gallery,
+  .home-overview-information {
+    width: 100%;
+    height: 360px;
+  }
+
+
+  .home-overview-competitions {
+    width: 100%;
+
+    height: auto;
+    min-height: 0;
+  }
+
+
+  .home-overview-gallery-box {
+    min-height: 280px;
+  }
+
+
+  /*
+   * هر صفحه همچنان 3 مسابقه دارد
+   * ولی روی موبایل زیر هم هستند.
+   */
+
+  .home-competitions-pagination
+  .paginated-list-items {
+    grid-template-columns: 1fr;
+
+    gap: 12px;
+  }
+
+
+  .home-overview-comp-card {
+    min-height: 330px;
+  }
+
+
+  .home-overview-comp-image {
+    height: 185px;
+    flex-basis: 185px;
+  }
+
+
+  .home-overview-comp-body h3 {
+    font-size: 11px;
+  }
+
+
+  .home-overview-comp-meta span {
+    font-size: 8px;
+  }
+
+
+  .home-overview-comp-body > button {
+    min-height: 36px;
+
+    font-size: 8px;
+  }
+
+
+  .home-comp-pagination {
+    height: 51px;
+
+    align-items: center;
+  }
+
+
+  .home-overview-stats {
+    height: auto;
+
+    grid-template-columns:
+      repeat(2, 1fr);
+
+    border-radius: 14px;
+  }
+
+
+  .home-overview-stat {
+    min-height: 100px;
+  }
+
+
+  .home-overview-stat.is-featured {
+    margin: 0;
+
+    clip-path: none;
+  }
+
+
+  .home-overview-stat-icon svg {
+    width: 21px;
+    height: 21px;
+  }
+
+
+  .home-overview-stat-text strong {
+    font-size: 19px;
+  }
+
+}
+
+
+/* =========================================================
+   SMALL MOBILE
+========================================================= */
+
+@media (max-width: 390px) {
+
+  .home-overview-gallery,
+  .home-overview-information {
+    height: 330px;
+  }
+
+
+  .home-overview-gallery-box {
+    min-height: 250px;
+  }
+
+
+  .home-comp-pagination {
+    gap: 4px;
+
+    overflow-x: auto;
+
+    justify-content: flex-start;
+
+    padding-right: 4px;
+    padding-left: 4px;
+  }
+
+
+  .home-comp-pagination button {
+    flex: 0 0 28px;
+
+    width: 28px;
+    height: 28px;
+  }
+
+}
+
+/* =========================================================
+   CLICKABLE STAT - COACHES
+========================================================= */
+
+.home-overview-stat.is-clickable {
+  cursor: pointer;
+
+  user-select: none;
+
+  transition:
+    transform .22s ease,
+    background .22s ease,
+    box-shadow .22s ease;
+}
+
+
+.home-overview-stat.is-clickable:hover {
+  transform:
+    translateY(-3px);
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      .055
+    );
+}
+
+
+.home-overview-stat.is-clickable:active {
+  transform:
+    translateY(0)
+    scale(.985);
+}
+
+
+.home-overview-stat.is-clickable:focus-visible {
+  outline:
+    2px solid #e7ad1e;
+
+  outline-offset:
+    -4px;
+}
+
+
+.home-stat-link-hint {
+  display: block;
+
+  margin-top: 6px;
+
+  color:
+    #e7ad1e;
+
+  font-size: 7px;
+
+  font-weight: 800;
+
+  opacity: .75;
+
+  transition:
+    opacity .2s ease,
+    transform .2s ease;
+}
+
+
+.home-overview-stat.is-clickable:hover
+.home-stat-link-hint {
+  opacity: 1;
+
+  transform:
+    translateY(-1px);
+}
